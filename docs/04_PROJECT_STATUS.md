@@ -52,21 +52,21 @@
 - S1-03 稳定恢复点：commit `a503ef13a90977a3061d5f3bba892fd2b47e9d02`，tree `66c53e52a11f1ba2f4e688e5144d49b24924be46`。
 - 后续 Flag 约束：Scene/UI 必须调用集中领域转换并消费结构化 Result，不得直接修改 Board；UI、音效与持久化等副作用只能根据真实 transition result 决定，`unchanged` 不得被当作状态变化；Flag 对移动合法性的影响留给后续移动规则；外部 JSON/存档恢复仍须经过运行时验证。
 - S1-04 前置产品/技术边界（产品经理批准，2026-09-04）：Hidden Mine 是允许尝试进入但必须返回 `requires-resolution / mine-encounter` 的目标，不是普通 `not-movable`；S1-04 不揭示雷、不判定失败、不处理 Lucky/Revive，也不把角色位置永久提交到该雷。普通移动可选择任意合法坐标，不要求相邻、路径或寻路；Flag 无论真假均作为移动安全锁。
-- S1-04 当前门禁：**NEEDS DECISION**。冻结规格同时规定“安全格实际走过才算已探索”和“当前安全格是角色所在位置”；若普通 Safe 移动只更新角色位置而不更新 `explored`，权威状态会自相矛盾；若拆成后续独立提交，则破坏移动状态的原子一致性。S1-04 在产品经理决定是否允许普通 Safe 成功移动原子更新最小 Run State 中的位置与目标 Safe 的 explored 状态前，不得开始实现。
+- S1-04 原子边界（产品经理批准，2026-09-04）：普通 Safe 移动在同一纯转换中原子更新最小 `RunState { board, characterPosition }`；未探索目标 Safe 同时转为 explored，已探索目标只更新位置，不允许出现角色已位于 Safe 而该 Cell 仍未 explored 的中间状态。角色开局位置为明确的 `outside-board / waiting`，不得用非法 Coordinate 伪装；首次 Hidden Mine encounter 不提交位置。
 
 ## 当前阶段
 
 **STAGE 1 IN PROGRESS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03 已通过自动门禁和产品经理人工验收；S1-04 因普通 Safe 移动与首次探索的原子边界等待产品经理决定；Stage 1 尚未整体 PASS。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03 已通过自动门禁和产品经理人工验收；S1-04 的移动/探索原子边界与 waiting 初始位置已经产品经理批准，当前执行 S1-04；Stage 1 尚未整体 PASS。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-04 — 决定普通 Safe 移动与首次 explored 的原子边界。**
+**Stage 1 / Task S1-04 — 角色位置与普通移动目标合法性纯规则。**
 
-待产品经理决定：是否批准普通 Safe 移动成功时，在同一个不可变领域转换中原子更新最小 `RunState` 的角色位置，并将未探索目标 Safe 转为 explored。推荐批准；这是保持“走过即探索”与权威状态一致所需的最小边界，不包含数字、胜利、奖励、存档或表现层。
+目标：在 `core` 层建立明确区分 waiting/on-board 的最小权威角色位置、最小 Run State，以及普通移动命令的集中不可变目标合法性与结构化结果；Safe 成功移动原子提交位置和必要的 explored 转换。
 
-已冻结且无需重议：Hidden Mine 返回 requires-resolution 且不改变位置/雷状态；未探索或已探索 Safe 可普通移动；Flagged Safe/Mine、Obstacle、Revealed Mine 与越界目标拒绝；原地目标 unchanged；任意合法目标不受距离、邻域、路径或中间障碍限制。在上述 explored 原子边界获批前，状态为 NEEDS DECISION，不得实现 S1-04 或执行 S1-05。
+边界：Hidden Mine 返回 requires-resolution 且不改变位置/雷状态；未探索或已探索 Safe 可普通移动；Flagged Safe/Mine、Obstacle、Revealed Mine 与越界目标拒绝；原地目标 unchanged；任意合法目标不受距离、邻域、路径或中间障碍限制。不得实现数字、胜负、奖励、存档、动画、UI、Lucky、Revive 或其他后续逻辑；不得执行 S1-05。
 
 ## 最近完成任务
 
@@ -189,11 +189,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03 已通过自动门
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-S1-04 当前为 NEEDS DECISION。请决定是否批准：普通 Safe 移动成功时，在同一个不可变领域转换中原子更新最小 Run State 的角色位置，并将未探索目标 Safe 转为 explored。
-
-推荐批准。原因是冻结规格要求安全格实际走过才算已探索；只更新位置会产生矛盾权威状态，拆成两个提交会破坏移动的原子一致性。Hidden Mine requires-resolution、Flag 安全锁、任意合法目标距离以及全部禁止范围已经冻结，无需重议。
-
-在产品经理明确决定前，不实现 S1-04，不执行 S1-05。
+请只执行 S1-04：建立 waiting/on-board 角色位置、最小 Run State 和普通移动纯规则。Safe 成功移动必须原子更新位置及必要的 explored；Hidden Mine 返回 requires-resolution 且不提交状态；各类拒绝与 unchanged 不携带伪造的新状态。完成本地与 Linux 完整门禁后停止等待人工验收，不执行 S1-05。
 ```
 
 ## 阶段看板
@@ -201,7 +197,7 @@ S1-04 当前为 NEEDS DECISION。请决定是否批准：普通 Safe 移动成�
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | IN PROGRESS（S1-01/S1-02/S1-03 PASS；S1-04 NEEDS DECISION） | Stage 0 PASS |
+| 1 | 核心棋盘 | IN PROGRESS（S1-01/S1-02/S1-03 PASS；S1-04 IN PROGRESS） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
