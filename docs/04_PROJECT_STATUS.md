@@ -56,6 +56,8 @@
 - Stage 1 / Task S1-04 角色位置与普通移动目标合法性纯规则：产品经理人工验收 PASS（2026-09-04）。
 - S1-04 稳定恢复点：commit `f813f0058e0ca644a81679638718d64166e25e09`，tree `c1b13c007bcaa5ff450fcff67de7609cf647b499`。
 - 后续移动约束：未来 Revive 的临时 Revealed Mine 站立必须使用明确特殊领域状态，不得放宽普通 `on-board -> explored Safe` 不变量；Hidden Mine 的最终 encounter/resolution 必须由后续集中规则完成；Scene/UI 只能消费 `moveCharacter` 结构化结果，不得自行移动权威位置；外部 JSON/Save 恢复 RunState 必须运行时验证。
+- S1-05 产品/技术边界（产品经理批准，2026-09-04）：Hidden Mine 最终优先级固定为 Lucky 自动结算 > Revive 玩家选择 > Failure；S1-05 只建立权威 pending encounter、first-step 最小事实与无救济介入时的基础 failure 边界，不实现 Lucky/Revive 库存、消耗、选择、揭雷、道具、存档或 UI。
+- S1-05 编排约束：pending encounter 期间普通移动必须拒绝；现有 `setFlagged(board, ...)` 不为本 Task 大改，未来 orchestration 必须阻止 Flag 或其他命令绕过/丢失 pending encounter。
 
 ## 当前阶段
 
@@ -69,7 +71,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03、S1-04 已通过�
 
 目标：在 `core` 层承接 `moveCharacter` 的 `requires-resolution: hidden-mine`，建立唯一、显式、不可变且可测试的 Hidden Mine encounter 待结算状态与基础失败边界，避免 Scene/UI 或未来道具各自复制踩雷规则。
 
-边界：开始实现前必须依据冻结规格明确“待结算 encounter”“无保护时失败”以及未来 Lucky 优先、Revive 选择的组合边界；若不能在不提前实现 Stage 3 道具的前提下保持统一规则入口，停止并提交 NEEDS DECISION。不得实现 UI、动画、存档、奖励、胜利、正式 Lucky/Revive 道具库存或其他后续 Task；不得自动执行 S1-06。
+边界：Hidden Mine 优先级已冻结为 Lucky 自动结算 > Revive 玩家选择 > Failure。本 Task 只实现 pending encounter 身份、可靠 first-step 事实、pending 期间移动锁和无救济介入时的基础 failure；Board、mine 与角色位置保持 encounter 前事实。不得实现 UI、动画、存档、奖励、胜利、Lucky/Revive 库存或消耗、揭雷、Revive 选择/站雷及其他后续 Task；不得自动执行 S1-06。
 
 ## 最近完成任务
 
@@ -204,7 +206,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03、S1-04 已通过�
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档和现有 core 状态，只执行 Stage 1 / Task S1-05：Hidden Mine Encounter 的待结算状态与基础失败边界。先明确它与未来 Lucky 优先、Revive 选择的组合边界；若不能在不提前实现 Stage 3 道具的情况下保持统一规则入口，停止为 NEEDS DECISION。不得实现 UI、动画、存档、奖励、胜利或后续 Task。
+请读取最新控制文档和现有 core 状态，只执行 Stage 1 / Task S1-05：Hidden Mine Encounter 的待结算状态与基础失败边界。实现权威 pending encounter、可靠 first-step 事实、pending 移动锁与无救济介入时的基础 failure；不实现 Lucky/Revive、揭雷、存档、UI 或后续 Task。
 ```
 
 ## 阶段看板

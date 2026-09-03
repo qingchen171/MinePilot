@@ -4,14 +4,30 @@ import {
   replaceCellAt,
   type Coordinate,
 } from './board';
-import { createOnBoardPosition, createRunState, type RunState } from './run';
+import {
+  createOnBoardPosition,
+  createPendingMineEncounterRunState,
+  createRunState,
+  type MineEncounter,
+  type RunState,
+} from './run';
 
 export type MoveCharacterResult =
   | { readonly outcome: 'moved'; readonly state: RunState }
-  | { readonly outcome: 'requires-resolution'; readonly encounter: 'hidden-mine' }
+  | {
+      readonly outcome: 'requires-resolution';
+      readonly encounter: MineEncounter;
+      readonly state: RunState;
+    }
   | {
       readonly outcome: 'rejected';
-      readonly reason: 'out-of-bounds' | 'flagged' | 'obstacle' | 'revealed-mine';
+      readonly reason:
+        | 'out-of-bounds'
+        | 'flagged'
+        | 'obstacle'
+        | 'revealed-mine'
+        | 'pending-mine-encounter'
+        | 'run-failed';
     }
   | { readonly outcome: 'unchanged'; readonly reason: 'already-at-target' };
 
@@ -20,6 +36,11 @@ function coordinatesEqual(left: Coordinate, right: Coordinate): boolean {
 }
 
 export function moveCharacter(run: RunState, target: Coordinate): MoveCharacterResult {
+  if (run.phase.kind === 'pending-mine-encounter') {
+    return { outcome: 'rejected', reason: 'pending-mine-encounter' };
+  }
+  if (run.phase.kind === 'failed') return { outcome: 'rejected', reason: 'run-failed' };
+
   const targetCell = getCellAt(run.board, target);
   if (targetCell === undefined) return { outcome: 'rejected', reason: 'out-of-bounds' };
 
@@ -35,9 +56,15 @@ export function moveCharacter(run: RunState, target: Coordinate): MoveCharacterR
   }
   if (targetCell.kind === 'obstacle') return { outcome: 'rejected', reason: 'obstacle' };
   if (targetCell.kind === 'mine') {
-    return targetCell.revelation === 'revealed'
-      ? { outcome: 'rejected', reason: 'revealed-mine' }
-      : { outcome: 'requires-resolution', encounter: 'hidden-mine' };
+    if (targetCell.revelation === 'revealed') {
+      return { outcome: 'rejected', reason: 'revealed-mine' };
+    }
+
+    const state = createPendingMineEncounterRunState(run, target);
+    if (state.phase.kind !== 'pending-mine-encounter') {
+      throw new Error('Pending mine encounter state was not created.');
+    }
+    return { outcome: 'requires-resolution', encounter: state.phase.encounter, state };
   }
 
   const nextBoard =
@@ -59,6 +86,6 @@ export function moveCharacter(run: RunState, target: Coordinate): MoveCharacterR
 
   return {
     outcome: 'moved',
-    state: createRunState(nextBoard, createOnBoardPosition(target)),
+    state: createRunState(nextBoard, createOnBoardPosition(target), { hasTakenStep: true }),
   };
 }

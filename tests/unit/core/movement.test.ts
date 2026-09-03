@@ -128,9 +128,11 @@ describe('ordinary movement transitions', () => {
   });
 
   it('returns requires-resolution for an unflagged hidden mine', () => {
-    expect(moveCharacter(createWaitingRunState(boardOf(mine())), createCoordinate(0, 0))).toEqual({
+    const result = moveCharacter(createWaitingRunState(boardOf(mine())), createCoordinate(0, 0));
+
+    expect(result).toMatchObject({
       outcome: 'requires-resolution',
-      encounter: 'hidden-mine',
+      encounter: { target: { x: 0, y: 0 }, occurredOnFirstStep: true },
     });
   });
 
@@ -143,7 +145,8 @@ describe('ordinary movement transitions', () => {
     expect(getCellAt(run.board, createCoordinate(0, 0))).toBe(hiddenMine);
     expect(hiddenMine).toEqual({ kind: 'mine', revelation: 'hidden', flagged: false });
     expect(run.characterPosition).toEqual({ kind: 'waiting' });
-    expect('state' in result).toBe(false);
+    expect(result.outcome === 'requires-resolution' && result.state).not.toBe(run);
+    expect(result.outcome === 'requires-resolution' && result.state.board).toBe(run.board);
   });
 
   it('rejects entering a revealed mine', () => {
