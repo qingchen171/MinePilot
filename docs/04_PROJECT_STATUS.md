@@ -3,7 +3,7 @@
 **项目：MinePilot / Minesweeper Product**  
 **状态更新时间：2026-09-04**  
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：尚未开始**
+**正式游戏代码：Stage 1 core implementation 已建立并通过 S1-01 至 S1-10 人工验收；Stage 1 尚未 Freeze**
 
 ## 当前事实
 
@@ -80,20 +80,27 @@
 - S1-10 稳定恢复点：commit `02b7bdef83de84c4eb2be9688d6aacd398539dd4`，tree `a307c69ff8c47c335145bb8819567d5218f02c9e`。
 - Board 生成路径边界：`strategy -> candidates -> S1-09 placement -> S1-10 assembly -> BoardState`；S1-10 只组装上游已明确的 dimensions、Obstacle coordinates 与 Mine coordinates，不承担生成策略。
 - 外部 Board 恢复路径边界：`unknown external Board data -> S1-08 validator -> BoardState`；生成路径与外部输入路径最终都必须汇聚到现有 `createCellState` / `createBoard` 权威模型，不得新增第二套 GeneratedBoard/MineCell/ObstacleCell 权威模型。
+- Stage 1 / Task S1-11 核心闭环审计与剩余任务冻结：产品经理人工验收 PASS（2026-09-04）；Recovery Test PASS，可仅依赖正式资料恢复 Stage、已完成 Tasks、稳定 baseline、Stage boundary 与 Next Action。
+- S1-11 审计 baseline：commit `7da1bf369e62d12c99cb714372c9724fd5676f4e`；source code changes `0`，tests changes `0`；审计期间本地 `npm run quality` PASS，Vitest 14 files、237/237 PASS。
+- Stage 1 剩余范围冻结：S1-12 是唯一剩余 gameplay implementation blocker；S1-13 是 S1-12 后的 Stage 1 Core lifecycle integration 与 Freeze Gate。除非测试暴露新的真实 blocker，不得继续扩张 Stage 1。
+- 审计缺口：Board-level `setFlagged` 尚无 Run lifecycle gate；当前也缺少从 Initial Board 贯穿 Safe movement、number query、Flag、Hidden Mine/Failure 与 Victory 的完整 core lifecycle integration evidence。
+- 最小架构约束：S1-12 只需建立窄的 Run-level Flag command 并复用现有 `setFlagged` / `RunState`；不得引入 Command Bus、GameManager、DI、event bus 或通用 orchestration framework。
+- Deferred-by-design 边界：Save/Retry 属于 Stage 2；Lucky/Revive/Detection/Airplane 属于 Stage 3；Rewards/Inventory/Shop/Tutorial/Benben/Level progression 属于 Stage 4；presentation/UI/animation/audio 属于 Stage 5。不得把这些功能重新拉入 Stage 1。
+- `createRunState` 及完整 Run lifecycle 的外部 Save runtime validation 属于 Stage 2；Phaser bundle >500 KB 继续仅为 observation，不是 Stage 1 blocker。
 
 ## 当前阶段
 
 **STAGE 1 IN PROGRESS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-10 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS，必须先审计剩余闭环缺口再冻结后续实现任务。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-11 已通过自动门禁或只读审计门禁及产品经理人工验收；Stage 1 保持 IN PROGRESS。S1-12 与 S1-13 完成并人工 PASS 前不得 Freeze 或进入 Stage 2。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-11 — Stage 1 核心闭环审计与剩余任务冻结（只读）。**
+**Stage 1 / Task S1-12 — Run-level Flag 命令与生命周期门禁。**
 
-目标：对照 MVP Specification、Stage 1 门禁和 S1-01 至 S1-10 已冻结 core，确认距离“无美术依赖的基本玩法完整可玩”仍缺哪些领域能力、集成边界与测试，并把每个剩余能力拆成可单独人工验收的后续 Task 合同。
+目标：建立最小 Run-level Flag command；仅在 active Run 中复用现有 Board-level `setFlagged`，成功时不可变地产生保留角色位置、`hasTakenStep` 与 phase 的新 `RunState`，并在 pending/failed/won Run 中结构化拒绝 Flag 命令。
 
-边界：本 Task 只读，不写代码、不实现玩法、不改变冻结规则、不进入 Stage 2。若审计发现需要新的产品决策，必须列为 `NEEDS DECISION`；未经产品经理批准不得开始任何审计后提出的实现 Task。
+边界：不修改现有 Board-level Flag 事实规则，不实现 UI/右键/触摸、Save/Retry、道具、奖励、关卡或表现层；不引入 Command Bus、GameManager、DI、event bus 或通用 orchestration framework；不得执行 S1-13。
 
 ## 最近完成任务
 
@@ -296,12 +303,25 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-10 已通过自动门禁和
 - 自动证据：本地 architecture、TypeScript、Vitest 14 文件 237/237、production build 与 Playwright Chromium 全部 PASS；GitHub Actions Linux `Quality` run `33813850082` Success。
 - 回滚方法：优先 revert `02b7bdef83de84c4eb2be9688d6aacd398539dd4` 并推送；也可从其父 commit `cd4e729c579ad1d84c1bdcb8161ce543562fd79e` 创建隔离分支/worktree，禁止 `reset --hard`。
 
+### Stage 1 / Task S1-11 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`；接受结论 `B — STAGE 1 NEEDS REMAINING TASKS`，并批准 S1-12 与 S1-13 两个最小剩余 Task。
+- Recovery Test：PASS。仅凭当前 Git repository、正式控制文档、source、tests 与 Git history，可以恢复当前 Stage、S1-01 至 S1-10 完成状态、稳定 baseline、Stage boundary 与唯一 Next Action；无关键 `RECOVERY GAP`。
+- 审计 baseline：commit `7da1bf369e62d12c99cb714372c9724fd5676f4e`；本 Task 未修改 source code 或 tests。
+- 自动证据：审计期间 `npm run quality` PASS；architecture、TypeScript、Vitest 14 files 237/237、production build 与 Playwright Chromium 全部 PASS。
+- 唯一 gameplay implementation gap：Board-level `setFlagged` 缺少 Run lifecycle gate，无法自行阻止 pending/failed/won Run 继续改变 Board；S1-12 以最小 Run-level command 修复该边界。
+- Freeze evidence gap：当前缺少贯穿 Initial Board、waiting、Safe movement/exploration、number query、revisit、Flag protection、Hidden Mine/Failure 与 final-Safe/Victory 的完整 core lifecycle integration；S1-13 负责该证据与 Stage 1 Freeze Gate。
+- 范围纪律：S1-12/S1-13 不授权 Save、Retry、Lucky、Revive、Detection、Airplane、Rewards、Inventory、Shop、Tutorial、Benben、Level progression、presentation/UI/animation/audio 或其他后续 Stage 功能。
+- 架构纪律：无需且禁止为两个剩余 Task 引入 Command Bus、GameManager、DI、event bus 或通用 orchestration framework；`createRunState` 外部 Save runtime validation 留给 Stage 2。
+- 已知观察：Phaser bundle >500 KB 继续保留为 observation，不是 Stage 1 blocker。
+- 回滚方法：S1-11 为只读审计；状态收尾仅修改本文件，优先 revert 对应 documentation/status-only closeout commit，不执行 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档和 S1-01 至 S1-10 已冻结 core，只执行 Stage 1 / Task S1-11：Stage 1 核心闭环审计与剩余任务冻结。该 Task 只读，只识别并拆分 Stage 1 剩余缺口，不写代码、不实现玩法、不进入 Stage 2；发现产品歧义时报告 NEEDS DECISION。
+请读取最新控制文档和 S1-01 至 S1-11 已冻结事实，只执行 Stage 1 / Task S1-12：Run-level Flag 命令与生命周期门禁。只建立窄的 Run-level Flag command，复用现有 Board-level `setFlagged`，并阻止 pending/failed/won Run 改变 Board；不得引入通用 orchestration framework，不得执行 S1-13 或进入 Stage 2。
 ```
 
 ## 阶段看板
@@ -309,7 +329,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-10 已通过自动门禁和
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-10 PASS；S1-11 NEXT） | Stage 0 PASS |
+| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-11 PASS；S1-12 NEXT；S1-13 FREEZE GATE） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
