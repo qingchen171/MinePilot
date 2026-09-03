@@ -32,20 +32,23 @@
 - S0-04 稳定恢复点：commit `a2261ba9cd0f0773e9622aa75f50c8c4e0f3ba51`，tree `efd0f15b73cb22e71b8dbb1eeeaa5e868d95108d`。
 - 工程基线：Node.js 24.16.0、npm 11.13.0、Phaser 3.90.0、Vite 8.2.2、TypeScript 7.0.2、Vitest 5.0.0、Playwright Test 1.62.1；直接依赖与锁文件已固定。
 - S0-04 恢复验证：隔离克隆后 `npm ci`、类型检查、单元测试、production build 与 Playwright 浏览器测试全部通过。
+- Stage 0 / Task S0-05 本地统一质量门禁与安全执行守卫：产品经理人工验收 PASS（2026-09-04）。
+- S0-05 稳定恢复点：commit `1c2ec68f9981493b5d751c886587df23223a6428`，tree `eff799a0d4543ac123611e0385646fb6adeb3772`。
+- 后续所有开发 Task 的统一本地质量门禁：在 `D:\eliogames` 执行 `npm run quality`；任一子门禁失败时整体必须失败并停止后续步骤。
 
 ## 当前阶段
 
 **STAGE 0 IN PROGRESS**
 
-S0-01、S0-02、S0-03、S0-04 已 PASS。Stage 0 尚未整体 PASS，不能开始 Stage 1 核心玩法代码。
+S0-01、S0-02、S0-03、S0-04、S0-05 已 PASS。Stage 0 尚未整体 PASS，不能开始 Stage 1 核心玩法代码。
 
 ## 唯一下一行动
 
-**Stage 0 / Task S0-05 — 本地统一质量门禁与安全执行守卫（不配置远程 CI，不实现游戏玩法）。**
+**Stage 0 / Task S0-06 — 工程目录边界与架构决策基线（不实现游戏玩法）。**
 
-目标：把安装、类型检查、单元测试、production build 和浏览器冒烟测试组织为可重复的一键本地门禁；以最小实现验证写盘命令的工作目录边界，使 Windows 本地检查可作为未来 Linux CI 的等价基础。
+目标：把冻结规格和 Development Protocol 中的模块边界转化为可执行的工程约束与架构决策记录；只建立当前工程实际需要的边界，不预建未来空系统，并证明后续 AI 能判断代码应放在哪里、哪些依赖方向被禁止。
 
-完成物：一个简单、跨平台、可测试的工作目录前置检查；统一的本地质量门禁命令；成功与错误目录两类验证；运行说明、稳定 commit 和恢复步骤，以及 S0-06 的唯一建议。S0-05 不实现任何游戏玩法，不创建远程 GitHub 仓库，不配置 GitHub Actions，不决定仓库公开/私有或预算，不进入 S0-06。
+完成物：简洁的架构决策记录、当前所需目录/模块边界、依赖方向与禁止事项、可自动验证的最小边界检查、`npm run quality` 全门禁结果、稳定 commit 和恢复步骤，以及 S0-07 的唯一建议。S0-06 不实现任何游戏玩法，不预建没有消费者的空目录，不创建远程 GitHub 仓库，不配置 GitHub Actions，不决定仓库公开/私有或预算，不进入 S0-07。
 
 ## 最近完成任务
 
@@ -95,29 +98,40 @@ S0-01、S0-02、S0-03、S0-04 已 PASS。Stage 0 尚未整体 PASS，不能开�
 - 未实现内容：没有棋盘、地雷、移动、数字、旗帜、道具、关卡、存档或其他玩法。
 - 回滚方法：使用 `a2261ba9cd0f0773e9622aa75f50c8c4e0f3ba51` 做隔离克隆/worktree 恢复；如需撤销本 Task，优先创建 revert commit，不执行 `reset --hard`。
 
+### Stage 0 / Task S0-05 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`。
+- 人工证据：在 `D:\eliogames` 执行 `npm run quality` 正常通过；从项目外目录执行质量门禁会被立即拒绝。
+- 稳定恢复点：commit `1c2ec68f9981493b5d751c886587df23223a6428`，tree `eff799a0d4543ac123611e0385646fb6adeb3772`。
+- 统一门禁：`npm run quality` 依次执行工作目录守卫、TypeScript、Vitest、production bundle 和 Playwright E2E；任一步骤非零即停止并令总体非零退出。
+- 自动证据：TypeScript PASS；Vitest 2 个文件、6/6 PASS；Vite build PASS；Playwright 1/1 PASS；完整门禁最终复验耗时 8.536 秒。
+- 负向证据：错误目录实际退出码 1 且没有启动 npm 子命令；模拟 `test:unit` 失败时整体退出码 1，build/E2E 未执行。
+- 依赖：未新增第三方依赖，冻结版本与 `package-lock.json` 未变化。
+- 回滚方法：使用 `1c2ec68f9981493b5d751c886587df23223a6428` 做隔离克隆/worktree 恢复；如需撤销本 Task，优先创建 revert commit，不执行 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 v1.0 五份控制文档。现在只执行 PROJECT_STATUS 的 Stage 0 / Task S0-05：本地统一质量门禁与安全执行守卫。
+请读取 v1.0 五份控制文档。现在只执行 PROJECT_STATUS 的 Stage 0 / Task S0-06：工程目录边界与架构决策基线。
 
-不要实现任何游戏玩法，不创建远程 GitHub 仓库，不配置 GitHub Actions，不决定仓库公开/私有或预算。只完成：
-1) 复核 S0-04 稳定基线与当前工作区；
-2) 用简单、跨平台方式实现写盘命令工作目录前置检查；
-3) 将类型检查、单元测试、production build 和 Playwright 冒烟测试组织成统一本地门禁；
-4) 验证在 `D:\eliogames` 正常通过，在错误目录安全拒绝且不写入；
-5) 更新运行说明并建立本 Task 稳定 commit、恢复步骤；
-6) 给出 S0-06 的唯一建议。
+不要实现任何游戏玩法，不预建没有消费者的空目录，不创建远程 GitHub 仓库，不配置 GitHub Actions，不决定仓库公开/私有或预算。只完成：
+1) 复核 S0-05 稳定基线与当前工作区；
+2) 依据冻结规格和 Development Protocol 记录模块职责、依赖方向及禁止事项；
+3) 只建立当前最小工程实际需要的目录/模块边界；
+4) 用轻量、可测试方式验证关键边界，不引入大型工具；
+5) 执行 `npm run quality` 并建立本 Task 稳定 commit、恢复步骤；
+6) 给出 S0-07 的唯一建议。
 
-按 AI Development Protocol 先提交单任务计划，再执行并输出测试、人工验收与回滚报告。完成后停下，等待我批准；不要进入 S0-06。
+按 AI Development Protocol 先提交单任务计划，再执行并输出测试、人工验收与回滚报告。完成后停下，等待我批准；不要进入 S0-07。
 ```
 
 ## 阶段看板
 
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
-| 0 | 工程骨架 | IN PROGRESS（S0-01/S0-02/S0-03/S0-04 PASS；S0-05 NEXT） | 控制文档冻结 |
+| 0 | 工程骨架 | IN PROGRESS（S0-01/S0-02/S0-03/S0-04/S0-05 PASS；S0-06 NEXT） | 控制文档冻结 |
 | 1 | 核心棋盘 | LOCKED | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
