@@ -11,8 +11,10 @@
   "scripts": {
     "dev": "vite",
     "preview": "vite preview",
+    "quality": "node scripts/quality-gate.mjs",
     "typecheck": "tsc --noEmit",
-    "build": "npm run typecheck && vite build",
+    "build": "npm run typecheck && npm run build:bundle",
+    "build:bundle": "vite build",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "vitest run",
     "test:e2e": "playwright test"
