@@ -62,20 +62,23 @@
 - S1-05 稳定恢复点：commit `d6edd50f80433d4d085a2e2fdd13c9d2f87fb1bd`，tree `c1389410906667cfcccf7c38b88c76164544b677`。
 - 后续 encounter 约束：Lucky/Revive 必须消费同一 `pending-mine-encounter`，不得另建踩雷判断；Lucky first-step 必须使用 `hasTakenStep` 与 encounter 快照，不得从 characterPosition 重新猜测；Revive 临时站雷必须使用明确特殊位置状态；pending/failed 下未来 Run-level orchestration 必须阻止 Flag/Item 绕过生命周期，但当前不得为 Board-level `setFlagged` 引入 Command Bus 或大规模重构；外部 Save/JSON 恢复生命周期状态必须运行时验证。
 - S1-06 编排边界：`won` 必须作为权威 Run phase，普通 `moveCharacter` 必须拒绝 won 后移动；现有 Board-level `setFlagged` 不在本 Task 重构，未来 Run-level orchestration 必须阻止 won 后通过 Flag、Item 或其他命令改变本局权威玩法状态。
+- Stage 1 / Task S1-06 全部安全格实际探索的胜利判定与 Run 胜利边界：产品经理人工验收 PASS（2026-09-04）。
+- S1-06 稳定恢复点：commit `c4bda35dc5a1efc668cf8b26a3f0c9c36f8e86c1`，tree `a9f8c53c76df0964431baf523aeae290e154b6bf`。
+- 后续胜利约束：Airplane 等任何把 Safe 变成 explored 的机制必须复用统一 victory rule；外部 Save/JSON 恢复 won Run 必须运行时验证；won/pending/failed 下未来 Run-level orchestration 必须阻止 Flag/Item 等命令改变本局玩法状态，但当前不得为 Board-level `setFlagged` 引入 Command Bus 或大规模重构；关卡是否允许零 required Safe 属于 Level Config / Board Validator，不属于 Victory 规则。
 
 ## 当前阶段
 
 **STAGE 1 IN PROGRESS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-05 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-06 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-06 — 全部安全格实际探索的胜利判定与 Run 胜利边界。**
+**Stage 1 / Task S1-07 — 当前角色脚下数字查询纯规则。**
 
-目标：在 `core` 层建立统一纯规则，只有全部非雷、非障碍 Safe Cell 实际 explored 时才判定胜利，并明确胜利作为 Run 生命周期事实如何与 Safe 移动原子衔接。
+目标：在 `core` 层基于权威 Run State、角色位置和既有 `countAdjacentMines`，建立当前角色所在 Safe Cell 的周围真实雷数查询；数字是可推导事实，不写回 Cell/Board，也不建立第二套邻域或计雷逻辑。
 
-边界：胜利只由所有 Safe Cell explored 触发；Mine、Revealed Mine、Obstacle 与 Flag 不得计入探索需求或替代真实探索。开始实现前须明确最后一个 Safe 移动与 Run 胜利 phase 的原子转换，禁止 Scene/UI 自行判胜。不得实现奖励、通关 UI、存档、重试、关卡解锁、Lucky/Revive 或其他后续 Task；不得自动执行 S1-07。
+边界：角色处于 waiting 时没有脚下 Cell；普通 on-board 位置必须继续遵守 explored Safe 不变量。开始实现前须从冻结规格确认 pending/failed/won 生命周期下的查询语义，若规格不足则停止请求决策，不得猜测。不得实现数字显示、零格视觉反馈、动画、UI、存档、道具或其他后续 Task；不得自动执行 S1-08。
 
 ## 最近完成任务
 
@@ -217,12 +220,23 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-05 已通过自动门禁和
 - 后续强制约束：Lucky/Revive 消费同一 pending encounter；Lucky 使用权威 first-step 事实；Revive 使用特殊站雷位置；Run-level orchestration 阻止 pending/failed 下的其他命令；不为此提前重构 Board-level Flag API；Save/JSON 必须运行时验证。
 - 回滚方法：优先 revert `d6edd50f80433d4d085a2e2fdd13c9d2f87fb1bd` 并推送；也可从其父 commit `24a9e324d56ab4eb9abc960f41732765ca9c8578` 创建隔离分支/worktree，禁止 `reset --hard`。
 
+### Stage 1 / Task S1-06 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`；接受统一胜利判定、`won` Run phase、原子胜利转换及零 required Safe 的分层边界。
+- 稳定恢复点：commit `c4bda35dc5a1efc668cf8b26a3f0c9c36f8e86c1`，tree `a9f8c53c76df0964431baf523aeae290e154b6bf`。
+- 胜利事实：`areAllRequiredSafeCellsExplored(board)` 只依据 Safe/explored 权威事实；Obstacle、Hidden Mine、Revealed Mine 不属于 required exploration，Flag 不提供胜利贡献。
+- Run 生命周期：`RunPhase` 增加 `won`；`settleRunAsWon(run)` 只允许 active 且满足统一胜利条件的 Run 进入 won，pending/failed 不能转 won，won 后普通移动被拒绝。
+- 原子转换：`moveCharacter` 首次探索最后一个 required Safe 时，在同一次纯转换中直接返回 won Run；Hidden Mine encounter 不触发 victory。
+- 自动证据：S1-06 提交前本地完整 `npm run quality` PASS，Vitest 9 个文件、126/126 PASS，production build 与 Playwright Chromium PASS；GitHub Actions Linux `Quality` run `33806653905` Success。状态收尾提交将再次执行本地与远程完整门禁。
+- 后续强制约束：未来所有 explored Safe 转换复用统一 victory rule；Save/JSON 恢复 won Run 必须运行时验证；Run-level orchestration 阻止 won/pending/failed 下的其他命令；不得提前大改 Board-level Flag API；零 required Safe 的关卡合法性由 Level Config / Board Validator 决定。
+- 回滚方法：优先 revert `c4bda35dc5a1efc668cf8b26a3f0c9c36f8e86c1` 并推送；也可从其父 commit `e35293e759b22d8399ef5d4cdc0c72786e427cfa` 创建隔离分支/worktree，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档和现有 core 状态，只执行 Stage 1 / Task S1-06：全部安全格实际探索的胜利判定与 Run 胜利边界。只实现统一纯胜利规则及其与最后一个 Safe 移动的原子 Run 生命周期转换；不实现奖励、UI、存档、关卡解锁、道具或后续 Task。
+请读取最新控制文档和现有 core 状态，只执行 Stage 1 / Task S1-07：当前角色脚下数字查询纯规则。只建立基于权威 Run State、角色位置、统一八邻域与真实 mine count 的纯查询；不得把数字存入 Cell/Board，不实现数字显示、零格视觉反馈、UI、存档、道具或后续 Task。
 ```
 
 ## 阶段看板
@@ -230,7 +244,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-05 已通过自动门禁和
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-05 PASS；S1-06 NEXT） | Stage 0 PASS |
+| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-06 PASS；S1-07 NEXT） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
