@@ -61,6 +61,7 @@
 - Stage 1 / Task S1-05 Hidden Mine Encounter 的待结算状态与基础失败边界：产品经理人工验收 PASS（2026-09-04）。
 - S1-05 稳定恢复点：commit `d6edd50f80433d4d085a2e2fdd13c9d2f87fb1bd`，tree `c1389410906667cfcccf7c38b88c76164544b677`。
 - 后续 encounter 约束：Lucky/Revive 必须消费同一 `pending-mine-encounter`，不得另建踩雷判断；Lucky first-step 必须使用 `hasTakenStep` 与 encounter 快照，不得从 characterPosition 重新猜测；Revive 临时站雷必须使用明确特殊位置状态；pending/failed 下未来 Run-level orchestration 必须阻止 Flag/Item 绕过生命周期，但当前不得为 Board-level `setFlagged` 引入 Command Bus 或大规模重构；外部 Save/JSON 恢复生命周期状态必须运行时验证。
+- S1-06 编排边界：`won` 必须作为权威 Run phase，普通 `moveCharacter` 必须拒绝 won 后移动；现有 Board-level `setFlagged` 不在本 Task 重构，未来 Run-level orchestration 必须阻止 won 后通过 Flag、Item 或其他命令改变本局权威玩法状态。
 
 ## 当前阶段
 

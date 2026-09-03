@@ -8,6 +8,7 @@ import {
   createOnBoardPosition,
   createPendingMineEncounterRunState,
   createRunState,
+  settleRunAsWon,
   type MineEncounter,
   type RunState,
 } from './run';
@@ -27,7 +28,8 @@ export type MoveCharacterResult =
         | 'obstacle'
         | 'revealed-mine'
         | 'pending-mine-encounter'
-        | 'run-failed';
+        | 'run-failed'
+        | 'run-won';
     }
   | { readonly outcome: 'unchanged'; readonly reason: 'already-at-target' };
 
@@ -40,6 +42,7 @@ export function moveCharacter(run: RunState, target: Coordinate): MoveCharacterR
     return { outcome: 'rejected', reason: 'pending-mine-encounter' };
   }
   if (run.phase.kind === 'failed') return { outcome: 'rejected', reason: 'run-failed' };
+  if (run.phase.kind === 'won') return { outcome: 'rejected', reason: 'run-won' };
 
   const targetCell = getCellAt(run.board, target);
   if (targetCell === undefined) return { outcome: 'rejected', reason: 'out-of-bounds' };
@@ -84,8 +87,10 @@ export function moveCharacter(run: RunState, target: Coordinate): MoveCharacterR
 
   if (nextBoard === undefined) return { outcome: 'rejected', reason: 'out-of-bounds' };
 
-  return {
-    outcome: 'moved',
-    state: createRunState(nextBoard, createOnBoardPosition(target), { hasTakenStep: true }),
-  };
+  const movedState = createRunState(nextBoard, createOnBoardPosition(target), {
+    hasTakenStep: true,
+  });
+  const victory = settleRunAsWon(movedState);
+
+  return { outcome: 'moved', state: victory.outcome === 'won' ? victory.state : movedState };
 }

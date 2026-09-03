@@ -1,4 +1,5 @@
 import { createCoordinate, getCellAt, type BoardState, type Coordinate } from './board';
+import { areAllRequiredSafeCellsExplored } from './victory';
 
 export interface WaitingPosition {
   readonly kind: 'waiting';
@@ -19,7 +20,8 @@ export interface MineEncounter {
 export type RunPhase =
   | { readonly kind: 'active' }
   | { readonly kind: 'pending-mine-encounter'; readonly encounter: MineEncounter }
-  | { readonly kind: 'failed'; readonly encounter: MineEncounter };
+  | { readonly kind: 'failed'; readonly encounter: MineEncounter }
+  | { readonly kind: 'won' };
 
 export interface RunState {
   readonly board: BoardState;
@@ -52,7 +54,9 @@ function copyEncounter(encounter: MineEncounter): MineEncounter {
 }
 
 function copyPhase(phase: RunPhase): RunPhase {
-  if (phase.kind === 'active') return Object.freeze({ kind: 'active' });
+  if (phase.kind === 'active' || phase.kind === 'won') {
+    return Object.freeze({ kind: phase.kind });
+  }
   return Object.freeze({ kind: phase.kind, encounter: copyEncounter(phase.encounter) });
 }
 
@@ -77,7 +81,7 @@ export function createRunState(
     if (!hasTakenStep) throw new Error('An on-board character must have taken a step.');
   }
 
-  if (phase.kind !== 'active') {
+  if (phase.kind === 'pending-mine-encounter' || phase.kind === 'failed') {
     if (!hasTakenStep) throw new Error('A mine encounter requires a recorded step attempt.');
     const targetCell = getCellAt(board, phase.encounter.target);
     if (targetCell?.kind !== 'mine' || targetCell.revelation !== 'hidden' || targetCell.flagged) {
@@ -86,6 +90,9 @@ export function createRunState(
     if (phase.encounter.occurredOnFirstStep && position.kind !== 'waiting') {
       throw new Error('A first-step mine encounter must originate from waiting.');
     }
+  }
+  if (phase.kind === 'won' && !areAllRequiredSafeCellsExplored(board)) {
+    throw new Error('A won run requires every required safe cell to be explored.');
   }
 
   return Object.freeze({ board, characterPosition: position, hasTakenStep, phase });
@@ -111,4 +118,28 @@ export function createPendingMineEncounterRunState(
       },
     },
   });
+}
+
+export type SettleRunAsWonResult =
+  | { readonly outcome: 'won'; readonly state: RunState }
+  | {
+      readonly outcome: 'rejected';
+      readonly reason: 'run-not-active' | 'required-safe-cells-unexplored';
+    };
+
+export function settleRunAsWon(run: RunState): SettleRunAsWonResult {
+  if (run.phase.kind !== 'active') {
+    return { outcome: 'rejected', reason: 'run-not-active' };
+  }
+  if (!areAllRequiredSafeCellsExplored(run.board)) {
+    return { outcome: 'rejected', reason: 'required-safe-cells-unexplored' };
+  }
+
+  return {
+    outcome: 'won',
+    state: createRunState(run.board, run.characterPosition, {
+      hasTakenStep: run.hasTakenStep,
+      phase: { kind: 'won' },
+    }),
+  };
 }
