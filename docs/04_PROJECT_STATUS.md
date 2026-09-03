@@ -35,20 +35,23 @@
 - Stage 0 / Task S0-05 本地统一质量门禁与安全执行守卫：产品经理人工验收 PASS（2026-09-04）。
 - S0-05 稳定恢复点：commit `1c2ec68f9981493b5d751c886587df23223a6428`，tree `eff799a0d4543ac123611e0385646fb6adeb3772`。
 - 后续所有开发 Task 的统一本地质量门禁：在 `D:\eliogames` 执行 `npm run quality`；任一子门禁失败时整体必须失败并停止后续步骤。
+- Stage 0 / Task S0-06 工程目录边界与架构决策基线：产品经理人工验收 PASS（2026-09-04）。
+- S0-06 稳定恢复点：commit `691ba6d90a71c0dd7e7af304d8538f57b858eee6`。
+- 后续开发必须遵守 `08_Architecture_Decision_S0-06.md` 的模块职责、依赖方向、状态唯一事实来源及状态/持久化/动画顺序；`npm run quality` 的第一道自动门禁为 architecture boundary check。
 
 ## 当前阶段
 
 **STAGE 0 IN PROGRESS**
 
-S0-01、S0-02、S0-03、S0-04、S0-05 已 PASS。Stage 0 尚未整体 PASS，不能开始 Stage 1 核心玩法代码。
+S0-01、S0-02、S0-03、S0-04、S0-05、S0-06 已 PASS。Stage 0 尚未整体 PASS，不能开始 Stage 1 核心玩法代码。
 
 ## 唯一下一行动
 
-**Stage 0 / Task S0-06 — 工程目录边界与架构决策基线（不实现游戏玩法）。**
+**Stage 0 / Task S0-07 — 远程仓库与 GitHub Actions Linux 权威质量门禁。**
 
-目标：把冻结规格和 Development Protocol 中的模块边界转化为可执行的工程约束与架构决策记录；只建立当前工程实际需要的边界，不预建未来空系统，并证明后续 AI 能判断代码应放在哪里、哪些依赖方向被禁止。
+目标：在产品经理先行确认 GitHub 仓库公开/私有及 Actions 预算边界后，建立远程恢复副本，并让受支持的 Linux CI 实际执行与本地一致的 `npm run quality`，形成 Stage 0 的权威跨平台质量门禁。
 
-完成物：简洁的架构决策记录、当前所需目录/模块边界、依赖方向与禁止事项、可自动验证的最小边界检查、`npm run quality` 全门禁结果、稳定 commit 和恢复步骤，以及 S0-07 的唯一建议。S0-06 不实现任何游戏玩法，不预建没有消费者的空目录，不创建远程 GitHub 仓库，不配置 GitHub Actions，不决定仓库公开/私有或预算，不进入 S0-07。
+开始条件：产品经理明确决定仓库可见性与可接受的 GitHub Actions 预算/用量策略。完成物至少包括远程仓库恢复验证、Linux CI 配置、依赖锁定安装、完整质量门禁实测、失败传播验证、权限/费用/回滚说明和稳定 commit。S0-07 不实现游戏玩法，不进入 Stage 1。
 
 ## 最近完成任务
 
@@ -109,29 +112,40 @@ S0-01、S0-02、S0-03、S0-04、S0-05 已 PASS。Stage 0 尚未整体 PASS，不
 - 依赖：未新增第三方依赖，冻结版本与 `package-lock.json` 未变化。
 - 回滚方法：使用 `1c2ec68f9981493b5d751c886587df23223a6428` 做隔离克隆/worktree 恢复；如需撤销本 Task，优先创建 revert commit，不执行 `reset --hard`。
 
+### Stage 0 / Task S0-06 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`；确认 `npm run quality` 完整通过、Phaser baseline 页面正常且没有提前实现游戏玩法。
+- 稳定恢复点：commit `691ba6d90a71c0dd7e7af304d8538f57b858eee6`。
+- 架构决策：`08_Architecture_Decision_S0-06.md` 冻结 `core / systems / scenes / config / ui / audio / assets` 职责、允许的依赖方向、Game State 唯一事实来源，以及状态、必要持久化先于视觉结果的原则。
+- 自动约束：`npm run quality` 首先执行 architecture boundary check；禁止 core 反向依赖表现/编排层、UI/audio 依赖 systems/scenes、不同 systems capability 任意互引，以及 assets 包含可执行源码。
+- 自动证据：architecture PASS；TypeScript PASS；Vitest 3 个文件、10/10 PASS；Vite production build PASS；Playwright Chromium 1/1 PASS。
+- 最小实现纪律：没有预建无消费者空目录，没有新增第三方依赖，没有实现棋盘、地雷、移动、道具、存档或其他玩法。
+- 已知限制：自动门禁检查导入方向，无法替代对“规则是否被隐藏在表现层”的人工审查；非常规运行时模块加载仍需审查。
+- 回滚方法：使用 `691ba6d90a71c0dd7e7af304d8538f57b858eee6` 做隔离克隆/worktree 恢复；如需撤销本 Task，优先创建 revert commit，不执行 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 v1.0 五份控制文档。现在只执行 PROJECT_STATUS 的 Stage 0 / Task S0-06：工程目录边界与架构决策基线。
+请读取 v1.0 五份控制文档及现有 Engineering/Architecture Baseline。现在只执行 PROJECT_STATUS 的 Stage 0 / Task S0-07：远程仓库与 GitHub Actions Linux 权威质量门禁。
 
-不要实现任何游戏玩法，不预建没有消费者的空目录，不创建远程 GitHub 仓库，不配置 GitHub Actions，不决定仓库公开/私有或预算。只完成：
-1) 复核 S0-05 稳定基线与当前工作区；
-2) 依据冻结规格和 Development Protocol 记录模块职责、依赖方向及禁止事项；
-3) 只建立当前最小工程实际需要的目录/模块边界；
-4) 用轻量、可测试方式验证关键边界，不引入大型工具；
-5) 执行 `npm run quality` 并建立本 Task 稳定 commit、恢复步骤；
-6) 给出 S0-07 的唯一建议。
+开始前先让我决定 GitHub 仓库公开/私有及 Actions 预算/用量策略；未得到明确决定不得创建远程仓库或启用 Actions。得到决定后只完成：
+1) 复核 S0-06 稳定基线与干净工作区；
+2) 建立远程恢复副本并验证可克隆恢复；
+3) 在受支持 Linux runner 上从锁文件安装依赖并执行完整 `npm run quality`；
+4) 验证任一门禁失败时 CI 整体失败；
+5) 报告权限、费用、维护风险、回滚与人工验收步骤；
+6) 建立本 Task 稳定 commit。
 
-按 AI Development Protocol 先提交单任务计划，再执行并输出测试、人工验收与回滚报告。完成后停下，等待我批准；不要进入 S0-07。
+不要实现任何游戏玩法。按 AI Development Protocol 先提交单任务计划，再执行并输出测试、人工验收与回滚报告。完成后停下，等待我批准；不要进入 Stage 1。
 ```
 
 ## 阶段看板
 
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
-| 0 | 工程骨架 | IN PROGRESS（S0-01/S0-02/S0-03/S0-04/S0-05 PASS；S0-06 NEXT） | 控制文档冻结 |
+| 0 | 工程骨架 | IN PROGRESS（S0-01 至 S0-06 PASS；S0-07 NEXT） | 控制文档冻结 |
 | 1 | 核心棋盘 | LOCKED | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
@@ -150,6 +164,7 @@ S0-01、S0-02、S0-03、S0-04、S0-05 已 PASS。Stage 0 尚未整体 PASS，不
 - 平衡参数（掉率、价格、援助阈值、障碍比例最终值）等待可玩原型数据。
 - 美术、音乐与音效素材来源等待核心玩法验证后决定。
 - 目标浏览器最低版本等待 Stage 0/6 兼容性审查。
+- 流程改进候选：现行“同一 Bug 两次修复未通过即 STOP”可能需要区分“未知根因下的连续试错”与“根因已明确的直接连锁修复”；在正式审查并修改 Protocol 前继续严格遵守现行规则，本次不修改 Protocol。
 
 ## 状态更新规则
 
