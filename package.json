@@ -12,6 +12,7 @@
     "dev": "vite",
     "preview": "vite preview",
     "quality": "node scripts/quality-gate.mjs",
+    "architecture": "node scripts/check-architecture.mjs",
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && npm run build:bundle",
     "build:bundle": "vite build",

@@ -29,7 +29,8 @@ TypeScript checks project source in strict mode. `skipLibCheck` is enabled only 
 - `npm ci`: reproduce the locked dependency tree.
 - `npm run dev`: start the local Vite development server at `http://127.0.0.1:5173`.
 - `npm run preview`: serve the production build at `http://127.0.0.1:4173`.
-- `npm run quality`: run the reusable local quality gate: working-directory guard, TypeScript, Vitest, production bundle, and Playwright E2E.
+- `npm run architecture`: verify the frozen directory dependency boundaries with the repository's dependency scanner.
+- `npm run quality`: run the reusable local quality gate: working-directory guard, architecture boundaries, TypeScript, Vitest, production bundle, and Playwright E2E.
 - `npm run typecheck`: run strict TypeScript checks without emitting files.
 - `npm run test:unit`: run the minimal Vitest engineering-baseline test.
 - `npm run test:e2e`: start Vite and verify Phaser initialization in Chromium.
@@ -46,3 +47,7 @@ The displayed Phaser scene is an engineering health check only. It contains no b
 ## Safe command execution
 
 Project commands that can write to disk must be started from `D:\eliogames` or one of its descendants. The unified quality command checks the resolved working directory before running any child command and then runs every child explicitly from the repository root. A directory outside the repository is rejected with a non-zero exit code before any quality step starts.
+
+## Architecture boundary
+
+The frozen responsibilities, dependency directions, state ownership, persistence/animation ordering, and future file-placement rules are recorded in `docs/08_Architecture_Decision_S0-06.md`. The architecture check is the first executable step of `npm run quality` and adds no third-party dependency. It recognizes static imports/exports and literal dynamic imports; semantic review remains required for rule ownership.

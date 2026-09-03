@@ -33,7 +33,7 @@ describe('unified quality gate', () => {
     expect(() => runQualityGate({ cwd: PROJECT_ROOT, runStep })).toThrow(
       'Quality gate failed at "test:unit" with exit code 17.',
     );
-    expect(runStep.mock.calls.map(([step]) => step)).toEqual(['typecheck', 'test:unit']);
+    expect(runStep.mock.calls.map(([step]) => step)).toEqual(['architecture', 'typecheck', 'test:unit']);
   });
 
   it('does not start any step when the working directory is unsafe', () => {
