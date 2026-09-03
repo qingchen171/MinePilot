@@ -48,20 +48,23 @@
 - Stage 1 / Task S1-02 八邻域坐标与周围真实雷数纯规则：产品经理人工验收 PASS（2026-09-04）。
 - S1-02 稳定恢复点：commit `7940bd2a334a3a4bb10b3cee3fe92943dbccd593`，tree `8d6ddfac25ce77bca6f6e1327a332fc9a9d24f30`。
 - 后续邻域约束：所有八邻域规则必须优先复用 `getNeighborCoordinates`；Detection 的随机选择不得利用邻域数组顺序伪装随机；任何修改状态的命令必须独立验证目标合法性，不得把越界空查询当作成功操作。
+- Stage 1 / Task S1-03 普通 Flag 的纯状态转换与目标合法性：产品经理人工验收 PASS（2026-09-04）。
+- S1-03 稳定恢复点：commit `a503ef13a90977a3061d5f3bba892fd2b47e9d02`，tree `66c53e52a11f1ba2f4e688e5144d49b24924be46`。
+- 后续 Flag 约束：Scene/UI 必须调用集中领域转换并消费结构化 Result，不得直接修改 Board；UI、音效与持久化等副作用只能根据真实 transition result 决定，`unchanged` 不得被当作状态变化；Flag 对移动合法性的影响留给后续移动规则；外部 JSON/存档恢复仍须经过运行时验证。
 
 ## 当前阶段
 
 **STAGE 1 IN PROGRESS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-03 — 普通 Flag 的纯状态转换与目标合法性。**
+**Stage 1 / Task S1-04 — 角色位置与普通移动目标合法性纯规则。**
 
-目标：在 `core` 层建立添加、移除普通 Flag 的集中纯状态转换；命令必须验证坐标与 Cell 当前状态，Flag 只代表玩家猜测且不得改变真实 safe/mine 身份。
+目标：在 `core` 层建立最小权威角色位置表达，以及普通移动命令的集中、不可变目标合法性判断与结构化结果；统一落实 Flag、Obstacle、Revealed Mine 和棋盘边界对普通移动的影响。
 
-边界：只实现不可变 Flag 转换与明确成功/拒绝结果；允许未探索 hidden safe/mine 添加或移除 Flag，拒绝越界、Obstacle、explored safe、Revealed Mine 及无效重复命令。不得实现 UI 点击、移动、雷生成、揭示、胜负、奖励、存档、道具或 Phaser 表现。完成物必须包含规则单元测试、本地完整 `npm run quality`、GitHub Actions Linux `Quality` PASS、稳定 commit、回滚与产品经理人工验收步骤；不得自动执行 S1-04。
+边界：只冻结普通移动的权威位置、允许/拒绝条件、原地目标语义与不可变结构化结果；必须复用现有 Board/Coordinate/CellState/Flag 事实。不得实现输入/UI、动画、地雷生成、踩雷揭示或复活结算、数字显示、胜负、奖励、存档、道具或 Phaser 表现。开始实现前须依据冻结规格进一步拆清“移动到隐藏雷”的命令结果与状态结算边界；如存在产品歧义必须停止报告。完成物必须包含规则单元测试、本地完整 `npm run quality`、GitHub Actions Linux `Quality` PASS、稳定 commit、回滚与产品经理人工验收步骤；不得自动执行后续 Task。
 
 ## 最近完成任务
 
@@ -168,22 +171,33 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02 已通过自动门禁和�
 - 后续强制约束：Detection 与其他八邻域规则必须复用统一 API；随机选择必须使用未来可注入、可重放随机源，不得以邻域顺序代替随机。
 - 回滚方法：优先 revert `7940bd2a334a3a4bb10b3cee3fe92943dbccd593` 并推送；也可从其父 commit `cd3e1fe35b757b1d07f365281876979bb2922b17` 创建隔离分支/worktree，禁止 `reset --hard`。
 
+### Stage 1 / Task S1-03 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`；实际执行本地 `npm run quality`，architecture、TypeScript、Vitest 73/73、production build 与 Playwright Chromium 全部 PASS。
+- 稳定恢复点：commit `a503ef13a90977a3061d5f3bba892fd2b47e9d02`，tree `66c53e52a11f1ba2f4e688e5144d49b24924be46`。
+- 领域转换：`setFlagged(board, coordinate, desiredFlagged)` 返回 `changed / rejected / unchanged` 结构化结果；成功进一步区分 `placed / removed`，拒绝区分 `out-of-bounds / not-flaggable`，无变化区分 `already-flagged / already-unflagged`。
+- Flag 规则：只有未探索 Safe 与 Hidden Mine 可拥有普通 Flag；Obstacle、Explored Safe 与 Revealed Mine 不可 Flag；Flag 只代表玩家猜测，不改变 Cell 的真实 safe/mine 等事实。
+- 不可变性：成功转换产生新 Board，原 Board/Cell 不修改且非目标 Cell 引用保持不变；`rejected / unchanged` 不伪造新 Board，防止副作用层误判状态变化。
+- 自动证据：本地 architecture PASS、TypeScript PASS、Vitest 6 文件 73/73 PASS、production build PASS、Playwright 1/1 PASS；GitHub Actions Linux `Quality` run `33802972706` Success。
+- 后续强制约束：Scene/UI 只能调用领域转换并消费 Result；UI、音效、持久化等副作用只能响应真实 `changed`；Flag 对移动合法性的影响由后续移动规则统一处理；外部 JSON/存档恢复必须运行时验证。
+- 回滚方法：优先 revert `a503ef13a90977a3061d5f3bba892fd2b47e9d02` 并推送；也可从其父 commit `e8298a87bdcc55c9290cd1c1519bd9e04ba394ee` 创建隔离分支/worktree，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 v1.0 五份控制文档、Architecture Baseline 和现有 core 模型。现在只执行 PROJECT_STATUS 的 Stage 1 / Task S1-03：普通 Flag 的纯状态转换与目标合法性。
+请读取 v1.0 五份控制文档、Architecture Baseline 和现有 core 模型。现在只执行 PROJECT_STATUS 的 Stage 1 / Task S1-04：角色位置与普通移动目标合法性纯规则。
 
 只完成：
-1) 复核 S1-02 稳定基线与干净工作区；
-2) 建立添加/移除普通 Flag 的不可变纯状态转换；
-3) 独立验证目标坐标与 Cell 当前状态；
-4) 保持 Flag 仅为玩家猜测，不改变 safe/mine 身份；
-5) 覆盖 hidden safe/mine、越界、Obstacle、explored safe、Revealed Mine 和重复命令；
+1) 复核 S1-03 稳定基线与干净工作区；
+2) 建立最小权威角色位置表达与不可变普通移动领域命令；
+3) 独立验证起点、目标坐标和目标 Cell 当前状态；
+4) 统一处理越界、Obstacle、Flagged Cell、Revealed Mine 和原地目标；
+5) 明确测试允许与拒绝结果、原状态不变及非目标事实不变；
 6) 执行本地完整 `npm run quality`，提交并推送稳定 commit，再确认 GitHub Actions Linux `Quality` PASS。
 
-不要实现 UI 点击、移动、地雷生成、揭示、胜负、奖励、存档、关卡、道具或 Phaser 表现。按 AI Development Protocol 先提交单任务计划，再执行并输出测试、人工验收与回滚报告。完成后停下，等待我批准；不要执行 S1-04。
+不要实现 UI/输入、动画、地雷生成、踩雷揭示或复活结算、数字显示、胜负、奖励、存档、关卡、道具或 Phaser 表现。开始前先根据冻结规格明确移动到隐藏雷的结果与结算边界；如有歧义停止报告。按 AI Development Protocol 先提交单任务计划，再执行并输出测试、人工验收与回滚报告。完成后停下，等待我批准；不要执行后续 Task。
 ```
 
 ## 阶段看板
@@ -191,7 +205,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02 已通过自动门禁和�
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | IN PROGRESS（S1-01/S1-02 PASS；S1-03 NEXT） | Stage 0 PASS |
+| 1 | 核心棋盘 | IN PROGRESS（S1-01/S1-02/S1-03 PASS；S1-04 NEXT） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
