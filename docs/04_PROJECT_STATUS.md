@@ -3,7 +3,7 @@
 **项目：MinePilot / Minesweeper Product**  
 **状态更新时间：2026-09-04**  
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core implementation 已建立并通过 S1-01 至 S1-10 人工验收；Stage 1 尚未 Freeze**
+**正式游戏代码：Stage 1 core implementation 已建立并通过 S1-01 至 S1-12 人工验收；Stage 1 尚未 Freeze**
 
 ## 当前事实
 
@@ -82,9 +82,12 @@
 - 外部 Board 恢复路径边界：`unknown external Board data -> S1-08 validator -> BoardState`；生成路径与外部输入路径最终都必须汇聚到现有 `createCellState` / `createBoard` 权威模型，不得新增第二套 GeneratedBoard/MineCell/ObstacleCell 权威模型。
 - Stage 1 / Task S1-11 核心闭环审计与剩余任务冻结：产品经理人工验收 PASS（2026-09-04）；Recovery Test PASS，可仅依赖正式资料恢复 Stage、已完成 Tasks、稳定 baseline、Stage boundary 与 Next Action。
 - S1-11 审计 baseline：commit `7da1bf369e62d12c99cb714372c9724fd5676f4e`；source code changes `0`，tests changes `0`；审计期间本地 `npm run quality` PASS，Vitest 14 files、237/237 PASS。
-- Stage 1 剩余范围冻结：S1-12 是唯一剩余 gameplay implementation blocker；S1-13 是 S1-12 后的 Stage 1 Core lifecycle integration 与 Freeze Gate。除非测试暴露新的真实 blocker，不得继续扩张 Stage 1。
-- 审计缺口：Board-level `setFlagged` 尚无 Run lifecycle gate；当前也缺少从 Initial Board 贯穿 Safe movement、number query、Flag、Hidden Mine/Failure 与 Victory 的完整 core lifecycle integration evidence。
-- 最小架构约束：S1-12 只需建立窄的 Run-level Flag command 并复用现有 `setFlagged` / `RunState`；不得引入 Command Bus、GameManager、DI、event bus 或通用 orchestration framework。
+- Stage 1 / Task S1-12 Run-level Flag 命令与生命周期门禁：产品经理人工验收 PASS（2026-09-04）。
+- S1-12 稳定恢复点：commit `dac0058c00d7fc225bd8a04f4274b09cea2cc0d7`，tree `6d7a7601817e7f0d44dc31b743bdac268fa4979f`。
+- S1-12 gameplay 边界：`setRunFlagged` 是实际 gameplay 的 Run-level Flag 入口；仅 active Run 委托现有 Board-level `setFlagged`，pending/failed/won 在调用 primitive 前结构化拒绝。只有真实 changed 产生保留角色位置、`hasTakenStep` 与 active phase 的新 RunState；rejected/unchanged 不产生伪造状态。
+- S1-12 架构约束：Board-level `setFlagged` 继续作为合法 core primitive；未来 gameplay/systems/Scene/UI 不得绕过 Run-level command 直接修改 `run.board`；不得为此引入 Command Bus、GameManager、DI、event bus、generic reducer 或通用 orchestration framework。
+- Stage 1 剩余范围冻结：S1-11 确认的 gameplay implementation blocker 已由 S1-12 关闭；Stage 1 现在只剩 S1-13 Core lifecycle integration 与 Freeze Gate。除非测试暴露新的真实 blocker，不得继续扩张 Stage 1。
+- 剩余证据缺口：仍缺少从 Initial Board 贯穿 Safe movement、number query、Flag、Hidden Mine/Failure 与 Victory 的完整 core lifecycle integration evidence；仅由 S1-13 负责。
 - Deferred-by-design 边界：Save/Retry 属于 Stage 2；Lucky/Revive/Detection/Airplane 属于 Stage 3；Rewards/Inventory/Shop/Tutorial/Benben/Level progression 属于 Stage 4；presentation/UI/animation/audio 属于 Stage 5。不得把这些功能重新拉入 Stage 1。
 - `createRunState` 及完整 Run lifecycle 的外部 Save runtime validation 属于 Stage 2；Phaser bundle >500 KB 继续仅为 observation，不是 Stage 1 blocker。
 
@@ -92,15 +95,15 @@
 
 **STAGE 1 IN PROGRESS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-11 已通过自动门禁或只读审计门禁及产品经理人工验收；Stage 1 保持 IN PROGRESS。S1-12 与 S1-13 完成并人工 PASS 前不得 Freeze 或进入 Stage 2。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-12 已通过自动门禁或只读审计门禁及产品经理人工验收；Stage 1 保持 IN PROGRESS。S1-13 完成并人工 PASS 前不得 Freeze 或进入 Stage 2。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-12 — Run-level Flag 命令与生命周期门禁。**
+**Stage 1 / Task S1-13 — Stage 1 Core 生命周期集成与 Freeze Gate。**
 
-目标：建立最小 Run-level Flag command；仅在 active Run 中复用现有 Board-level `setFlagged`，成功时不可变地产生保留角色位置、`hasTakenStep` 与 phase 的新 `RunState`，并在 pending/failed/won Run 中结构化拒绝 Flag 命令。
+目标：以完整 core lifecycle integration evidence 验证 Stage 1 已冻结模块能够形成闭环，并执行 Stage 1 Freeze Gate。
 
-边界：不修改现有 Board-level Flag 事实规则，不实现 UI/右键/触摸、Save/Retry、道具、奖励、关卡或表现层；不引入 Command Bus、GameManager、DI、event bus 或通用 orchestration framework；不得执行 S1-13。
+边界：除非集成测试暴露真实 Stage 1 blocker，不扩张 Stage 1；不实现 Save/Retry、Lucky/Revive/Detection/Airplane、奖励/关卡/商店/教程或表现层，不进入 Stage 2。
 
 ## 最近完成任务
 
@@ -316,12 +319,23 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-11 已通过自动门禁或
 - 已知观察：Phaser bundle >500 KB 继续保留为 observation，不是 Stage 1 blocker。
 - 回滚方法：S1-11 为只读审计；状态收尾仅修改本文件，优先 revert 对应 documentation/status-only closeout commit，不执行 `reset --hard`。
 
+### Stage 1 / Task S1-12 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`；接受 `setRunFlagged(run, coordinate, desiredFlagged)` 为实际 gameplay 的 Run-level Flag 入口。
+- 稳定恢复点：commit `dac0058c00d7fc225bd8a04f4274b09cea2cc0d7`，tree `6d7a7601817e7f0d44dc31b743bdac268fa4979f`。
+- 生命周期门禁：仅 active Run 可以委托现有 `setFlagged`；pending-mine-encounter、failed、won 在 Board primitive 调用前结构化拒绝。
+- 状态转换：只有 Board-level changed 产生新 RunState，并保留 `characterPosition`、`hasTakenStep` 与 active phase；rejected/unchanged 不携带伪造的新 Run。
+- 玩法边界：Flag 不触发 Victory、Failure 或 Mine encounter，也不是 step；Cell legality 完全复用既有 Board primitive。
+- 架构边界：Board-level `setFlagged` 保留为合法 core primitive；未来实际 gameplay/systems/Scene/UI 必须使用 Run-level command，且不引入通用 orchestration framework。
+- 自动证据：本地 `npm run quality` PASS；architecture、TypeScript、Vitest 15 files 253/253、production build 与 Playwright Chromium 全部 PASS；GitHub Actions Linux `Quality` run `33817750530` Success。
+- 回滚方法：优先 revert `dac0058c00d7fc225bd8a04f4274b09cea2cc0d7` 并推送；禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档和 S1-01 至 S1-11 已冻结事实，只执行 Stage 1 / Task S1-12：Run-level Flag 命令与生命周期门禁。只建立窄的 Run-level Flag command，复用现有 Board-level `setFlagged`，并阻止 pending/failed/won Run 改变 Board；不得引入通用 orchestration framework，不得执行 S1-13 或进入 Stage 2。
+请读取最新控制文档和 S1-01 至 S1-12 已冻结事实，只执行 Stage 1 / Task S1-13：Stage 1 Core 生命周期集成与 Freeze Gate。只建立完整 core lifecycle integration evidence 并执行 Freeze Gate；除非测试暴露新的真实 Stage 1 blocker，不扩张 Stage 1，不进入 Stage 2。
 ```
 
 ## 阶段看板
@@ -329,7 +343,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-11 已通过自动门禁或
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-11 PASS；S1-12 NEXT；S1-13 FREEZE GATE） | Stage 0 PASS |
+| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-12 PASS；S1-13 NEXT / FREEZE GATE） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
