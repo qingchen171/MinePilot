@@ -76,20 +76,24 @@
 - 随机重放兼容合同：PRNG algorithm、seed、`nextInt` 映射算法、RNG 调用顺序、candidate 内容与顺序、placement algorithm、mineCount 共同决定结果；Mulberry32、rejection sampling、row-major/candidate ordering 与 partial Fisher-Yates 均不得作为普通内部实现静默修改。
 - Golden compatibility 哨兵：seed `123456789`、row-major `3×3` candidates、mineCount `4` 的 expected coordinates 固定为 `(2,2), (0,0), (0,2), (1,2)`；未来测试失败时不得直接更新 expected，必须先判断是否破坏重放兼容合同。
 - Stage 2 Save 约束：设计 Save schema 时重新评估保存最终 Board、保存 seed、引入 RNG/Generation version 及算法升级后的旧存档兼容方式；当前不提前实现这些 Save/versioning 决策。
+- Stage 1 / Task S1-10 基础初始 Board 构造纯规则：产品经理人工验收 PASS（2026-09-04）。
+- S1-10 稳定恢复点：commit `02b7bdef83de84c4eb2be9688d6aacd398539dd4`，tree `a307c69ff8c47c335145bb8819567d5218f02c9e`。
+- Board 生成路径边界：`strategy -> candidates -> S1-09 placement -> S1-10 assembly -> BoardState`；S1-10 只组装上游已明确的 dimensions、Obstacle coordinates 与 Mine coordinates，不承担生成策略。
+- 外部 Board 恢复路径边界：`unknown external Board data -> S1-08 validator -> BoardState`；生成路径与外部输入路径最终都必须汇聚到现有 `createCellState` / `createBoard` 权威模型，不得新增第二套 GeneratedBoard/MineCell/ObstacleCell 权威模型。
 
 ## 当前阶段
 
 **STAGE 1 IN PROGRESS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-09 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-10 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS，必须先审计剩余闭环缺口再冻结后续实现任务。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-10 — 基础初始 Board 构造纯规则。**
+**Stage 1 / Task S1-11 — Stage 1 核心闭环审计与剩余任务冻结（只读）。**
 
-目标：在 `core` 层把明确的 Board dimensions、Obstacle coordinates 与已选择的 Mine coordinates 组合成权威的初始 `BoardState`，统一建立 row-major、全部未探索且未插旗的初始 Cell 事实。
+目标：对照 MVP Specification、Stage 1 门禁和 S1-01 至 S1-10 已冻结 core，确认距离“无美术依赖的基本玩法完整可玩”仍缺哪些领域能力、集成边界与测试，并把每个剩余能力拆成可单独人工验收的后续 Task 合同。
 
-边界：开始实现前必须冻结 Obstacle/Mine 坐标冲突、越界与重复输入的结构化拒绝语义，并复用现有 Board/Cell 构造不变量。只负责初始 Board 组装，不选择 Mine、不生成 Obstacle、不决定比例、首击安全、教程、奖励、seed、Retry、Save 或完整 Level Generator；不得自动执行 S1-11。
+边界：本 Task 只读，不写代码、不实现玩法、不改变冻结规则、不进入 Stage 2。若审计发现需要新的产品决策，必须列为 `NEEDS DECISION`；未经产品经理批准不得开始任何审计后提出的实现 Task。
 
 ## 最近完成任务
 
@@ -279,12 +283,25 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-09 已通过自动门禁和
 - Stage 2 决策留白：最终 Board/seed 保存策略、RNG/Generation version 及旧存档迁移必须在 Save schema Task 重新评估，本轮未提前冻结。
 - 回滚方法：优先 revert `ecc217a1ab6248ab2a6b51dc299b3961cbfdd3b7` 并推送；也可从其父 commit `59988df770d742b53940f16177227e6de4495ddf` 创建隔离分支/worktree，禁止 `reset --hard`。
 
+### Stage 1 / Task S1-10 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`；接受 `createInitialBoard(input)` 的纯组装职责、初始 Cell 事实、结构化冲突拒绝、稳定 row-major 输出及 S1-09 -> S1-10 小型组合测试。
+- 稳定恢复点：commit `02b7bdef83de84c4eb2be9688d6aacd398539dd4`，tree `a307c69ff8c47c335145bb8819567d5218f02c9e`。
+- 统一入口：`createInitialBoard(input)` 只把明确 dimensions、Obstacle coordinates 与已选择 Mine coordinates 组装为 `BoardState`；不选择 Mine、不生成 Obstacle、不调用 RNG。
+- 初始事实：普通 Safe 为 unexplored/unflagged，Mine 为 hidden/unflagged，Obstacle 永远不是 Mine；初始 Board 不产生 explored Safe、Flag 或 Revealed Mine。
+- 结构拒绝：invalid dimensions、Obstacle/Mine 越界、各自重复及 Mine/Obstacle overlap 均明确拒绝；不静默去重、忽略、移动或覆盖冲突坐标。
+- 权威复用与顺序：逐格调用 `createCellState`，最终调用 `createBoard`；cells 固定为 row-major，输入坐标数组顺序不改变最终 Board facts，原输入及其后续 mutation 不污染 Board。
+- 双路径边界：生成路径为 `strategy -> candidates -> S1-09 placement -> S1-10 assembly -> BoardState`；外部恢复路径为 `unknown external Board data -> S1-08 validator -> BoardState`。两者汇聚到同一权威 Board/Cell 模型，禁止建立第二套 GeneratedBoard/MineCell/ObstacleCell 模型。
+- 策略留空：正式 Level 的 density、Obstacle ratio、首击安全、教程、奖励、difficulty、连通性与可解性仍属于后续独立策略层。
+- 自动证据：本地 architecture、TypeScript、Vitest 14 文件 237/237、production build 与 Playwright Chromium 全部 PASS；GitHub Actions Linux `Quality` run `33813850082` Success。
+- 回滚方法：优先 revert `02b7bdef83de84c4eb2be9688d6aacd398539dd4` 并推送；也可从其父 commit `cd4e729c579ad1d84c1bdcb8161ce543562fd79e` 创建隔离分支/worktree，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档和现有 core 状态，只执行 Stage 1 / Task S1-10：基础初始 Board 构造纯规则。只把明确 dimensions、Obstacle coordinates 和已选择 Mine coordinates 组合为合法、row-major 的初始 Board；不得选择雷位、生成障碍、决定比例、首击安全、教程、奖励、seed、Retry、Save、完整 Level Generator 或后续 Task。
+请读取最新控制文档和 S1-01 至 S1-10 已冻结 core，只执行 Stage 1 / Task S1-11：Stage 1 核心闭环审计与剩余任务冻结。该 Task 只读，只识别并拆分 Stage 1 剩余缺口，不写代码、不实现玩法、不进入 Stage 2；发现产品歧义时报告 NEEDS DECISION。
 ```
 
 ## 阶段看板
@@ -292,7 +309,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-09 已通过自动门禁和
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-09 PASS；S1-10 NEXT） | Stage 0 PASS |
+| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-10 PASS；S1-11 NEXT） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
