@@ -2,11 +2,15 @@
 node_modules/
 dist/
 coverage/
+*.tsbuildinfo
 
 # Test output
 test-results/
 playwright-report/
 blob-report/
+
+# Tool caches
+.vite/
 
 # Local environment files and logs
 .env
