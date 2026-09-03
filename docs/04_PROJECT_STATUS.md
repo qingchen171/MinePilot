@@ -38,20 +38,24 @@
 - Stage 0 / Task S0-06 工程目录边界与架构决策基线：产品经理人工验收 PASS（2026-09-04）。
 - S0-06 稳定恢复点：commit `691ba6d90a71c0dd7e7af304d8538f57b858eee6`。
 - 后续开发必须遵守 `08_Architecture_Decision_S0-06.md` 的模块职责、依赖方向、状态唯一事实来源及状态/持久化/动画顺序；`npm run quality` 的第一道自动门禁为 architecture boundary check。
+- Stage 0 / Task S0-07 远程仓库与 Linux 权威质量门禁：产品经理人工验收 PASS（2026-09-04）。
+- S0-07 稳定恢复点：commit `ddf614bd81f508f3a7927d85c1474c13bf8c586c`，tree `2e7a03dda5aa4db19a7be4cb2b53d0475adac1df`。
+- GitHub public repository：`https://github.com/qingchen171/MinePilot`；本地 `main` 跟踪 `origin/main`。
+- 远程权威质量门禁：GitHub Actions `Quality` workflow 在标准 `ubuntu-latest` runner 上执行完整 `npm run quality`；本地开发门禁继续是在 `D:\eliogames` 执行 `npm run quality`。
 
 ## 当前阶段
 
-**STAGE 0 IN PROGRESS**
+**STAGE 0 PASS / STAGE 1 READY**
 
-S0-01、S0-02、S0-03、S0-04、S0-05、S0-06 已 PASS。Stage 0 尚未整体 PASS，不能开始 Stage 1 核心玩法代码。
+S0-01 至 S0-07 均已通过自动门禁和产品经理人工验收。Stage 0 工程骨架 PASS；Stage 1 已解锁，但尚未开始任何核心玩法 Task。
 
 ## 唯一下一行动
 
-**Stage 0 / Task S0-07 — 远程仓库与 GitHub Actions Linux 权威质量门禁。**
+**Stage 1 / Task S1-01 — 纯领域棋盘模型、坐标与 Cell State 基础不变量。**
 
-目标：在产品经理先行确认 GitHub 仓库公开/私有及 Actions 预算边界后，建立远程恢复副本，并让受支持的 Linux CI 实际执行与本地一致的 `npm run quality`，形成 Stage 0 的权威跨平台质量门禁。
+目标：在 `core` 层建立后续数字、移动、旗帜、胜利与统一 Revealed Mine 规则共同依赖的最小权威棋盘事实模型，包括坐标、棋盘边界、Cell State 分类及基础不变量；保持纯函数、确定性、无 Phaser/DOM/存储依赖。
 
-开始条件：产品经理明确决定仓库可见性与可接受的 GitHub Actions 预算/用量策略。完成物至少包括远程仓库恢复验证、Linux CI 配置、依赖锁定安装、完整质量门禁实测、失败传播验证、权限/费用/回滚说明和稳定 commit。S0-07 不实现游戏玩法，不进入 Stage 1。
+边界：只完成可测试的领域模型与不变量，不实现地雷随机生成、数字计算、角色移动、旗帜交互、胜利流程、存档、关卡、道具或 Phaser 表现。完成物必须包含规则单元测试、本地完整 `npm run quality`、GitHub Actions Linux `Quality` PASS、稳定 commit、回滚与产品经理人工验收步骤；不得自动执行 S1-02。
 
 ## 最近完成任务
 
@@ -123,30 +127,42 @@ S0-01、S0-02、S0-03、S0-04、S0-05、S0-06 已 PASS。Stage 0 尚未整体 PA
 - 已知限制：自动门禁检查导入方向，无法替代对“规则是否被隐藏在表现层”的人工审查；非常规运行时模块加载仍需审查。
 - 回滚方法：使用 `691ba6d90a71c0dd7e7af304d8538f57b858eee6` 做隔离克隆/worktree 恢复；如需撤销本 Task，优先创建 revert commit，不执行 `reset --hard`。
 
+### Stage 0 / Task S0-07 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`。
+- 远程仓库：`qingchen171/MinePilot`，实际 visibility 为 public；remote URL 为 `https://github.com/qingchen171/MinePilot.git`，本地 `main` 跟踪 `origin/main`。
+- 稳定恢复点：commit `ddf614bd81f508f3a7927d85c1474c13bf8c586c`，tree `2e7a03dda5aa4db19a7be4cb2b53d0475adac1df`；从公开远程隔离克隆后 commit/tree 一致且恢复工作区干净。
+- 远程权威门禁：`.github/workflows/quality.yml` 的 GitHub Actions `Quality` workflow；仅由必要的 `main` push 和面向 `main` 的 Pull Request 触发，无定时任务。
+- Linux 实证：run `33798898077` 在标准 `ubuntu-latest`（实际 Ubuntu 24.04.4 LTS）执行成功；Node 24.16.0、npm 11.13.0、architecture PASS、TypeScript PASS、Vitest 3 文件 10/10 PASS、production build PASS、Playwright Chromium 1/1 PASS。
+- 权限与成本：workflow 仅授予 `contents: read`；repository secrets 为 0；不使用 larger/GPU/self-hosted runner，不上传 artifact，不使用 Actions cache；public repository 标准 hosted runner 当前成本为 $0。
+- 双门禁纪律：Windows 10 本地 `npm run quality` 为每个开发 Task 的日常门禁；GitHub Actions Linux `Quality` 为远程权威门禁。两者均通过后，开发 Task 才可提交人工验收。
+- 跨平台结论：Windows/Linux 暂无阻塞性差异；两端均保留 Phaser bundle >500 KB 警告作为观察项。
+- 回滚/禁用：优先 revert S0-07 commit 并推送，以保留历史并移除 workflow；也可在 GitHub Actions 页面禁用 workflow。未经明确批准不得删除远程仓库。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 v1.0 五份控制文档及现有 Engineering/Architecture Baseline。现在只执行 PROJECT_STATUS 的 Stage 0 / Task S0-07：远程仓库与 GitHub Actions Linux 权威质量门禁。
+请读取 v1.0 五份控制文档及现有 Engineering/Architecture Baseline。现在只执行 PROJECT_STATUS 的 Stage 1 / Task S1-01：纯领域棋盘模型、坐标与 Cell State 基础不变量。
 
-开始前先让我决定 GitHub 仓库公开/私有及 Actions 预算/用量策略；未得到明确决定不得创建远程仓库或启用 Actions。得到决定后只完成：
-1) 复核 S0-06 稳定基线与干净工作区；
-2) 建立远程恢复副本并验证可克隆恢复；
-3) 在受支持 Linux runner 上从锁文件安装依赖并执行完整 `npm run quality`；
-4) 验证任一门禁失败时 CI 整体失败；
-5) 报告权限、费用、维护风险、回滚与人工验收步骤；
-6) 建立本 Task 稳定 commit。
+只完成：
+1) 复核 S0-07 稳定基线与干净工作区；
+2) 在 `core` 层定义最小坐标、棋盘边界与 Cell State 权威模型；
+3) 用不变量拒绝越界坐标、矛盾 Cell State 和非法棋盘基础状态；
+4) 保持纯规则、确定性且不依赖 Phaser、DOM、存储或动画；
+5) 建立覆盖合法/非法/边界输入的单元测试；
+6) 执行本地完整 `npm run quality`，提交并推送稳定 commit，再确认 GitHub Actions Linux `Quality` PASS。
 
-不要实现任何游戏玩法。按 AI Development Protocol 先提交单任务计划，再执行并输出测试、人工验收与回滚报告。完成后停下，等待我批准；不要进入 Stage 1。
+不要实现地雷随机生成、数字计算、角色移动、旗帜交互、胜利流程、存档、关卡、道具或 Phaser UI。按 AI Development Protocol 先提交单任务计划，再执行并输出测试、人工验收与回滚报告。完成后停下，等待我批准；不要执行 S1-02。
 ```
 
 ## 阶段看板
 
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
-| 0 | 工程骨架 | IN PROGRESS（S0-01 至 S0-06 PASS；S0-07 NEXT） | 控制文档冻结 |
-| 1 | 核心棋盘 | LOCKED | Stage 0 PASS |
+| 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
+| 1 | 核心棋盘 | READY（S1-01 NEXT） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
@@ -156,8 +172,6 @@ S0-01、S0-02、S0-03、S0-04、S0-05、S0-06 已 PASS。Stage 0 尚未整体 PA
 
 ## 已知未决
 
-- GitHub 仓库公开或私有：创建远程仓库前由产品经理决定。
-- GitHub Actions 预算：启用云端 CI 前由产品经理确认；不得默认产生付费用量。
 - Windows 10 不在 Playwright 当前官方原生支持矩阵内；本地测试已实测可用，但正式 E2E 结果以 GitHub Actions Linux 为准。
 - Phaser 3 基线 bundle 当前超过 Vite 500 KB chunk 提示阈值；属于性能观察项，不在 Stage 0 无数据优化。
 - 游戏正式名称与域名未定。
