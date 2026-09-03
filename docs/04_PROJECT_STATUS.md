@@ -51,20 +51,22 @@
 - Stage 1 / Task S1-03 普通 Flag 的纯状态转换与目标合法性：产品经理人工验收 PASS（2026-09-04）。
 - S1-03 稳定恢复点：commit `a503ef13a90977a3061d5f3bba892fd2b47e9d02`，tree `66c53e52a11f1ba2f4e688e5144d49b24924be46`。
 - 后续 Flag 约束：Scene/UI 必须调用集中领域转换并消费结构化 Result，不得直接修改 Board；UI、音效与持久化等副作用只能根据真实 transition result 决定，`unchanged` 不得被当作状态变化；Flag 对移动合法性的影响留给后续移动规则；外部 JSON/存档恢复仍须经过运行时验证。
+- S1-04 前置产品/技术边界（产品经理批准，2026-09-04）：Hidden Mine 是允许尝试进入但必须返回 `requires-resolution / mine-encounter` 的目标，不是普通 `not-movable`；S1-04 不揭示雷、不判定失败、不处理 Lucky/Revive，也不把角色位置永久提交到该雷。普通移动可选择任意合法坐标，不要求相邻、路径或寻路；Flag 无论真假均作为移动安全锁。
+- S1-04 当前门禁：**NEEDS DECISION**。冻结规格同时规定“安全格实际走过才算已探索”和“当前安全格是角色所在位置”；若普通 Safe 移动只更新角色位置而不更新 `explored`，权威状态会自相矛盾；若拆成后续独立提交，则破坏移动状态的原子一致性。S1-04 在产品经理决定是否允许普通 Safe 成功移动原子更新最小 Run State 中的位置与目标 Safe 的 explored 状态前，不得开始实现。
 
 ## 当前阶段
 
 **STAGE 1 IN PROGRESS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03 已通过自动门禁和产品经理人工验收；S1-04 因普通 Safe 移动与首次探索的原子边界等待产品经理决定；Stage 1 尚未整体 PASS。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-04 — 角色位置与普通移动目标合法性纯规则。**
+**Stage 1 / Task S1-04 — 决定普通 Safe 移动与首次 explored 的原子边界。**
 
-目标：在 `core` 层建立最小权威角色位置表达，以及普通移动命令的集中、不可变目标合法性判断与结构化结果；统一落实 Flag、Obstacle、Revealed Mine 和棋盘边界对普通移动的影响。
+待产品经理决定：是否批准普通 Safe 移动成功时，在同一个不可变领域转换中原子更新最小 `RunState` 的角色位置，并将未探索目标 Safe 转为 explored。推荐批准；这是保持“走过即探索”与权威状态一致所需的最小边界，不包含数字、胜利、奖励、存档或表现层。
 
-边界：只冻结普通移动的权威位置、允许/拒绝条件、原地目标语义与不可变结构化结果；必须复用现有 Board/Coordinate/CellState/Flag 事实。不得实现输入/UI、动画、地雷生成、踩雷揭示或复活结算、数字显示、胜负、奖励、存档、道具或 Phaser 表现。开始实现前须依据冻结规格进一步拆清“移动到隐藏雷”的命令结果与状态结算边界；如存在产品歧义必须停止报告。完成物必须包含规则单元测试、本地完整 `npm run quality`、GitHub Actions Linux `Quality` PASS、稳定 commit、回滚与产品经理人工验收步骤；不得自动执行后续 Task。
+已冻结且无需重议：Hidden Mine 返回 requires-resolution 且不改变位置/雷状态；未探索或已探索 Safe 可普通移动；Flagged Safe/Mine、Obstacle、Revealed Mine 与越界目标拒绝；原地目标 unchanged；任意合法目标不受距离、邻域、路径或中间障碍限制。在上述 explored 原子边界获批前，状态为 NEEDS DECISION，不得实现 S1-04 或执行 S1-05。
 
 ## 最近完成任务
 
@@ -187,17 +189,11 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03 已通过自动门
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 v1.0 五份控制文档、Architecture Baseline 和现有 core 模型。现在只执行 PROJECT_STATUS 的 Stage 1 / Task S1-04：角色位置与普通移动目标合法性纯规则。
+S1-04 当前为 NEEDS DECISION。请决定是否批准：普通 Safe 移动成功时，在同一个不可变领域转换中原子更新最小 Run State 的角色位置，并将未探索目标 Safe 转为 explored。
 
-只完成：
-1) 复核 S1-03 稳定基线与干净工作区；
-2) 建立最小权威角色位置表达与不可变普通移动领域命令；
-3) 独立验证起点、目标坐标和目标 Cell 当前状态；
-4) 统一处理越界、Obstacle、Flagged Cell、Revealed Mine 和原地目标；
-5) 明确测试允许与拒绝结果、原状态不变及非目标事实不变；
-6) 执行本地完整 `npm run quality`，提交并推送稳定 commit，再确认 GitHub Actions Linux `Quality` PASS。
+推荐批准。原因是冻结规格要求安全格实际走过才算已探索；只更新位置会产生矛盾权威状态，拆成两个提交会破坏移动的原子一致性。Hidden Mine requires-resolution、Flag 安全锁、任意合法目标距离以及全部禁止范围已经冻结，无需重议。
 
-不要实现 UI/输入、动画、地雷生成、踩雷揭示或复活结算、数字显示、胜负、奖励、存档、关卡、道具或 Phaser 表现。开始前先根据冻结规格明确移动到隐藏雷的结果与结算边界；如有歧义停止报告。按 AI Development Protocol 先提交单任务计划，再执行并输出测试、人工验收与回滚报告。完成后停下，等待我批准；不要执行后续 Task。
+在产品经理明确决定前，不实现 S1-04，不执行 S1-05。
 ```
 
 ## 阶段看板
@@ -205,7 +201,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03 已通过自动门
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | IN PROGRESS（S1-01/S1-02/S1-03 PASS；S1-04 NEXT） | Stage 0 PASS |
+| 1 | 核心棋盘 | IN PROGRESS（S1-01/S1-02/S1-03 PASS；S1-04 NEEDS DECISION） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
