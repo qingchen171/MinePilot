@@ -42,20 +42,23 @@
 - S0-07 稳定恢复点：commit `ddf614bd81f508f3a7927d85c1474c13bf8c586c`，tree `2e7a03dda5aa4db19a7be4cb2b53d0475adac1df`。
 - GitHub public repository：`https://github.com/qingchen171/MinePilot`；本地 `main` 跟踪 `origin/main`。
 - 远程权威质量门禁：GitHub Actions `Quality` workflow 在标准 `ubuntu-latest` runner 上执行完整 `npm run quality`；本地开发门禁继续是在 `D:\eliogames` 执行 `npm run quality`。
+- Stage 1 / Task S1-01 纯领域棋盘模型、坐标与 Cell State 基础不变量：产品经理人工验收 PASS（2026-09-04）。
+- S1-01 稳定恢复点：commit `e5db9e3747fdb25271a066e86916c896d1d2f7a7`，tree `b2a12f667e2fba8f24cbde0e2b9809ca6f2038e7`。
+- 后续实现约束：外部 JSON、存档与配置进入领域状态时必须经过运行时验证；状态转换必须通过集中纯规则完成，Scene/UI 不得直接修改领域对象；棋盘规则必须继续使用统一坐标/边界 API，不得散落重复索引计算。
 
 ## 当前阶段
 
-**STAGE 0 PASS / STAGE 1 READY**
+**STAGE 1 IN PROGRESS**
 
-S0-01 至 S0-07 均已通过自动门禁和产品经理人工验收。Stage 0 工程骨架 PASS；Stage 1 已解锁，但尚未开始任何核心玩法 Task。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-01 — 纯领域棋盘模型、坐标与 Cell State 基础不变量。**
+**Stage 1 / Task S1-02 — 八邻域坐标与周围真实雷数纯规则。**
 
-目标：在 `core` 层建立后续数字、移动、旗帜、胜利与统一 Revealed Mine 规则共同依赖的最小权威棋盘事实模型，包括坐标、棋盘边界、Cell State 分类及基础不变量；保持纯函数、确定性、无 Phaser/DOM/存储依赖。
+目标：在 `core` 层基于 S1-01 的统一坐标/边界 API，实现确定性的八邻域合法坐标枚举与当前 Cell 周围真实 mine 数量计算；障碍不阻断邻接或数字计算，边角坐标只统计棋盘内邻居。
 
-边界：只完成可测试的领域模型与不变量，不实现地雷随机生成、数字计算、角色移动、旗帜交互、胜利流程、存档、关卡、道具或 Phaser 表现。完成物必须包含规则单元测试、本地完整 `npm run quality`、GitHub Actions Linux `Quality` PASS、稳定 commit、回滚与产品经理人工验收步骤；不得自动执行 S1-02。
+边界：只实现纯坐标/计数规则，不实现地雷随机生成、首步保护、数字显示、角色移动、旗帜操作、胜利/失败、奖励、存档、道具、Scene/UI 或关卡配置。完成物必须包含中心/边/角、Obstacle 邻接、隐藏/已揭示 mine 等规则单元测试，本地完整 `npm run quality`、GitHub Actions Linux `Quality` PASS、稳定 commit、回滚与产品经理人工验收步骤；不得自动执行 S1-03。
 
 ## 最近完成任务
 
@@ -139,22 +142,34 @@ S0-01 至 S0-07 均已通过自动门禁和产品经理人工验收。Stage 0 �
 - 跨平台结论：Windows/Linux 暂无阻塞性差异；两端均保留 Phaser bundle >500 KB 警告作为观察项。
 - 回滚/禁用：优先 revert S0-07 commit 并推送，以保留历史并移除 workflow；也可在 GitHub Actions 页面禁用 workflow。未经明确批准不得删除远程仓库。
 
+### Stage 1 / Task S1-01 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`；实际执行本地 `npm run quality`，architecture、TypeScript、Vitest 34/34、production build 与 Playwright Chromium 全部 PASS。
+- 稳定恢复点：commit `e5db9e3747fdb25271a066e86916c896d1d2f7a7`，tree `b2a12f667e2fba8f24cbde0e2b9809ca6f2038e7`。
+- 领域模型：`Coordinate`、`BoardDimensions`、`CellState`、`BoardState`；统一表达 Obstacle、Safe、Mine、Revealed Mine 和普通 Flag 的权威事实。
+- 集中不变量：拒绝 Obstacle/mine、Obstacle/explored、Obstacle/flag、safe/revealed mine、explored safe/flag、mine/explored、Revealed Mine/flag、非法尺寸/坐标及 Cell 数量不匹配等组合。
+- 边界规则：`isCoordinateInBoard` 统一判断归属，`getCellAt` 对越界统一返回 `undefined`；Board 创建时复制并冻结 Cell 集合。
+- 范围控制：Reward 归属暂不冻结；玩家位置留给未来 Run State；未实现状态转换、随机生成、数字、移动、胜负、存档、道具或 UI。
+- 自动证据：本地 architecture PASS、TypeScript PASS、Vitest 4 文件 34/34 PASS、production build PASS、Playwright 1/1 PASS；GitHub Actions Linux `Quality` run `33800633060` Success。
+- 后续强制约束：外部 JSON/存档/配置必须运行时验证；领域状态只能由集中纯规则转换；后续棋盘规则必须复用统一坐标/边界 API。
+- 回滚方法：优先 revert `e5db9e3747fdb25271a066e86916c896d1d2f7a7` 并推送；也可从其父 commit `8b31b011b188914837e20bd68ae0f5082b3ccecd` 创建隔离分支/worktree，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 v1.0 五份控制文档及现有 Engineering/Architecture Baseline。现在只执行 PROJECT_STATUS 的 Stage 1 / Task S1-01：纯领域棋盘模型、坐标与 Cell State 基础不变量。
+请读取 v1.0 五份控制文档、Architecture Baseline 和 S1-01 领域模型。现在只执行 PROJECT_STATUS 的 Stage 1 / Task S1-02：八邻域坐标与周围真实雷数纯规则。
 
 只完成：
-1) 复核 S0-07 稳定基线与干净工作区；
-2) 在 `core` 层定义最小坐标、棋盘边界与 Cell State 权威模型；
-3) 用不变量拒绝越界坐标、矛盾 Cell State 和非法棋盘基础状态；
-4) 保持纯规则、确定性且不依赖 Phaser、DOM、存储或动画；
-5) 建立覆盖合法/非法/边界输入的单元测试；
+1) 复核 S1-01 稳定基线与干净工作区；
+2) 复用统一坐标/边界 API 枚举棋盘内八邻域坐标；
+3) 计算当前坐标周围真实 mine 数量，隐藏与已揭示 mine 均计数；
+4) 证明 Obstacle 不阻断邻接或数字计算；
+5) 覆盖中心、边、角、无 mine、混合 mine 状态及越界输入；
 6) 执行本地完整 `npm run quality`，提交并推送稳定 commit，再确认 GitHub Actions Linux `Quality` PASS。
 
-不要实现地雷随机生成、数字计算、角色移动、旗帜交互、胜利流程、存档、关卡、道具或 Phaser UI。按 AI Development Protocol 先提交单任务计划，再执行并输出测试、人工验收与回滚报告。完成后停下，等待我批准；不要执行 S1-02。
+不要实现地雷随机生成、首步保护、数字显示、角色移动、旗帜操作、胜负、奖励、存档、关卡、道具或 Phaser UI。按 AI Development Protocol 先提交单任务计划，再执行并输出测试、人工验收与回滚报告。完成后停下，等待我批准；不要执行 S1-03。
 ```
 
 ## 阶段看板
@@ -162,7 +177,7 @@ S0-01 至 S0-07 均已通过自动门禁和产品经理人工验收。Stage 0 �
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | READY（S1-01 NEXT） | Stage 0 PASS |
+| 1 | 核心棋盘 | IN PROGRESS（S1-01 PASS；S1-02 NEXT） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
