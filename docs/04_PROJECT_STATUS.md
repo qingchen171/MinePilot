@@ -68,20 +68,23 @@
 - Stage 1 / Task S1-07 当前角色脚下数字查询纯规则：产品经理人工验收 PASS（2026-09-04）。
 - S1-07 稳定恢复点：commit `6b10844a035b80ebbc6aaad7957223aebac598c5`，tree `c58935909167bb1da9a84f0637ba7e76efb046d3`。
 - 后续数字查询约束：未来 Revive 的特殊 Revealed Mine 站立位置必须使 `getCurrentCellMineCount` 返回 unavailable，且不得放宽普通 `on-board -> explored Safe` 不变量；Scene/UI 只能消费统一 query，不得自行扫描 Board；数字显示/隐藏属于 presentation，不得写回 Board State；外部 Save/JSON 恢复仍须运行时验证。
+- Stage 1 / Task S1-08 基础 Board Validator 与外部棋盘输入运行时验证边界：产品经理人工验收 PASS（2026-09-04）。
+- S1-08 稳定恢复点：commit `a0d43c2347524cca161b5d6aa06bc782015ee296`，tree `6a724885127737544fa5d9580992656bd9a6ff9c`。
+- 后续验证约束：Stage 2 Save parser 必须显式映射外部存储结构并复用当前 Board runtime validator，禁止以 `as BoardState` 绕过验证；未来 Level/Generator 产品策略验证必须与当前结构验证分离，不得把比例、可解性、教程规则或体验评分塞入当前 Validator；诊断保持机器可判断且不包含最终 UX 文案；RunState、phase、characterPosition 与 pending encounter 的恢复验证留给 Stage 2。
 
 ## 当前阶段
 
 **STAGE 1 IN PROGRESS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-07 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-08 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-08 — 基础 Board Validator 与外部棋盘输入运行时验证边界。**
+**Stage 1 / Task S1-09 — 可重放随机源与基础 Mine Placement 纯规则。**
 
-目标：在 `core` 层为来自关卡配置、JSON 或未来存档边界的未知棋盘输入建立最小运行时验证入口，复用并保护现有 Board/Cell 不变量，并为 MVP 基础 Board Validator 明确结构化验证结果。
+目标：在 `core` 层建立可注入、可由 seed 重放的最小随机边界，并在明确的合法候选 Cell 中无重复地选择指定数量的 Mine 位置，为后续新棋盘生成提供确定性基础。
 
-边界：开始实现前必须根据冻结规格区分领域状态结构有效性、关卡生成合法性和“胜利可达性”等验证层级，任何尚未冻结的比例或关卡策略不得擅自定值。不得实现随机棋盘生成、存档系统、关卡内容、UI、道具或其他后续 Task；不得自动执行 S1-09。
+边界：开始实现前必须冻结 seed 表达、候选 Cell 输入、Mine 数量非法时的结构化结果，以及同 seed/同输入的跨平台确定性。只处理基础 Mine Placement，不决定 mine density、障碍比例、首击安全、教程关卡保证、奖励位置、完整 Level Generator 或体验评分；不得自动执行 S1-10。
 
 ## 最近完成任务
 
@@ -245,12 +248,25 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-07 已通过自动门禁和
 - 后续强制约束：Revive 特殊站雷位置必须返回 unavailable；不得削弱普通位置不变量；Scene/UI 只能消费统一 query；显示/隐藏是 presentation；Save/JSON 恢复必须运行时验证。
 - 回滚方法：优先 revert `6b10844a035b80ebbc6aaad7957223aebac598c5` 并推送；也可从其父 commit `e3745f0398639ecabae453ed925ed082738ff10f` 创建隔离分支/worktree，禁止 `reset --hard`。
 
+### Stage 1 / Task S1-08 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`；接受统一 Board runtime validation 边界、结构化机器错误、权威构造复用及策略层留空。
+- 稳定恢复点：commit `a0d43c2347524cca161b5d6aa06bc782015ee296`，tree `6a724885127737544fa5d9580992656bd9a6ff9c`。
+- 统一入口：`validateBoardInput(input: unknown)` 对外部 `{ dimensions, cells: CellFacts[] }` 做运行时结构验证；valid 返回已构造的 `BoardState`，invalid 返回 `BoardValidationIssue[]`。
+- 错误模型：稳定 code 为 `invalid-input / invalid-dimensions / invalid-cell-count / invalid-cell / invalid-cell-state`，可携带 field/cellIndex，不包含最终用户 UX 文案。
+- 权威复用：外部字段检查后逐格调用 `createCellState`，最终调用 `createBoard`；没有复制第二套 Cell/Board legality rules，也没有使用 `as BoardState` 绕过验证。
+- 隔离性：Validator 不修改原 input；成功 Board 继续遵守复制/freeze 约束，不受原 input 后续 mutation 污染。
+- 策略留空：未加入 mine/obstacle 比例、minimum safe/mine、全 Obstacle/零 required Safe 禁令、连通性、可解性、首击安全、教程规则、体验评分或防刷策略。
+- 自动证据：本地 architecture、TypeScript、Vitest 11 文件 178/178、production build 与 Playwright Chromium 全部 PASS；GitHub Actions Linux `Quality` run `33809961319` Success。
+- 后续强制约束：Save parser 显式映射并复用 Validator；Level/Generator 策略验证保持独立；机器诊断不混入 UX；完整 RunState 恢复验证留给 Stage 2。
+- 回滚方法：优先 revert `a0d43c2347524cca161b5d6aa06bc782015ee296` 并推送；也可从其父 commit `fa1e1c0451e0b266ca7d0c61dc7ed7de6d0f3f4d` 创建隔离分支/worktree，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档和现有 core 状态，只执行 Stage 1 / Task S1-08：基础 Board Validator 与外部棋盘输入运行时验证边界。只建立最小、结构化、纯 TypeScript 的棋盘输入验证，不实现随机生成、存档、关卡内容、UI、道具或后续 Task；遇到未冻结的关卡策略立即停止请求产品决策。
+请读取最新控制文档和现有 core 状态，只执行 Stage 1 / Task S1-09：可重放随机源与基础 Mine Placement 纯规则。只建立可注入、seed 可重放且无重复的基础雷位选择；不得决定密度、障碍比例、首击安全、教程保证、奖励位置、完整 Level Generator 或后续 Task。
 ```
 
 ## 阶段看板
@@ -258,7 +274,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-07 已通过自动门禁和
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-07 PASS；S1-08 NEXT） | Stage 0 PASS |
+| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-08 PASS；S1-09 NEXT） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
