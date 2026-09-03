@@ -58,20 +58,23 @@
 - 后续移动约束：未来 Revive 的临时 Revealed Mine 站立必须使用明确特殊领域状态，不得放宽普通 `on-board -> explored Safe` 不变量；Hidden Mine 的最终 encounter/resolution 必须由后续集中规则完成；Scene/UI 只能消费 `moveCharacter` 结构化结果，不得自行移动权威位置；外部 JSON/Save 恢复 RunState 必须运行时验证。
 - S1-05 产品/技术边界（产品经理批准，2026-09-04）：Hidden Mine 最终优先级固定为 Lucky 自动结算 > Revive 玩家选择 > Failure；S1-05 只建立权威 pending encounter、first-step 最小事实与无救济介入时的基础 failure 边界，不实现 Lucky/Revive 库存、消耗、选择、揭雷、道具、存档或 UI。
 - S1-05 编排约束：pending encounter 期间普通移动必须拒绝；现有 `setFlagged(board, ...)` 不为本 Task 大改，未来 orchestration 必须阻止 Flag 或其他命令绕过/丢失 pending encounter。
+- Stage 1 / Task S1-05 Hidden Mine Encounter 的待结算状态与基础失败边界：产品经理人工验收 PASS（2026-09-04）。
+- S1-05 稳定恢复点：commit `d6edd50f80433d4d085a2e2fdd13c9d2f87fb1bd`，tree `c1389410906667cfcccf7c38b88c76164544b677`。
+- 后续 encounter 约束：Lucky/Revive 必须消费同一 `pending-mine-encounter`，不得另建踩雷判断；Lucky first-step 必须使用 `hasTakenStep` 与 encounter 快照，不得从 characterPosition 重新猜测；Revive 临时站雷必须使用明确特殊位置状态；pending/failed 下未来 Run-level orchestration 必须阻止 Flag/Item 绕过生命周期，但当前不得为 Board-level `setFlagged` 引入 Command Bus 或大规模重构；外部 Save/JSON 恢复生命周期状态必须运行时验证。
 
 ## 当前阶段
 
 **STAGE 1 IN PROGRESS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03、S1-04 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-05 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-05 — Hidden Mine Encounter 的待结算状态与基础失败边界。**
+**Stage 1 / Task S1-06 — 全部安全格实际探索的胜利判定与 Run 胜利边界。**
 
-目标：在 `core` 层承接 `moveCharacter` 的 `requires-resolution: hidden-mine`，建立唯一、显式、不可变且可测试的 Hidden Mine encounter 待结算状态与基础失败边界，避免 Scene/UI 或未来道具各自复制踩雷规则。
+目标：在 `core` 层建立统一纯规则，只有全部非雷、非障碍 Safe Cell 实际 explored 时才判定胜利，并明确胜利作为 Run 生命周期事实如何与 Safe 移动原子衔接。
 
-边界：Hidden Mine 优先级已冻结为 Lucky 自动结算 > Revive 玩家选择 > Failure。本 Task 只实现 pending encounter 身份、可靠 first-step 事实、pending 期间移动锁和无救济介入时的基础 failure；Board、mine 与角色位置保持 encounter 前事实。不得实现 UI、动画、存档、奖励、胜利、Lucky/Revive 库存或消耗、揭雷、Revive 选择/站雷及其他后续 Task；不得自动执行 S1-06。
+边界：胜利只由所有 Safe Cell explored 触发；Mine、Revealed Mine、Obstacle 与 Flag 不得计入探索需求或替代真实探索。开始实现前须明确最后一个 Safe 移动与 Run 胜利 phase 的原子转换，禁止 Scene/UI 自行判胜。不得实现奖励、通关 UI、存档、重试、关卡解锁、Lucky/Revive 或其他后续 Task；不得自动执行 S1-07。
 
 ## 最近完成任务
 
@@ -201,12 +204,24 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03、S1-04 已通过�
 - 后续强制约束：Revive 临时站雷必须增加明确特殊状态，禁止削弱普通位置不变量；Hidden Mine 由后续统一 encounter/resolution 规则处理；Scene/UI 不得直接修改角色位置；外部 JSON/Save 恢复 RunState 必须运行时验证。
 - 回滚方法：优先 revert `f813f0058e0ca644a81679638718d64166e25e09` 并推送；也可从其父 commit `9c66ef9cbb3eeb4300654c642931c166d5756d1f` 创建隔离分支/worktree，禁止 `reset --hard`。
 
+### Stage 1 / Task S1-05 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`；接受 Run 生命周期、权威 pending encounter、first-step 快照、pending/failed 移动锁与基础 failure 边界。
+- 稳定恢复点：commit `d6edd50f80433d4d085a2e2fdd13c9d2f87fb1bd`，tree `c1389410906667cfcccf7c38b88c76164544b677`。
+- Run 状态：最小权威事实为 `board / characterPosition / hasTakenStep / phase`；phase 为 `active / pending-mine-encounter / failed`。
+- Encounter：保存目标 coordinate 与 `occurredOnFirstStep`；`hasTakenStep` 与 encounter 快照共同冻结历史事实。Encounter 不移动角色、不揭雷、不改变 Board、不消耗道具，且必须指向真实未插旗 Hidden Mine。
+- 生命周期门禁：pending/failed Run 不能通过普通 `moveCharacter` 绕过；Hidden Mine 的 requires-resolution 结果携带新的 pending RunState。
+- 基础 Failure：`settleMineEncounterAsFailure` 只接受真实 pending encounter；Failure 保留 Board、mine、角色位置与 explored progress，不 restart、不 reroll、不揭雷。
+- 自动证据：本地 architecture PASS、TypeScript PASS、Vitest 8 文件 109/109 PASS、production build PASS、Playwright 1/1 PASS；GitHub Actions Linux `Quality` run `33805641623` Success。
+- 后续强制约束：Lucky/Revive 消费同一 pending encounter；Lucky 使用权威 first-step 事实；Revive 使用特殊站雷位置；Run-level orchestration 阻止 pending/failed 下的其他命令；不为此提前重构 Board-level Flag API；Save/JSON 必须运行时验证。
+- 回滚方法：优先 revert `d6edd50f80433d4d085a2e2fdd13c9d2f87fb1bd` 并推送；也可从其父 commit `24a9e324d56ab4eb9abc960f41732765ca9c8578` 创建隔离分支/worktree，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档和现有 core 状态，只执行 Stage 1 / Task S1-05：Hidden Mine Encounter 的待结算状态与基础失败边界。实现权威 pending encounter、可靠 first-step 事实、pending 移动锁与无救济介入时的基础 failure；不实现 Lucky/Revive、揭雷、存档、UI 或后续 Task。
+请读取最新控制文档和现有 core 状态，只执行 Stage 1 / Task S1-06：全部安全格实际探索的胜利判定与 Run 胜利边界。只实现统一纯胜利规则及其与最后一个 Safe 移动的原子 Run 生命周期转换；不实现奖励、UI、存档、关卡解锁、道具或后续 Task。
 ```
 
 ## 阶段看板
@@ -214,7 +229,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03、S1-04 已通过�
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-04 PASS；S1-05 NEXT） | Stage 0 PASS |
+| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-05 PASS；S1-06 NEXT） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
