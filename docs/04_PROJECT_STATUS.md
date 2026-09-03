@@ -45,20 +45,23 @@
 - Stage 1 / Task S1-01 纯领域棋盘模型、坐标与 Cell State 基础不变量：产品经理人工验收 PASS（2026-09-04）。
 - S1-01 稳定恢复点：commit `e5db9e3747fdb25271a066e86916c896d1d2f7a7`，tree `b2a12f667e2fba8f24cbde0e2b9809ca6f2038e7`。
 - 后续实现约束：外部 JSON、存档与配置进入领域状态时必须经过运行时验证；状态转换必须通过集中纯规则完成，Scene/UI 不得直接修改领域对象；棋盘规则必须继续使用统一坐标/边界 API，不得散落重复索引计算。
+- Stage 1 / Task S1-02 八邻域坐标与周围真实雷数纯规则：产品经理人工验收 PASS（2026-09-04）。
+- S1-02 稳定恢复点：commit `7940bd2a334a3a4bb10b3cee3fe92943dbccd593`，tree `8d6ddfac25ce77bca6f6e1327a332fc9a9d24f30`。
+- 后续邻域约束：所有八邻域规则必须优先复用 `getNeighborCoordinates`；Detection 的随机选择不得利用邻域数组顺序伪装随机；任何修改状态的命令必须独立验证目标合法性，不得把越界空查询当作成功操作。
 
 ## 当前阶段
 
 **STAGE 1 IN PROGRESS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-02 — 八邻域坐标与周围真实雷数纯规则。**
+**Stage 1 / Task S1-03 — 普通 Flag 的纯状态转换与目标合法性。**
 
-目标：在 `core` 层基于 S1-01 的统一坐标/边界 API，实现确定性的八邻域合法坐标枚举与当前 Cell 周围真实 mine 数量计算；障碍不阻断邻接或数字计算，边角坐标只统计棋盘内邻居。
+目标：在 `core` 层建立添加、移除普通 Flag 的集中纯状态转换；命令必须验证坐标与 Cell 当前状态，Flag 只代表玩家猜测且不得改变真实 safe/mine 身份。
 
-边界：只实现纯坐标/计数规则，不实现地雷随机生成、首步保护、数字显示、角色移动、旗帜操作、胜利/失败、奖励、存档、道具、Scene/UI 或关卡配置。完成物必须包含中心/边/角、Obstacle 邻接、隐藏/已揭示 mine 等规则单元测试，本地完整 `npm run quality`、GitHub Actions Linux `Quality` PASS、稳定 commit、回滚与产品经理人工验收步骤；不得自动执行 S1-03。
+边界：只实现不可变 Flag 转换与明确成功/拒绝结果；允许未探索 hidden safe/mine 添加或移除 Flag，拒绝越界、Obstacle、explored safe、Revealed Mine 及无效重复命令。不得实现 UI 点击、移动、雷生成、揭示、胜负、奖励、存档、道具或 Phaser 表现。完成物必须包含规则单元测试、本地完整 `npm run quality`、GitHub Actions Linux `Quality` PASS、稳定 commit、回滚与产品经理人工验收步骤；不得自动执行 S1-04。
 
 ## 最近完成任务
 
@@ -154,22 +157,33 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 已通过自动门禁和产品经�
 - 后续强制约束：外部 JSON/存档/配置必须运行时验证；领域状态只能由集中纯规则转换；后续棋盘规则必须复用统一坐标/边界 API。
 - 回滚方法：优先 revert `e5db9e3747fdb25271a066e86916c896d1d2f7a7` 并推送；也可从其父 commit `8b31b011b188914837e20bd68ae0f5082b3ccecd` 创建隔离分支/worktree，禁止 `reset --hard`。
 
+### Stage 1 / Task S1-02 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`；实际执行本地 `npm run quality`，architecture、TypeScript、Vitest 56/56、production build 与 Playwright Chromium 全部 PASS。
+- 稳定恢复点：commit `7940bd2a334a3a4bb10b3cee3fe92943dbccd593`，tree `8d6ddfac25ce77bca6f6e1327a332fc9a9d24f30`。
+- 统一邻域：`getNeighborCoordinates` 返回中心周围最多 8 个棋盘内坐标，永不包含中心；角落 3 个、非角边缘 5 个、`1×1` 为 0，Obstacle 不改变邻域关系。
+- 雷数规则：`countAdjacentMines` 复用统一邻域、`getCellAt` 与 `isMineCell`；Hidden、Revealed、Flagged Mine 均按真实 mine 计数，Wrongly Flagged Safe、Obstacle、explored/unexplored Safe 均不计数。
+- 越界语义：合法但位于当前 Board 外的中心坐标返回空邻域/0；修改状态的命令不得沿用空查询作为成功结果，必须独立验证目标。
+- 自动证据：本地 architecture PASS、TypeScript PASS、Vitest 5 文件 56/56 PASS、production build PASS、Playwright 1/1 PASS；GitHub Actions Linux `Quality` run `33801841578` Success。
+- 后续强制约束：Detection 与其他八邻域规则必须复用统一 API；随机选择必须使用未来可注入、可重放随机源，不得以邻域顺序代替随机。
+- 回滚方法：优先 revert `7940bd2a334a3a4bb10b3cee3fe92943dbccd593` 并推送；也可从其父 commit `cd3e1fe35b757b1d07f365281876979bb2922b17` 创建隔离分支/worktree，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 v1.0 五份控制文档、Architecture Baseline 和 S1-01 领域模型。现在只执行 PROJECT_STATUS 的 Stage 1 / Task S1-02：八邻域坐标与周围真实雷数纯规则。
+请读取 v1.0 五份控制文档、Architecture Baseline 和现有 core 模型。现在只执行 PROJECT_STATUS 的 Stage 1 / Task S1-03：普通 Flag 的纯状态转换与目标合法性。
 
 只完成：
-1) 复核 S1-01 稳定基线与干净工作区；
-2) 复用统一坐标/边界 API 枚举棋盘内八邻域坐标；
-3) 计算当前坐标周围真实 mine 数量，隐藏与已揭示 mine 均计数；
-4) 证明 Obstacle 不阻断邻接或数字计算；
-5) 覆盖中心、边、角、无 mine、混合 mine 状态及越界输入；
+1) 复核 S1-02 稳定基线与干净工作区；
+2) 建立添加/移除普通 Flag 的不可变纯状态转换；
+3) 独立验证目标坐标与 Cell 当前状态；
+4) 保持 Flag 仅为玩家猜测，不改变 safe/mine 身份；
+5) 覆盖 hidden safe/mine、越界、Obstacle、explored safe、Revealed Mine 和重复命令；
 6) 执行本地完整 `npm run quality`，提交并推送稳定 commit，再确认 GitHub Actions Linux `Quality` PASS。
 
-不要实现地雷随机生成、首步保护、数字显示、角色移动、旗帜操作、胜负、奖励、存档、关卡、道具或 Phaser UI。按 AI Development Protocol 先提交单任务计划，再执行并输出测试、人工验收与回滚报告。完成后停下，等待我批准；不要执行 S1-03。
+不要实现 UI 点击、移动、地雷生成、揭示、胜负、奖励、存档、关卡、道具或 Phaser 表现。按 AI Development Protocol 先提交单任务计划，再执行并输出测试、人工验收与回滚报告。完成后停下，等待我批准；不要执行 S1-04。
 ```
 
 ## 阶段看板
@@ -177,7 +191,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 已通过自动门禁和产品经�
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | IN PROGRESS（S1-01 PASS；S1-02 NEXT） | Stage 0 PASS |
+| 1 | 核心棋盘 | IN PROGRESS（S1-01/S1-02 PASS；S1-03 NEXT） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
