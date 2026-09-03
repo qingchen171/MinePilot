@@ -53,20 +53,23 @@
 - 后续 Flag 约束：Scene/UI 必须调用集中领域转换并消费结构化 Result，不得直接修改 Board；UI、音效与持久化等副作用只能根据真实 transition result 决定，`unchanged` 不得被当作状态变化；Flag 对移动合法性的影响留给后续移动规则；外部 JSON/存档恢复仍须经过运行时验证。
 - S1-04 前置产品/技术边界（产品经理批准，2026-09-04）：Hidden Mine 是允许尝试进入但必须返回 `requires-resolution / mine-encounter` 的目标，不是普通 `not-movable`；S1-04 不揭示雷、不判定失败、不处理 Lucky/Revive，也不把角色位置永久提交到该雷。普通移动可选择任意合法坐标，不要求相邻、路径或寻路；Flag 无论真假均作为移动安全锁。
 - S1-04 原子边界（产品经理批准，2026-09-04）：普通 Safe 移动在同一纯转换中原子更新最小 `RunState { board, characterPosition }`；未探索目标 Safe 同时转为 explored，已探索目标只更新位置，不允许出现角色已位于 Safe 而该 Cell 仍未 explored 的中间状态。角色开局位置为明确的 `outside-board / waiting`，不得用非法 Coordinate 伪装；首次 Hidden Mine encounter 不提交位置。
+- Stage 1 / Task S1-04 角色位置与普通移动目标合法性纯规则：产品经理人工验收 PASS（2026-09-04）。
+- S1-04 稳定恢复点：commit `f813f0058e0ca644a81679638718d64166e25e09`，tree `c1b13c007bcaa5ff450fcff67de7609cf647b499`。
+- 后续移动约束：未来 Revive 的临时 Revealed Mine 站立必须使用明确特殊领域状态，不得放宽普通 `on-board -> explored Safe` 不变量；Hidden Mine 的最终 encounter/resolution 必须由后续集中规则完成；Scene/UI 只能消费 `moveCharacter` 结构化结果，不得自行移动权威位置；外部 JSON/Save 恢复 RunState 必须运行时验证。
 
 ## 当前阶段
 
 **STAGE 1 IN PROGRESS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03 已通过自动门禁和产品经理人工验收；S1-04 的移动/探索原子边界与 waiting 初始位置已经产品经理批准，当前执行 S1-04；Stage 1 尚未整体 PASS。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03、S1-04 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-04 — 角色位置与普通移动目标合法性纯规则。**
+**Stage 1 / Task S1-05 — Hidden Mine Encounter 的待结算状态与基础失败边界。**
 
-目标：在 `core` 层建立明确区分 waiting/on-board 的最小权威角色位置、最小 Run State，以及普通移动命令的集中不可变目标合法性与结构化结果；Safe 成功移动原子提交位置和必要的 explored 转换。
+目标：在 `core` 层承接 `moveCharacter` 的 `requires-resolution: hidden-mine`，建立唯一、显式、不可变且可测试的 Hidden Mine encounter 待结算状态与基础失败边界，避免 Scene/UI 或未来道具各自复制踩雷规则。
 
-边界：Hidden Mine 返回 requires-resolution 且不改变位置/雷状态；未探索或已探索 Safe 可普通移动；Flagged Safe/Mine、Obstacle、Revealed Mine 与越界目标拒绝；原地目标 unchanged；任意合法目标不受距离、邻域、路径或中间障碍限制。不得实现数字、胜负、奖励、存档、动画、UI、Lucky、Revive 或其他后续逻辑；不得执行 S1-05。
+边界：开始实现前必须依据冻结规格明确“待结算 encounter”“无保护时失败”以及未来 Lucky 优先、Revive 选择的组合边界；若不能在不提前实现 Stage 3 道具的前提下保持统一规则入口，停止并提交 NEEDS DECISION。不得实现 UI、动画、存档、奖励、胜利、正式 Lucky/Revive 道具库存或其他后续 Task；不得自动执行 S1-06。
 
 ## 最近完成任务
 
@@ -184,12 +187,24 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03 已通过自动门
 - 后续强制约束：Scene/UI 只能调用领域转换并消费 Result；UI、音效、持久化等副作用只能响应真实 `changed`；Flag 对移动合法性的影响由后续移动规则统一处理；外部 JSON/存档恢复必须运行时验证。
 - 回滚方法：优先 revert `a503ef13a90977a3061d5f3bba892fd2b47e9d02` 并推送；也可从其父 commit `e8298a87bdcc55c9290cd1c1519bd9e04ba394ee` 创建隔离分支/worktree，禁止 `reset --hard`。
 
+### Stage 1 / Task S1-04 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`；接受 waiting/on-board 角色位置、Safe 移动/探索原子转换、Hidden Mine requires-resolution、Flag 安全锁及不限距离的目标规则。
+- 稳定恢复点：commit `f813f0058e0ca644a81679638718d64166e25e09`，tree `c1b13c007bcaa5ff450fcff67de7609cf647b499`。
+- 状态模型：最小 `RunState { board, characterPosition }`；角色位置为 `waiting | on-board(coordinate)`，waiting 不伪造棋盘坐标，普通 on-board 只能指向 explored Safe。
+- 移动结果：`moveCharacter` 只在 `moved` 时返回新 RunState；Hidden Mine 返回 `requires-resolution: hidden-mine` 且不揭雷、不提交位置；越界、Flagged Cell、Obstacle、Revealed Mine 返回明确 rejected，原地目标返回 unchanged。
+- 原子性与距离：首次进入 Safe 时位置与 explored 在同一不可变转换中提交；已 explored Safe 可复用原 Board；目标合法性不使用邻域、距离、路径或中间障碍。
+- 自动证据：本地 architecture PASS、TypeScript PASS、Vitest 7 文件 96/96 PASS、production build PASS、Playwright 1/1 PASS；GitHub Actions Linux `Quality` run `33804508118` Success。
+- 首次门禁问题：第一次完整 quality 在 TypeScript 阶段发现位置工厂返回类型过宽；通过唯一确定性修复——为 waiting/on-board 工厂补充精确显式返回类型——解决，随后完整 quality 全绿，不构成当前 blocker。
+- 后续强制约束：Revive 临时站雷必须增加明确特殊状态，禁止削弱普通位置不变量；Hidden Mine 由后续统一 encounter/resolution 规则处理；Scene/UI 不得直接修改角色位置；外部 JSON/Save 恢复 RunState 必须运行时验证。
+- 回滚方法：优先 revert `f813f0058e0ca644a81679638718d64166e25e09` 并推送；也可从其父 commit `9c66ef9cbb3eeb4300654c642931c166d5756d1f` 创建隔离分支/worktree，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请只执行 S1-04：建立 waiting/on-board 角色位置、最小 Run State 和普通移动纯规则。Safe 成功移动必须原子更新位置及必要的 explored；Hidden Mine 返回 requires-resolution 且不提交状态；各类拒绝与 unchanged 不携带伪造的新状态。完成本地与 Linux 完整门禁后停止等待人工验收，不执行 S1-05。
+请读取最新控制文档和现有 core 状态，只执行 Stage 1 / Task S1-05：Hidden Mine Encounter 的待结算状态与基础失败边界。先明确它与未来 Lucky 优先、Revive 选择的组合边界；若不能在不提前实现 Stage 3 道具的情况下保持统一规则入口，停止为 NEEDS DECISION。不得实现 UI、动画、存档、奖励、胜利或后续 Task。
 ```
 
 ## 阶段看板
@@ -197,7 +212,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01、S1-02、S1-03 已通过自动门
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | IN PROGRESS（S1-01/S1-02/S1-03 PASS；S1-04 IN PROGRESS） | Stage 0 PASS |
+| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-04 PASS；S1-05 NEXT） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
