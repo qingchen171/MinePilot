@@ -69,6 +69,15 @@ export function createCoordinate(x: number, y: number): Coordinate {
   return Object.freeze({ x, y });
 }
 
+export function createBoardDimensions(dimensions: BoardDimensions): BoardDimensions {
+  requirePositiveInteger(dimensions.width, 'Board width');
+  requirePositiveInteger(dimensions.height, 'Board height');
+
+  const cellCount = dimensions.width * dimensions.height;
+  if (!Number.isSafeInteger(cellCount)) throw new RangeError('Board cell count must be a safe integer.');
+  return Object.freeze({ width: dimensions.width, height: dimensions.height });
+}
+
 export function createCellState(facts: CellFacts): CellState {
   if (facts.terrain === 'obstacle') {
     if (facts.containsMine) throw new Error('An obstacle cannot contain a mine.');
@@ -102,30 +111,36 @@ export function isMineCell(cell: CellState): cell is MineCell {
 }
 
 export function createBoard(dimensions: BoardDimensions, cells: readonly CellState[]): BoardState {
-  requirePositiveInteger(dimensions.width, 'Board width');
-  requirePositiveInteger(dimensions.height, 'Board height');
-
-  const cellCount = dimensions.width * dimensions.height;
-  if (!Number.isSafeInteger(cellCount)) throw new RangeError('Board cell count must be a safe integer.');
+  const validatedDimensions = createBoardDimensions(dimensions);
+  const cellCount = validatedDimensions.width * validatedDimensions.height;
   if (cells.length !== cellCount) {
     throw new RangeError(`Board requires ${cellCount} cells, but received ${cells.length}.`);
   }
 
   return Object.freeze({
-    dimensions: Object.freeze({ width: dimensions.width, height: dimensions.height }),
+    dimensions: validatedDimensions,
     cells: Object.freeze([...cells]),
   });
 }
 
-export function isCoordinateInBoard(board: BoardState, coordinate: Coordinate): boolean {
+export function isCoordinateInDimensions(
+  dimensions: BoardDimensions,
+  coordinate: Coordinate,
+): boolean {
   return (
+    typeof coordinate === 'object' &&
+    coordinate !== null &&
     Number.isSafeInteger(coordinate.x) &&
     Number.isSafeInteger(coordinate.y) &&
     coordinate.x >= 0 &&
     coordinate.y >= 0 &&
-    coordinate.x < board.dimensions.width &&
-    coordinate.y < board.dimensions.height
+    coordinate.x < dimensions.width &&
+    coordinate.y < dimensions.height
   );
+}
+
+export function isCoordinateInBoard(board: BoardState, coordinate: Coordinate): boolean {
+  return isCoordinateInDimensions(board.dimensions, coordinate);
 }
 
 export function getCellAt(board: BoardState, coordinate: Coordinate): CellState | undefined {
