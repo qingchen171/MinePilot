@@ -132,3 +132,15 @@ export function getCellAt(board: BoardState, coordinate: Coordinate): CellState 
   if (!isCoordinateInBoard(board, coordinate)) return undefined;
   return board.cells[coordinate.y * board.dimensions.width + coordinate.x];
 }
+
+export function replaceCellAt(
+  board: BoardState,
+  coordinate: Coordinate,
+  replacement: CellState,
+): BoardState | undefined {
+  if (!isCoordinateInBoard(board, coordinate)) return undefined;
+
+  const cells = [...board.cells];
+  cells[coordinate.y * board.dimensions.width + coordinate.x] = replacement;
+  return createBoard(board.dimensions, cells);
+}
