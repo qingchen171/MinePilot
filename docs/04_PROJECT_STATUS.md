@@ -65,20 +65,23 @@
 - Stage 1 / Task S1-06 全部安全格实际探索的胜利判定与 Run 胜利边界：产品经理人工验收 PASS（2026-09-04）。
 - S1-06 稳定恢复点：commit `c4bda35dc5a1efc668cf8b26a3f0c9c36f8e86c1`，tree `a9f8c53c76df0964431baf523aeae290e154b6bf`。
 - 后续胜利约束：Airplane 等任何把 Safe 变成 explored 的机制必须复用统一 victory rule；外部 Save/JSON 恢复 won Run 必须运行时验证；won/pending/failed 下未来 Run-level orchestration 必须阻止 Flag/Item 等命令改变本局玩法状态，但当前不得为 Board-level `setFlagged` 引入 Command Bus 或大规模重构；关卡是否允许零 required Safe 属于 Level Config / Board Validator，不属于 Victory 规则。
+- Stage 1 / Task S1-07 当前角色脚下数字查询纯规则：产品经理人工验收 PASS（2026-09-04）。
+- S1-07 稳定恢复点：commit `6b10844a035b80ebbc6aaad7957223aebac598c5`，tree `c58935909167bb1da9a84f0637ba7e76efb046d3`。
+- 后续数字查询约束：未来 Revive 的特殊 Revealed Mine 站立位置必须使 `getCurrentCellMineCount` 返回 unavailable，且不得放宽普通 `on-board -> explored Safe` 不变量；Scene/UI 只能消费统一 query，不得自行扫描 Board；数字显示/隐藏属于 presentation，不得写回 Board State；外部 Save/JSON 恢复仍须运行时验证。
 
 ## 当前阶段
 
 **STAGE 1 IN PROGRESS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-06 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-07 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-07 — 当前角色脚下数字查询纯规则。**
+**Stage 1 / Task S1-08 — 基础 Board Validator 与外部棋盘输入运行时验证边界。**
 
-目标：在 `core` 层基于权威 Run State、角色位置和既有 `countAdjacentMines`，建立当前角色所在 Safe Cell 的周围真实雷数查询；数字是可推导事实，不写回 Cell/Board，也不建立第二套邻域或计雷逻辑。
+目标：在 `core` 层为来自关卡配置、JSON 或未来存档边界的未知棋盘输入建立最小运行时验证入口，复用并保护现有 Board/Cell 不变量，并为 MVP 基础 Board Validator 明确结构化验证结果。
 
-边界：角色处于 waiting 时没有脚下 Cell；普通 on-board 位置必须继续遵守 explored Safe 不变量。开始实现前须从冻结规格确认 pending/failed/won 生命周期下的查询语义，若规格不足则停止请求决策，不得猜测。不得实现数字显示、零格视觉反馈、动画、UI、存档、道具或其他后续 Task；不得自动执行 S1-08。
+边界：开始实现前必须根据冻结规格区分领域状态结构有效性、关卡生成合法性和“胜利可达性”等验证层级，任何尚未冻结的比例或关卡策略不得擅自定值。不得实现随机棋盘生成、存档系统、关卡内容、UI、道具或其他后续 Task；不得自动执行 S1-09。
 
 ## 最近完成任务
 
@@ -231,12 +234,23 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-06 已通过自动门禁和
 - 后续强制约束：未来所有 explored Safe 转换复用统一 victory rule；Save/JSON 恢复 won Run 必须运行时验证；Run-level orchestration 阻止 won/pending/failed 下的其他命令；不得提前大改 Board-level Flag API；零 required Safe 的关卡合法性由 Level Config / Board Validator 决定。
 - 回滚方法：优先 revert `c4bda35dc5a1efc668cf8b26a3f0c9c36f8e86c1` 并推送；也可从其父 commit `e35293e759b22d8399ef5d4cdc0c72786e427cfa` 创建隔离分支/worktree，禁止 `reset --hard`。
 
+### Stage 1 / Task S1-07 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`；接受统一当前脚下数字查询、结构化 available/unavailable 结果、合法 0 的明确表达及所有 phase 下的事实查询边界。
+- 稳定恢复点：commit `6b10844a035b80ebbc6aaad7957223aebac598c5`，tree `c58935909167bb1da9a84f0637ba7e76efb046d3`。
+- 统一查询：`getCurrentCellMineCount(run)` 仅在角色位于合法 explored Safe 时返回 `{ status: 'available', mineCount }`；waiting 返回 `{ status: 'unavailable' }`，合法数字 0 不与无数字混淆。
+- 规则复用：查询直接调用 `countAdjacentMines`；Hidden、Revealed、Flagged Mine 均按真实 Mine 事实计数，Wrong Flag、Safe、Obstacle 不计数，中心格不参与。
+- 生命周期与状态：pending/failed/won 不由 query 层按 phase 屏蔽；数字不缓存进 Cell、Board 或 Run State，查询无副作用。
+- 自动证据：本地 architecture、TypeScript、Vitest 10 文件 139/139、production build 与 Playwright Chromium 全部 PASS；GitHub Actions Linux `Quality` run `33807509370` Success。
+- 后续强制约束：Revive 特殊站雷位置必须返回 unavailable；不得削弱普通位置不变量；Scene/UI 只能消费统一 query；显示/隐藏是 presentation；Save/JSON 恢复必须运行时验证。
+- 回滚方法：优先 revert `6b10844a035b80ebbc6aaad7957223aebac598c5` 并推送；也可从其父 commit `e3745f0398639ecabae453ed925ed082738ff10f` 创建隔离分支/worktree，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档和现有 core 状态，只执行 Stage 1 / Task S1-07：当前角色脚下数字查询纯规则。只建立基于权威 Run State、角色位置、统一八邻域与真实 mine count 的纯查询；不得把数字存入 Cell/Board，不实现数字显示、零格视觉反馈、UI、存档、道具或后续 Task。
+请读取最新控制文档和现有 core 状态，只执行 Stage 1 / Task S1-08：基础 Board Validator 与外部棋盘输入运行时验证边界。只建立最小、结构化、纯 TypeScript 的棋盘输入验证，不实现随机生成、存档、关卡内容、UI、道具或后续 Task；遇到未冻结的关卡策略立即停止请求产品决策。
 ```
 
 ## 阶段看板
@@ -244,7 +258,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-06 已通过自动门禁和
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-06 PASS；S1-07 NEXT） | Stage 0 PASS |
+| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-07 PASS；S1-08 NEXT） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
