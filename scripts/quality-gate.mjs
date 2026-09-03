@@ -4,7 +4,14 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { assertProjectWorkingDirectory, PROJECT_ROOT } from './project-root.mjs';
 
-export const QUALITY_STEPS = ['architecture', 'typecheck', 'test:unit', 'build:bundle', 'test:e2e'];
+export const QUALITY_STEPS = [
+  'architecture',
+  'typecheck',
+  'test:unit',
+  'test:integration',
+  'build:bundle',
+  'test:e2e',
+];
 
 /**
  * @param {string} scriptName
