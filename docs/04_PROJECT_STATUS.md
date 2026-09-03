@@ -71,20 +71,25 @@
 - Stage 1 / Task S1-08 基础 Board Validator 与外部棋盘输入运行时验证边界：产品经理人工验收 PASS（2026-09-04）。
 - S1-08 稳定恢复点：commit `a0d43c2347524cca161b5d6aa06bc782015ee296`，tree `6a724885127737544fa5d9580992656bd9a6ff9c`。
 - 后续验证约束：Stage 2 Save parser 必须显式映射外部存储结构并复用当前 Board runtime validator，禁止以 `as BoardState` 绕过验证；未来 Level/Generator 产品策略验证必须与当前结构验证分离，不得把比例、可解性、教程规则或体验评分塞入当前 Validator；诊断保持机器可判断且不包含最终 UX 文案；RunState、phase、characterPosition 与 pending encounter 的恢复验证留给 Stage 2。
+- Stage 1 / Task S1-09 可重放随机源与基础 Mine Placement 纯规则：产品经理人工验收 PASS（2026-09-04）。
+- S1-09 稳定恢复点：commit `ecc217a1ab6248ab2a6b51dc299b3961cbfdd3b7`，tree `4eb65680f71746a7af36fb4e54c97e558dcc55e0`。
+- 随机重放兼容合同：PRNG algorithm、seed、`nextInt` 映射算法、RNG 调用顺序、candidate 内容与顺序、placement algorithm、mineCount 共同决定结果；Mulberry32、rejection sampling、row-major/candidate ordering 与 partial Fisher-Yates 均不得作为普通内部实现静默修改。
+- Golden compatibility 哨兵：seed `123456789`、row-major `3×3` candidates、mineCount `4` 的 expected coordinates 固定为 `(2,2), (0,0), (0,2), (1,2)`；未来测试失败时不得直接更新 expected，必须先判断是否破坏重放兼容合同。
+- Stage 2 Save 约束：设计 Save schema 时重新评估保存最终 Board、保存 seed、引入 RNG/Generation version 及算法升级后的旧存档兼容方式；当前不提前实现这些 Save/versioning 决策。
 
 ## 当前阶段
 
 **STAGE 1 IN PROGRESS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-08 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-09 已通过自动门禁和产品经理人工验收；Stage 1 尚未整体 PASS。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-09 — 可重放随机源与基础 Mine Placement 纯规则。**
+**Stage 1 / Task S1-10 — 基础初始 Board 构造纯规则。**
 
-目标：在 `core` 层建立可注入、可由 seed 重放的最小随机边界，并在明确的合法候选 Cell 中无重复地选择指定数量的 Mine 位置，为后续新棋盘生成提供确定性基础。
+目标：在 `core` 层把明确的 Board dimensions、Obstacle coordinates 与已选择的 Mine coordinates 组合成权威的初始 `BoardState`，统一建立 row-major、全部未探索且未插旗的初始 Cell 事实。
 
-边界：开始实现前必须冻结 seed 表达、候选 Cell 输入、Mine 数量非法时的结构化结果，以及同 seed/同输入的跨平台确定性。只处理基础 Mine Placement，不决定 mine density、障碍比例、首击安全、教程关卡保证、奖励位置、完整 Level Generator 或体验评分；不得自动执行 S1-10。
+边界：开始实现前必须冻结 Obstacle/Mine 坐标冲突、越界与重复输入的结构化拒绝语义，并复用现有 Board/Cell 构造不变量。只负责初始 Board 组装，不选择 Mine、不生成 Obstacle、不决定比例、首击安全、教程、奖励、seed、Retry、Save 或完整 Level Generator；不得自动执行 S1-11。
 
 ## 最近完成任务
 
@@ -261,12 +266,25 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-08 已通过自动门禁和
 - 后续强制约束：Save parser 显式映射并复用 Validator；Level/Generator 策略验证保持独立；机器诊断不混入 UX；完整 RunState 恢复验证留给 Stage 2。
 - 回滚方法：优先 revert `a0d43c2347524cca161b5d6aa06bc782015ee296` 并推送；也可从其父 commit `fa1e1c0451e0b266ca7d0c61dc7ed7de6d0f3f4d` 创建隔离分支/worktree，禁止 `reset --hard`。
 
+### Stage 1 / Task S1-09 — PASS
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`；接受显式 RandomSource、固定 Mulberry32、uint32 seed、rejection-sampling `nextInt`、partial Fisher-Yates 与 candidate-order 重放合同。
+- 稳定恢复点：commit `ecc217a1ab6248ab2a6b51dc299b3961cbfdd3b7`，tree `4eb65680f71746a7af36fb4e54c97e558dcc55e0`。
+- 随机源：`createSeededRandomSource(seed)` 接受 `0..4294967295`；`RandomSource.nextInt(maxExclusive)` 显式注入，不调用 `Math.random()`，同 seed/同调用顺序可跨环境重放。
+- Mine Placement：`selectMineCoordinates(candidates, mineCount, random)` 只做无重复坐标采样；0 与全选合法，候选不足不 clamp，输入不修改，输出冻结，不修改或生成 Board。
+- 结构化拒绝：`invalid-mine-count / mine-count-exceeds-candidates / invalid-candidate / duplicate-candidate`；Random seed 与 maxExclusive 构造不变量使用明确 RangeError。
+- 完整重放合同：算法、seed、映射、调用顺序、candidate 内容/顺序、placement、mineCount 任一变化都可能改变结果，未来必须版本化评估而非静默修改。
+- Golden test：seed `123456789`、row-major `3×3`、mineCount `4` 固定得到 `(2,2), (0,0), (0,2), (1,2)`，是 Save/replay compatibility 哨兵。
+- 自动证据：本地 architecture、TypeScript、Vitest 13 文件 216/216、production build 与 Playwright Chromium 全部 PASS；GitHub Actions Linux `Quality` run `33811343440` Success。
+- Stage 2 决策留白：最终 Board/seed 保存策略、RNG/Generation version 及旧存档迁移必须在 Save schema Task 重新评估，本轮未提前冻结。
+- 回滚方法：优先 revert `ecc217a1ab6248ab2a6b51dc299b3961cbfdd3b7` 并推送；也可从其父 commit `59988df770d742b53940f16177227e6de4495ddf` 创建隔离分支/worktree，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档和现有 core 状态，只执行 Stage 1 / Task S1-09：可重放随机源与基础 Mine Placement 纯规则。只建立可注入、seed 可重放且无重复的基础雷位选择；不得决定密度、障碍比例、首击安全、教程保证、奖励位置、完整 Level Generator 或后续 Task。
+请读取最新控制文档和现有 core 状态，只执行 Stage 1 / Task S1-10：基础初始 Board 构造纯规则。只把明确 dimensions、Obstacle coordinates 和已选择 Mine coordinates 组合为合法、row-major 的初始 Board；不得选择雷位、生成障碍、决定比例、首击安全、教程、奖励、seed、Retry、Save、完整 Level Generator 或后续 Task。
 ```
 
 ## 阶段看板
@@ -274,7 +292,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-08 已通过自动门禁和
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-08 PASS；S1-09 NEXT） | Stage 0 PASS |
+| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-09 PASS；S1-10 NEXT） | Stage 0 PASS |
 | 2 | State + Save | LOCKED | Stage 1 PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
