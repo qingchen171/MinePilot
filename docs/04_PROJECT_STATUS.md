@@ -3,7 +3,7 @@
 **项目：MinePilot / Minesweeper Product**  
 **状态更新时间：2026-09-04**  
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core implementation 已建立并通过 S1-01 至 S1-12 人工验收；Stage 1 尚未 Freeze**
+**正式游戏代码：Stage 1 core implementation 已完成；S1-01 至 S1-13 全部人工验收 PASS，Stage 1 FROZEN / PASS**
 
 ## 当前事实
 
@@ -86,24 +86,31 @@
 - S1-12 稳定恢复点：commit `dac0058c00d7fc225bd8a04f4274b09cea2cc0d7`，tree `6d7a7601817e7f0d44dc31b743bdac268fa4979f`。
 - S1-12 gameplay 边界：`setRunFlagged` 是实际 gameplay 的 Run-level Flag 入口；仅 active Run 委托现有 Board-level `setFlagged`，pending/failed/won 在调用 primitive 前结构化拒绝。只有真实 changed 产生保留角色位置、`hasTakenStep` 与 active phase 的新 RunState；rejected/unchanged 不产生伪造状态。
 - S1-12 架构约束：Board-level `setFlagged` 继续作为合法 core primitive；未来 gameplay/systems/Scene/UI 不得绕过 Run-level command 直接修改 `run.board`；不得为此引入 Command Bus、GameManager、DI、event bus、generic reducer 或通用 orchestration framework。
-- Stage 1 剩余范围冻结：S1-11 确认的 gameplay implementation blocker 已由 S1-12 关闭；Stage 1 现在只剩 S1-13 Core lifecycle integration 与 Freeze Gate。除非测试暴露新的真实 blocker，不得继续扩张 Stage 1。
-- 剩余证据缺口：仍缺少从 Initial Board 贯穿 Safe movement、number query、Flag、Hidden Mine/Failure 与 Victory 的完整 core lifecycle integration evidence；仅由 S1-13 负责。
-- Deferred-by-design 边界：Save/Retry 属于 Stage 2；Lucky/Revive/Detection/Airplane 属于 Stage 3；Rewards/Inventory/Shop/Tutorial/Benben/Level progression 属于 Stage 4；presentation/UI/animation/audio 属于 Stage 5。不得把这些功能重新拉入 Stage 1。
-- `createRunState` 及完整 Run lifecycle 的外部 Save runtime validation 属于 Stage 2；Phaser bundle >500 KB 继续仅为 observation，不是 Stage 1 blocker。
+- Stage 1 / Task S1-13 Core 生命周期集成与 Freeze Gate：产品经理人工验收 PASS（2026-09-04），结论 `A — READY TO FREEZE`。
+- S1-13 最终 implementation baseline：commit `30c8087190fba0327201c2eeb8af45613f9dc6d7`；`src/core` changes `0`，未新增玩法规则或通用 orchestration framework。
+- Stage 1 Freeze evidence：正式 `tests/integration/` 层与独立 `npm run test:integration` 已建立；Failure lifecycle、Victory lifecycle、deterministic generation composition 与跨模块不变量完整通过。Unit 253/253、Integration 4/4、Total 257/257、architecture、TypeScript、production build、Playwright 全部 PASS；GitHub Actions Linux `Quality` run `33819177341` Success。
+- Stage 1 frozen repository baseline：承载本段 Freeze 状态的 documentation/status-only closeout commit；精确 hash 由 Git history 中 subject `docs(status): freeze Stage 1` 唯一恢复，并在 closeout 报告中记录。implementation baseline `30c8087190fba0327201c2eeb8af45613f9dc6d7` 永久保留。
+- Stage 1 最终范围：Board/Cell 权威模型、Coordinate/dimensions、Obstacle 基础语义、八邻域、周围真实雷数、Board-level Flag primitive、Run-level Flag lifecycle gate、waiting/on-board 角色位置、任意合法 Cell 普通移动、Safe 原子探索、Hidden Mine pending encounter、first-step 事实、基础 Failure、Victory/won lifecycle、当前脚下雷数查询、外部 Board runtime validator、确定性可重放 RNG、基础 Mine Placement、初始 Board assembly、正式 Stage 1 lifecycle integration tests。
+- Stage 1 冻结架构合同：`BoardState` / `CellState` 是唯一权威棋盘真值；统一构造链为 `createCellState -> createBoard -> BoardState`；生成路径为 `strategy/config -> candidates -> placement -> initial board assembly -> BoardState`；外部输入路径为 `unknown external board data -> runtime validator -> BoardState`；禁止第二套 Board/Cell/Mine 权威模型。
+- Stage 1 冻结命令/生命周期合同：`setFlagged` 保留为 Board-level primitive，实际 gameplay Flag 必须通过 Run-level command；普通 `on-board` 必须指向 explored Safe；Hidden Mine 必须先进入 pending encounter，不得隐式 failure/reveal；Victory 只依赖 required Safe exploration；当前脚下数字是统一事实 query，不缓存。
+- Stage 1 冻结随机合同：RandomSource、PRNG algorithm、seed、`nextInt` 映射、RNG 调用顺序、candidate 内容与顺序、placement algorithm、mineCount 均为 persistence-sensitive compatibility contract，不得静默破坏 golden test。
+- Deferred-by-design 边界：Stage 2 为 State + Save、restore、restart/retry persistence concerns 与 migration/versioning；Stage 3 为 Lucky/Revive/Detection/Airplane；Stage 4 为 Rewards/Inventory/Shop/Tutorial/Benben/Level progression；Stage 5 为 presentation/UI/animation/audio；Stage 6 为 skins/mobile/bilingual；Stage 7 为 production levels/RC/deployment。这些均不是 Stage 1 缺失，不得因 Freeze 提前实现。
+- Freeze 后风险约束：Stage 2 Save parser 必须显式 runtime mapping 并复用 Board validator，禁止 `as BoardState`；Stage 2 persistence design 必须正式处理 RNG compatibility/versioning；未来 Revive 必须用独立特殊 character-position state 表达临时站 Revealed Mine，不得破坏普通 `on-board -> explored Safe`；未来 Items 必须复用同一 pending mine encounter，不得另建 mine-hit logic。
+- 已知观察/风险：Phaser bundle >500 KB 继续只是 observation；multi-tab duplication、奖励/援助复制与 reward farming 风险继续留待 State/Save、经济与 Future Requirements 对应阶段处理，不是 Stage 1 blocker。
 
 ## 当前阶段
 
-**STAGE 1 IN PROGRESS**
+**STAGE 1 FROZEN / PASS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-12 已通过自动门禁或只读审计门禁及产品经理人工验收；Stage 1 保持 IN PROGRESS。S1-13 完成并人工 PASS 前不得 Freeze 或进入 Stage 2。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已通过自动门禁、集成门禁与产品经理人工验收，核心范围及架构/测试合同正式冻结。Stage 2 尚未定义首个获批 Task，本轮不得进入 Stage 2 implementation。
 
 ## 唯一下一行动
 
-**Stage 1 / Task S1-13 — Stage 1 Core 生命周期集成与 Freeze Gate。**
+**Stage 2 — awaiting first task definition.**
 
-目标：以完整 core lifecycle integration evidence 验证 Stage 1 已冻结模块能够形成闭环，并执行 Stage 1 Freeze Gate。
+目标：产品经理依据 Stage 2 `State + Save` 阶段边界，定义并批准第一个具体 Task。
 
-边界：除非集成测试暴露真实 Stage 1 blocker，不扩张 Stage 1；不实现 Save/Retry、Lucky/Revive/Detection/Airplane、奖励/关卡/商店/教程或表现层，不进入 Stage 2。
+边界：当前仅等待 Task 定义；不得自行开始 Save、restore、restart/retry、migration/versioning 或任何其他 Stage 2 implementation。
 
 ## 最近完成任务
 
@@ -330,12 +337,25 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-12 已通过自动门禁或
 - 自动证据：本地 `npm run quality` PASS；architecture、TypeScript、Vitest 15 files 253/253、production build 与 Playwright Chromium 全部 PASS；GitHub Actions Linux `Quality` run `33817750530` Success。
 - 回滚方法：优先 revert `dac0058c00d7fc225bd8a04f4274b09cea2cc0d7` 并推送；禁止 `reset --hard`。
 
+### Stage 1 / Task S1-13 — PASS / FREEZE GATE
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS` 并接受最终结论 `A — READY TO FREEZE`。
+- implementation baseline：commit `30c8087190fba0327201c2eeb8af45613f9dc6d7`；S1-13 对 `src/core` 零修改，仅新增 integration tests 与必要的测试收集/质量门禁配置。
+- Integration layer：`tests/integration/stage-1-core-lifecycle.test.ts`；独立入口 `npm run test:integration`，且 `npm run quality` 强制依次执行 unit 与 integration，任一失败则总体失败。
+- Failure lifecycle：Initial Board、waiting、Safe 原子探索、当前数字、revisit、Flag 锁与移除、Hidden Mine pending encounter、pending lifecycle gates、基础 Failure、failed lifecycle gates 全部闭环，无 UI/Scene/Phaser 依赖。
+- Victory lifecycle：required Safe 逐个探索、错误 Flag 阻止探索、移除后最后 Safe 原子进入 won、Obstacle/Mine/Flag 不提供胜利贡献、won lifecycle gates 与 won 后事实 query 全部闭环。
+- Deterministic composition：`createSeededRandomSource -> selectMineCoordinates -> createInitialBoard -> BoardState` 通过；seed `123456789` golden coordinates 保持 `(2,2), (0,0), (0,2), (1,2)`。
+- Cross-module evidence：`on-board -> explored Safe`、pending/failed/won movement 与 Run-level Flag gates、统一 victory/number/mine truth、Revealed Mine 真实计数、不可变转换及统一 Board truth 均在 integration 层再次验证。
+- 反向扫描：未发现 `Math.random`、global RNG、random sort、重复 neighborhood/victory/Cell legality、第二套 Board truth、Scene/UI gameplay rule、core 平台依赖、`as BoardState`、通用 orchestration framework 或 Stage 2+ feature leakage。
+- Freeze test evidence：Unit 253/253、Integration 4/4、Total 257/257、architecture PASS、TypeScript PASS、production build PASS、Playwright PASS；GitHub Actions Linux `Quality` run `33819177341` Success。
+- 回滚方法：优先 revert `30c8087190fba0327201c2eeb8af45613f9dc6d7` 并推送；Freeze closeout 文档使用独立 documentation/status-only commit 回滚，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档和 S1-01 至 S1-12 已冻结事实，只执行 Stage 1 / Task S1-13：Stage 1 Core 生命周期集成与 Freeze Gate。只建立完整 core lifecycle integration evidence 并执行 Freeze Gate；除非测试暴露新的真实 Stage 1 blocker，不扩张 Stage 1，不进入 Stage 2。
+请读取最新控制文档、Stage 1 Freeze contracts、implementation baseline 与 frozen repository baseline。Stage 2 当前 awaiting first task definition：不要写代码，不要自行发明实现 Task；请仅依据正式 Stage 2 State + Save 边界，提出第一个最小 Task 供产品经理批准。
 ```
 
 ## 阶段看板
@@ -343,8 +363,8 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-12 已通过自动门禁或
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
-| 1 | 核心棋盘 | IN PROGRESS（S1-01 至 S1-12 PASS；S1-13 NEXT / FREEZE GATE） | Stage 0 PASS |
-| 2 | State + Save | LOCKED | Stage 1 PASS |
+| 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
+| 2 | State + Save | AWAITING FIRST TASK DEFINITION；未开始 implementation | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
@@ -355,6 +375,8 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-12 已通过自动门禁或
 
 - Windows 10 不在 Playwright 当前官方原生支持矩阵内；本地测试已实测可用，但正式 E2E 结果以 GitHub Actions Linux 为准。
 - Phaser 3 基线 bundle 当前超过 Vite 500 KB chunk 提示阈值；属于性能观察项，不在 Stage 0 无数据优化。
+- Stage 2 必须处理 Save runtime mapping、RNG/generation compatibility versioning、multi-tab duplication 与刷新/恢复时奖励或援助复制风险；当前尚未定义首个具体 Task。
+- Reward farming/反自动化继续保留于 Future Requirements Registry；在出现真实经济破坏证据前不提前实现复杂防刷系统。
 - 游戏正式名称与域名未定。
 - 平衡参数（掉率、价格、援助阈值、障碍比例最终值）等待可玩原型数据。
 - 美术、音乐与音效素材来源等待核心玩法验证后决定。
