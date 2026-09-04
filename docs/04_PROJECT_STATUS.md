@@ -97,20 +97,27 @@
 - Deferred-by-design 边界：Stage 2 为 State + Save、restore、restart/retry persistence concerns 与 migration/versioning；Stage 3 为 Lucky/Revive/Detection/Airplane；Stage 4 为 Rewards/Inventory/Shop/Tutorial/Benben/Level progression；Stage 5 为 presentation/UI/animation/audio；Stage 6 为 skins/mobile/bilingual；Stage 7 为 production levels/RC/deployment。这些均不是 Stage 1 缺失，不得因 Freeze 提前实现。
 - Freeze 后风险约束：Stage 2 Save parser 必须显式 runtime mapping 并复用 Board validator，禁止 `as BoardState`；Stage 2 persistence design 必须正式处理 RNG compatibility/versioning；未来 Revive 必须用独立特殊 character-position state 表达临时站 Revealed Mine，不得破坏普通 `on-board -> explored Safe`；未来 Items 必须复用同一 pending mine encounter，不得另建 mine-hit logic。
 - 已知观察/风险：Phaser bundle >500 KB 继续只是 observation；multi-tab duplication、奖励/援助复制与 reward farming 风险继续留待 State/Save、经济与 Future Requirements 对应阶段处理，不是 Stage 1 blocker。
+- Stage 2 / Task S2-01 Persistence Boundary & Save Contract Design（只读设计）：产品经理人工验收 PASS（2026-09-04）。设计/审计基线为 Stage 1 frozen repository baseline `156edeecc478be2013ac0f1e691293a747bbce82`；本 Task source/tests/config changes `0`。
+- Stage 2 persistence 核心合同：Runtime authoritative state 与 serialized Save DTO 严格分离；Save v1 必须有显式 `saveVersion`；当前 Board 以完整 authoritative facts snapshot 恢复；任何 load 必须经过 parse、validate、explicit map 与现有 constructors/validators 重建后才可成为权威 runtime state，禁止 `JSON.parse(...) as RunState` 或 `as BoardState`。
+- Stage 2 persistence 提交/恢复合同：Refresh/reopen 恢复同一 Run 且不得 reroll；Restart/Retry 是未来新 attempt，不得与 restore 混用；required persistence 必须 commit 成功后才能 publish runtime/visual success；浏览器 MVP 采用 crash-safe 双 slot + head commit 边界，localStorage 仅为 adapter，不被视为事务架构。
+- Stage 2 corruption/extension 合同：坏存档不得静默删除或自动覆盖；Seed、RNG version、generation version 只作为 provenance/compatibility metadata，不作为普通 F5 restore 的唯一依据；Stage 3/4 尚不存在的 runtime facts 不得提前伪造进 Save schema，未来 Account/Reward/Item facts 必须进入同一 versioned persistence aggregate。
+- Stage 2 multi-tab 合同：采用最小 single-writer、revision、session gate；不宣称 localStorage 提供强事务或分布式锁。S2-06 的 session identity 必须与 Stage 1 gameplay deterministic RandomSource 完全隔离，不得复用或污染其 seed、调用序列或兼容合同。
+- Stage 2 已批准 Task sequence：S2-02 Save v1 DTO 与纯映射/验证；S2-03 Version dispatcher 与 migration boundary；S2-04 Storage abstraction 与双 slot crash-safe adapter；S2-05 Persistence commit coordinator；S2-06 Single-active-session 与 revision conflict gate；S2-07 Refresh/reopen exact-restore integration；S2-08 Restart/Retry persistence semantics；S2-09 Stage 2 persistence integration 与 Freeze Gate。除唯一 Next Action 外不得提前执行后续 Task。
+- S2-03 范围约束：当前只有 v1，只建立最小 version dispatch/migration boundary；不得建立过度抽象 migration framework，也不得虚构多代 migration。
 
 ## 当前阶段
 
-**STAGE 1 FROZEN / PASS**
+**STAGE 2 IN PROGRESS；STAGE 1 FROZEN / PASS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已通过自动门禁、集成门禁与产品经理人工验收，核心范围及架构/测试合同正式冻结。Stage 2 尚未定义首个获批 Task，本轮不得进入 Stage 2 implementation。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 persistence architecture 已通过 S2-01 只读设计与人工验收；Stage 2 进入 IN PROGRESS，但当前只能执行唯一 Next Action S2-02。
 
 ## 唯一下一行动
 
-**Stage 2 — awaiting first task definition.**
+**Stage 2 / Task S2-02 — Save v1 DTO 与纯映射/验证。**
 
-目标：产品经理依据 Stage 2 `State + Save` 阶段边界，定义并批准第一个具体 Task。
+目标：建立 Save v1 的独立 serialized DTO、Runtime State 与 DTO 之间的纯显式映射，以及 unknown input 到权威 Board/Run State 的分层运行时验证边界。
 
-边界：当前仅等待 Task 定义；不得自行开始 Save、restore、restart/retry、migration/versioning 或任何其他 Stage 2 implementation。
+边界：不得实现 storage/localStorage adapter、双 slot/head commit、migration framework、commit coordinator、multi-tab session gate、refresh/reopen orchestration、Restart/Retry 或 Stage 3/4 facts；不得执行 S2-03。
 
 ## 最近完成任务
 
@@ -350,12 +357,25 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已通过自动门禁、
 - Freeze test evidence：Unit 253/253、Integration 4/4、Total 257/257、architecture PASS、TypeScript PASS、production build PASS、Playwright PASS；GitHub Actions Linux `Quality` run `33819177341` Success。
 - 回滚方法：优先 revert `30c8087190fba0327201c2eeb8af45613f9dc6d7` 并推送；Freeze closeout 文档使用独立 documentation/status-only commit 回滚，禁止 `reset --hard`。
 
+### Stage 2 / Task S2-01 — PASS（只读设计）
+
+- 人工验收：产品经理于 2026-09-04 明确确认 `PASS`；接受最终结论 `READY FOR STAGE 2 IMPLEMENTATION` 及 S2-02 至 S2-09 的最小 Task sequence。
+- 设计基线：Stage 1 frozen repository baseline `156edeecc478be2013ac0f1e691293a747bbce82`；本 Task 未修改 source、tests、package configuration 或 `PROJECT_STATUS` implementation facts。
+- Runtime/DTO 边界：Runtime authoritative state 不等于 serialized DTO；禁止直接 stringify runtime object 作为正式协议，禁止 parse 后以类型断言绕过运行时验证。Load 必须 validate/map/reconstruct 并复用 Stage 1 Board validator 与 Run constructors。
+- Board/RNG 决策：Save v1 保存完整当前 Board facts；seed/RNG/generation version 仅为 provenance/compatibility metadata，不作为 F5 restore 的唯一依据。
+- 生命周期语义：Refresh/reopen 恢复同一 Run；Restart/Retry 是未来新 attempt。两者入口必须分离，当前不实现 Restart/Retry。
+- 持久化顺序：candidate authoritative aggregate -> persistence commit -> runtime publish -> presentation；写入失败不得先宣称成功。浏览器方向为双 slot + head commit，最后一个有效快照必须可恢复。
+- 数据安全：坏存档非破坏性处理，不静默删除/覆盖；Stage 3/4 facts 只在真实 runtime model 出现后通过同一 versioned aggregate 扩展。
+- Multi-tab：最小 single-writer/revision/session gate；明确不提供强事务/分布式锁保证，session identity 与 gameplay deterministic RNG 严格隔离。
+- 自动证据：设计完成后本地 `npm run quality` PASS；architecture、TypeScript、Unit 253/253、Integration 4/4、production build 与 Playwright 全部 PASS。
+- 回滚方法：S2-01 为只读设计；状态收尾仅修改本文件，优先 revert 对应 documentation/status-only closeout commit，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档、Stage 1 Freeze contracts、implementation baseline 与 frozen repository baseline。Stage 2 当前 awaiting first task definition：不要写代码，不要自行发明实现 Task；请仅依据正式 Stage 2 State + Save 边界，提出第一个最小 Task 供产品经理批准。
+请读取最新控制文档、Stage 1 Freeze contracts 与 S2-01 已冻结 persistence contracts，只执行 Stage 2 / Task S2-02：Save v1 DTO 与纯映射/验证。不得实现 storage adapter、migration framework、commit coordinator、multi-tab gate、refresh/reopen、Restart/Retry 或 Stage 3/4 facts；不得执行 S2-03。
 ```
 
 ## 阶段看板
@@ -364,7 +384,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已通过自动门禁、
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
-| 2 | State + Save | AWAITING FIRST TASK DEFINITION；未开始 implementation | Stage 1 FROZEN / PASS |
+| 2 | State + Save | IN PROGRESS（S2-01 PASS；S2-02 NEXT；S2-03 至 S2-09 APPROVED/LOCKED） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
@@ -375,7 +395,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已通过自动门禁、
 
 - Windows 10 不在 Playwright 当前官方原生支持矩阵内；本地测试已实测可用，但正式 E2E 结果以 GitHub Actions Linux 为准。
 - Phaser 3 基线 bundle 当前超过 Vite 500 KB chunk 提示阈值；属于性能观察项，不在 Stage 0 无数据优化。
-- Stage 2 必须处理 Save runtime mapping、RNG/generation compatibility versioning、multi-tab duplication 与刷新/恢复时奖励或援助复制风险；当前尚未定义首个具体 Task。
+- Stage 2 必须处理 Save runtime mapping、RNG/generation compatibility versioning、multi-tab duplication 与刷新/恢复时奖励或援助复制风险；已批准 S2-02 至 S2-09 顺序，当前只能执行 S2-02。
 - Reward farming/反自动化继续保留于 Future Requirements Registry；在出现真实经济破坏证据前不提前实现复杂防刷系统。
 - 游戏正式名称与域名未定。
 - 平衡参数（掉率、价格、援助阈值、障碍比例最终值）等待可玩原型数据。
