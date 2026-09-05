@@ -109,20 +109,26 @@
 - Save v1 snapshot/reconstruction 合同：保存完整 Board authoritative facts snapshot；Board/Cell legality 继续由 Stage 1 validator/constructors 控制；CharacterPosition、phase、encounter 均显式验证与映射，`occurredOnFirstStep` 保存原事实而不重新推断；derived gameplay facts 不进入 Save。
 - Save v1 严格性与隔离合同：unknown fields 一律拒绝；generation provenance 仅为 metadata，不参与 ordinary restore；serialize/load 不与外部 DTO 共享可变引用；Stage 3/4 尚不存在的 runtime facts 不得提前加入 v1。
 - S2-02 延后边界：revision orchestration、JSON syntax parsing、storage adapter、version dispatch/migration 与 session coordination 均留给后续已批准 Task；S2-02 不实现这些职责。
+- Stage 2 / Task S2-03 Version dispatcher 与 migration boundary：产品经理人工验收 PASS（2026-09-06）。implementation stable point `fd87d54a38b1e8412ab053d61d1e80949d05c9f7`；GitHub Actions Linux `Quality` run `33991965438` Success。
+- Save version dispatch 合同：`CURRENT_SAVE_VERSION = 1`；`loadSaveDocument(input: unknown)` 只做最小 document/version inspection 与版本分类，current v1 完整委托 S2-02 `validateAndLoadSaveDocumentV1`，不得复制 Save v1 validation。
+- Version classification 合同：missing、invalid、unsupported old、unsupported future 与 current-v1-invalid-document 使用明确结构化结果；`0` 是 unsupported old，negative/fractional/unsafe integer/NaN/Infinity 及非 number 是 invalid；不得把缺失或非法版本猜成 v1。
+- Error preservation 合同：current v1 被 S2-02 拒绝时必须保留 `SaveV1ValidationIssue[]`，使后续 pipeline 能区分 unsupported version 与 supported-but-corrupt/inconsistent document。
+- Migration boundary 合同：当前没有真实 migration，接缝仅为显式版本分支；未来原则为 `validated old DTO -> pure DTO-to-DTO migration -> current DTO -> current full validation/reconstruction`，migration 不得直接生成或绕过 authoritative Runtime，也不得修改 Stage 1 invariants。
+- S2-03 延后边界：JSON syntax parsing 位于 dispatcher 外；storage、revision orchestration、session/multi-tab 尚未实现。当前不得虚构 v0 migration 或建立 migration registry、graph、plugin/schema framework 或 generic migration engine。
 
 ## 当前阶段
 
 **STAGE 2 IN PROGRESS；STAGE 1 FROZEN / PASS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 与 S2-02 已人工验收 PASS；Stage 2 保持 IN PROGRESS，当前只能执行唯一 Next Action S2-03。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-03 已人工验收 PASS；Stage 2 保持 IN PROGRESS，当前只能执行唯一 Next Action S2-04。
 
 ## 唯一下一行动
 
-**Stage 2 / Task S2-03 — Version dispatcher 与 migration boundary。**
+**Stage 2 / Task S2-04 — Storage abstraction 与双 slot crash-safe adapter。**
 
-目标：在当前仅有 Save v1 的事实下建立最小 version dispatch 与未来 migration 接缝，使未知版本被明确拒绝，并将 v1 委托给已冻结的 S2-02 load boundary。
+目标：建立持久化 storage abstraction 与浏览器 MVP 双 slot + head commit 的 crash-safe adapter 边界。
 
-边界：不得建立过度抽象 migration framework 或虚构多代 migration；不得实现 storage/localStorage adapter、双 slot/head commit、commit coordinator、multi-tab session gate、refresh/reopen orchestration、Restart/Retry 或 Stage 3/4 facts；不得执行 S2-04。
+边界：本 Task 的具体实现合同必须在执行前由产品经理批准；不得提前执行 persistence commit coordinator、multi-tab session gate、refresh/reopen orchestration、Restart/Retry 或 Stage 3/4 facts；不得执行 S2-05。
 
 ## 最近完成任务
 
@@ -387,12 +393,24 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 - 自动证据：Architecture PASS、TypeScript PASS、Unit 291/291、Integration 4/4、Total 295/295、production build 与 Playwright PASS；GitHub Actions Linux `Quality` run `33991133893` Success。
 - 回滚方法：优先 revert `8e99c41c34ad839d21ab62886c325802846667d3` 并推送；状态收尾使用独立 documentation/status-only commit 回滚，禁止 `reset --hard`。
 
+### Stage 2 / Task S2-03 — PASS
+
+- 人工验收：产品经理于 2026-09-06 明确确认 `PASS`；接受最小 version dispatcher、结构化版本分类、v1 完整委托与无真实 migration 的边界。
+- implementation stable point：commit `fd87d54a38b1e8412ab053d61d1e80949d05c9f7`。
+- 公开边界：`CURRENT_SAVE_VERSION = 1`；`loadSaveDocument(input: unknown)` 在 JSON syntax parsing 后接收未知 JS value，只检查足以分类版本的最小事实。
+- 分发合同：current v1 完整委托 `validateAndLoadSaveDocumentV1`；v1 Board/Run/phase/encounter/provenance/unknown-field validation 不在 dispatcher 复制。
+- 结果合同：明确区分 loaded、missing version、invalid type/number、unsupported old/future version 与 invalid current-version document；v1 validation issues 原样保留。
+- Migration 接缝：当前仅为显式版本分支，没有 v0 schema、真实 migration、registry、graph 或通用 migration framework。未来 migration 只允许 validated old DTO 到 current DTO 的纯转换，随后走 current full validation/reconstruction。
+- 延后职责：JSON parsing、storage、revision/session orchestration 与 multi-tab 不属于 S2-03。
+- 自动证据：Architecture PASS、TypeScript PASS、Unit 315/315、Integration 4/4、Total 319/319、production build 与 Playwright PASS；GitHub Actions Linux `Quality` run `33991965438` Success。
+- 回滚方法：优先 revert `fd87d54a38b1e8412ab053d61d1e80949d05c9f7` 并推送；状态收尾使用独立 documentation/status-only commit 回滚，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档、Stage 1 Freeze contracts 与 S2-01/S2-02 已冻结 persistence contracts，只执行 Stage 2 / Task S2-03：Version dispatcher 与 migration boundary。当前只有 v1，只建立最小 version dispatch/migration boundary；不得建立过度抽象 migration framework，不得执行 S2-04。
+请读取最新控制文档、Stage 1 Freeze contracts 与 S2-01 至 S2-03 已冻结 persistence contracts，只执行 Stage 2 / Task S2-04：Storage abstraction 与双 slot crash-safe adapter。执行前先冻结本 Task 的具体实现合同；不得执行 S2-05。
 ```
 
 ## 阶段看板
@@ -401,7 +419,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
-| 2 | State + Save | IN PROGRESS（S2-01/S2-02 PASS；S2-03 NEXT；S2-04 至 S2-09 APPROVED/LOCKED） | Stage 1 FROZEN / PASS |
+| 2 | State + Save | IN PROGRESS（S2-01 至 S2-03 PASS；S2-04 NEXT；S2-05 至 S2-09 APPROVED/LOCKED） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
@@ -412,7 +430,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 
 - Windows 10 不在 Playwright 当前官方原生支持矩阵内；本地测试已实测可用，但正式 E2E 结果以 GitHub Actions Linux 为准。
 - Phaser 3 基线 bundle 当前超过 Vite 500 KB chunk 提示阈值；属于性能观察项，不在 Stage 0 无数据优化。
-- Stage 2 必须继续处理 RNG/generation compatibility versioning、storage crash safety、revision/session conflict、multi-tab duplication 与刷新/恢复时奖励或援助复制风险；Save v1 runtime mapping 已由 S2-02 完成并冻结，当前只能执行 S2-03。
+- Stage 2 必须继续处理 storage crash safety、revision/session conflict、multi-tab duplication 与刷新/恢复时奖励或援助复制风险；Save v1 runtime mapping 与 version dispatch 已由 S2-02/S2-03 完成并冻结，当前只能执行 S2-04。
 - Reward farming/反自动化继续保留于 Future Requirements Registry；在出现真实经济破坏证据前不提前实现复杂防刷系统。
 - 游戏正式名称与域名未定。
 - 平衡参数（掉率、价格、援助阈值、障碍比例最终值）等待可玩原型数据。
