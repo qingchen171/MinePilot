@@ -1,7 +1,7 @@
 # PROJECT_STATUS
 
 **项目：MinePilot / Minesweeper Product**  
-**状态更新时间：2026-09-04**  
+**状态更新时间：2026-09-06**
 **控制文档版本：v1.0 FROZEN**  
 **正式游戏代码：Stage 1 core implementation 已完成；S1-01 至 S1-13 全部人工验收 PASS，Stage 1 FROZEN / PASS**
 
@@ -104,20 +104,25 @@
 - Stage 2 multi-tab 合同：采用最小 single-writer、revision、session gate；不宣称 localStorage 提供强事务或分布式锁。S2-06 的 session identity 必须与 Stage 1 gameplay deterministic RandomSource 完全隔离，不得复用或污染其 seed、调用序列或兼容合同。
 - Stage 2 已批准 Task sequence：S2-02 Save v1 DTO 与纯映射/验证；S2-03 Version dispatcher 与 migration boundary；S2-04 Storage abstraction 与双 slot crash-safe adapter；S2-05 Persistence commit coordinator；S2-06 Single-active-session 与 revision conflict gate；S2-07 Refresh/reopen exact-restore integration；S2-08 Restart/Retry persistence semantics；S2-09 Stage 2 persistence integration 与 Freeze Gate。除唯一 Next Action 外不得提前执行后续 Task。
 - S2-03 范围约束：当前只有 v1，只建立最小 version dispatch/migration boundary；不得建立过度抽象 migration framework，也不得虚构多代 migration。
+- Stage 2 / Task S2-02 Save v1 DTO 与纯映射/验证：产品经理人工验收 PASS（2026-09-06）。implementation stable point `8e99c41c34ad839d21ab62886c325802846667d3`；GitHub Actions Linux `Quality` run `33991133893` Success。
+- Save v1 strict DTO 合同：`serializeSaveDocumentV1(input)` 与 `validateAndLoadSaveDocumentV1(input: unknown)` 保持 Runtime State 与 serialized DTO 分离；load 必须经过 `unknown -> strict DTO validation -> validateBoardInput -> createRunState -> authoritative runtime`，禁止 DTO 直接成为 `RunState` / `BoardState`。
+- Save v1 snapshot/reconstruction 合同：保存完整 Board authoritative facts snapshot；Board/Cell legality 继续由 Stage 1 validator/constructors 控制；CharacterPosition、phase、encounter 均显式验证与映射，`occurredOnFirstStep` 保存原事实而不重新推断；derived gameplay facts 不进入 Save。
+- Save v1 严格性与隔离合同：unknown fields 一律拒绝；generation provenance 仅为 metadata，不参与 ordinary restore；serialize/load 不与外部 DTO 共享可变引用；Stage 3/4 尚不存在的 runtime facts 不得提前加入 v1。
+- S2-02 延后边界：revision orchestration、JSON syntax parsing、storage adapter、version dispatch/migration 与 session coordination 均留给后续已批准 Task；S2-02 不实现这些职责。
 
 ## 当前阶段
 
 **STAGE 2 IN PROGRESS；STAGE 1 FROZEN / PASS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 persistence architecture 已通过 S2-01 只读设计与人工验收；Stage 2 进入 IN PROGRESS，但当前只能执行唯一 Next Action S2-02。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 与 S2-02 已人工验收 PASS；Stage 2 保持 IN PROGRESS，当前只能执行唯一 Next Action S2-03。
 
 ## 唯一下一行动
 
-**Stage 2 / Task S2-02 — Save v1 DTO 与纯映射/验证。**
+**Stage 2 / Task S2-03 — Version dispatcher 与 migration boundary。**
 
-目标：建立 Save v1 的独立 serialized DTO、Runtime State 与 DTO 之间的纯显式映射，以及 unknown input 到权威 Board/Run State 的分层运行时验证边界。
+目标：在当前仅有 Save v1 的事实下建立最小 version dispatch 与未来 migration 接缝，使未知版本被明确拒绝，并将 v1 委托给已冻结的 S2-02 load boundary。
 
-边界：不得实现 storage/localStorage adapter、双 slot/head commit、migration framework、commit coordinator、multi-tab session gate、refresh/reopen orchestration、Restart/Retry 或 Stage 3/4 facts；不得执行 S2-03。
+边界：不得建立过度抽象 migration framework 或虚构多代 migration；不得实现 storage/localStorage adapter、双 slot/head commit、commit coordinator、multi-tab session gate、refresh/reopen orchestration、Restart/Retry 或 Stage 3/4 facts；不得执行 S2-04。
 
 ## 最近完成任务
 
@@ -370,12 +375,24 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 - 自动证据：设计完成后本地 `npm run quality` PASS；architecture、TypeScript、Unit 253/253、Integration 4/4、production build 与 Playwright 全部 PASS。
 - 回滚方法：S2-01 为只读设计；状态收尾仅修改本文件，优先 revert 对应 documentation/status-only closeout commit，禁止 `reset --hard`。
 
+### Stage 2 / Task S2-02 — PASS
+
+- 人工验收：产品经理于 2026-09-06 明确确认 `PASS`；接受 Save v1 DTO、纯显式 serialize/load mapping、严格 unknown-field policy 与 Stage 1 权威重建边界。
+- implementation stable point：commit `8e99c41c34ad839d21ab62886c325802846667d3`。
+- 公开边界：`serializeSaveDocumentV1(input)` 与 `validateAndLoadSaveDocumentV1(input: unknown)`；Runtime State 与 Save DTO 独立，Save v1 保存完整 Board authoritative facts snapshot。
+- 加载链：`unknown -> strict DTO validation -> validateBoardInput -> createRunState -> authoritative runtime`；DTO 不得直接成为 `RunState` / `BoardState`，Board/Cell legality 继续由 Stage 1 权威 validator/constructors 控制。
+- 语义合同：CharacterPosition、phase、encounter 显式验证和映射；`occurredOnFirstStep` 保存原事实；derived gameplay facts 不进入 Save；generation provenance 仅为 metadata，不参与 ordinary restore。
+- 安全合同：unknown fields 严格拒绝；serialize/load 不共享可变引用；Stage 3/4 尚不存在的状态不加入 v1。
+- 延后职责：JSON syntax parsing、storage、revision orchestration、version dispatch/migration 与 session 不属于 S2-02。
+- 自动证据：Architecture PASS、TypeScript PASS、Unit 291/291、Integration 4/4、Total 295/295、production build 与 Playwright PASS；GitHub Actions Linux `Quality` run `33991133893` Success。
+- 回滚方法：优先 revert `8e99c41c34ad839d21ab62886c325802846667d3` 并推送；状态收尾使用独立 documentation/status-only commit 回滚，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档、Stage 1 Freeze contracts 与 S2-01 已冻结 persistence contracts，只执行 Stage 2 / Task S2-02：Save v1 DTO 与纯映射/验证。不得实现 storage adapter、migration framework、commit coordinator、multi-tab gate、refresh/reopen、Restart/Retry 或 Stage 3/4 facts；不得执行 S2-03。
+请读取最新控制文档、Stage 1 Freeze contracts 与 S2-01/S2-02 已冻结 persistence contracts，只执行 Stage 2 / Task S2-03：Version dispatcher 与 migration boundary。当前只有 v1，只建立最小 version dispatch/migration boundary；不得建立过度抽象 migration framework，不得执行 S2-04。
 ```
 
 ## 阶段看板
@@ -384,7 +401,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
-| 2 | State + Save | IN PROGRESS（S2-01 PASS；S2-02 NEXT；S2-03 至 S2-09 APPROVED/LOCKED） | Stage 1 FROZEN / PASS |
+| 2 | State + Save | IN PROGRESS（S2-01/S2-02 PASS；S2-03 NEXT；S2-04 至 S2-09 APPROVED/LOCKED） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
@@ -395,7 +412,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 
 - Windows 10 不在 Playwright 当前官方原生支持矩阵内；本地测试已实测可用，但正式 E2E 结果以 GitHub Actions Linux 为准。
 - Phaser 3 基线 bundle 当前超过 Vite 500 KB chunk 提示阈值；属于性能观察项，不在 Stage 0 无数据优化。
-- Stage 2 必须处理 Save runtime mapping、RNG/generation compatibility versioning、multi-tab duplication 与刷新/恢复时奖励或援助复制风险；已批准 S2-02 至 S2-09 顺序，当前只能执行 S2-02。
+- Stage 2 必须继续处理 RNG/generation compatibility versioning、storage crash safety、revision/session conflict、multi-tab duplication 与刷新/恢复时奖励或援助复制风险；Save v1 runtime mapping 已由 S2-02 完成并冻结，当前只能执行 S2-03。
 - Reward farming/反自动化继续保留于 Future Requirements Registry；在出现真实经济破坏证据前不提前实现复杂防刷系统。
 - 游戏正式名称与域名未定。
 - 平衡参数（掉率、价格、援助阈值、障碍比例最终值）等待可玩原型数据。
