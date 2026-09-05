@@ -128,20 +128,28 @@
 - 反向恢复链：`committed snapshot -> JSON parse -> version dispatcher -> Save validation/reconstruction -> authoritative runtime`；JSON syntax failure 与 Save/version failure 必须分离，backup recovery provenance 必须保留，storage-valid backup 仍须通过 Save validation 才能成为成功恢复。
 - Cross-layer consistency 合同：storage envelope revision 与 SaveDocument revision 必须一致；successful new-head write 后的 backup update failure 只作为 warning 保留，不撤销已完成 commit。
 - Revision/session 未决边界：`structurally valid revision != authorized next revision`。S2-05 尚未处理 expected-current revision、next-revision progression、stale writer、writer ownership 或 multi-tab conflict；这些属于 S2-06。
+- Stage 2 / Task S2-06 Single-active-session 与 revision conflict gate：产品经理人工验收 PASS（2026-09-06）。implementation stable point `e1b3d161f7cb8e7211fdd8d3a2e73fc98bcfa2bb`；GitHub Actions Linux `Quality` run `33997625427` Success。
+- Session/lease boundary 合同：session identity 与 Stage 1 gameplay deterministic RandomSource 完全隔离；writer lease 是 persistence coordination metadata，不进入 SaveDocument、Board 或 Run；lease ownership 与 revision authority 是两个独立概念。
+- Writer lease 合同：writer 必须持有当前未过期且同时匹配 `sessionId + leaseToken` 的 lease；active unexpired owner 不得被静默抢占，expired lease 可 takeover；旧 owner 在 takeover 后不得 renew 或 release 新 owner lease。
+- Revision authority 合同：fresh persistence 只允许 `expectedRevision = null` 且 `candidate.revision = 0`；已有 revision N 只允许 `expectedRevision = N` 且 `candidate.revision = N + 1`；same、lower、skipped 或 stale expected revision 均必须拒绝。
+- Guarded commit 合同：必须读取真实 committed persistence revision；在 revision 检查前后分别验证 ownership，第二次 verification 位于 S2-05 commit 之前；guard failure 不进入 persistence commit，只有成功结果携带 candidate，实际 commit 继续委托 S2-05 coordinator。
+- Persistence safety 合同：valid recovered backup revision 可作为当前 authoritative persisted revision；corrupt、malformed、unsupported persistence 不得被当作 no-save 覆盖；lease/revision/commit failure 均不得产生 publish-capable result。
+- Concurrency limitation：当前只保证 `MVP best-effort single writer + stale-write rejection`。localStorage 没有 atomic compare-and-swap；两次 ownership verification 只能缩小普通 race window，不提供数据库级事务隔离、绝对互斥或强分布式锁。
+- S2-06 race evidence：第一次 guarded ownership read 观察到 original session；第二次 read 前注入 racer，第二次 verification 正确拒绝；临时移除 second verification 时测试 FAIL，恢复 production 后 PASS，临时 mutation 未进入 implementation commit。
 
 ## 当前阶段
 
 **STAGE 2 IN PROGRESS；STAGE 1 FROZEN / PASS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-05 已人工验收 PASS；Stage 2 保持 IN PROGRESS，当前只能执行唯一 Next Action S2-06。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-06 已人工验收 PASS；Stage 2 保持 IN PROGRESS，当前只能执行唯一 Next Action S2-07。
 
 ## 唯一下一行动
 
-**Stage 2 / Task S2-06 — Single-active-session 与 revision conflict gate。**
+**Stage 2 / Task S2-07 — Refresh / reopen exact-restore integration。**
 
-目标：建立最小 single-active-session、writer ownership 与 revision conflict gate，阻止 stale writer 或多标签页静默覆盖已提交状态。
+目标：建立 refresh / browser reopen 后从已提交 persistence aggregate 精确恢复同一 Run 的集成边界与证据。
 
-边界：本 Task 的具体实现合同必须在执行前由产品经理批准；session identity 不得复用或污染 Stage 1 gameplay deterministic RandomSource；不得提前执行 refresh/reopen orchestration、Restart/Retry 或 Stage 3/4 facts；不得执行 S2-07。
+边界：本 Task 的具体实现合同必须在执行前由产品经理批准；restore 与 Restart/Retry 必须保持不同入口；不得提前实现 Restart/Retry、Stage 3/4 facts 或 UI；不得执行 S2-08。
 
 ## 最近完成任务
 
@@ -445,12 +453,26 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 - 自动证据：Architecture PASS、TypeScript PASS、Unit 364/364、Integration 15/15、Total 379/379、production build 与 Playwright PASS；GitHub Actions Linux `Quality` run `33993518314` Success。
 - 回滚方法：优先 revert `e6b82fb831db87a24870c7fd39584dbf4c192359` 并推送；状态收尾使用独立 documentation/status-only commit 回滚，禁止 `reset --hard`。
 
+### Stage 2 / Task S2-06 — PASS
+
+- 人工验收：产品经理于 2026-09-06 明确确认 `PASS`；接受 best-effort single writer、writer lease、authoritative revision progression 与 guarded commit contracts。
+- implementation stable point：commit `e1b3d161f7cb8e7211fdd8d3a2e73fc98bcfa2bb`。
+- Session identity：生产 session/lease identity 使用独立 UUID capability，测试可注入固定 identity；不得调用或污染 Stage 1 deterministic RandomSource，且 session/lease 不进入 SaveDocument、Board 或 Run。
+- Lease API：提供 inspect/acquire/renew/release；固定 namespaced lease key，使用可注入 clock；write 后必须 read-back verify；仅 matching live `sessionId + leaseToken` 可 renew/release，expiry 是 crash fallback。
+- Revision gate：无 save 时只接受 expected null/candidate 0；已有 N 时只接受 expected N/candidate N+1；guarded commit 实际加载 committed save，拒绝 stale、same、lower、skipped revision 以及 corrupt/malformed/unsupported persistence。
+- Ownership gate：revision 检查前验证 live ownership，并在调用 S2-05 前再次验证；第二次检查用于缩小检查到 commit 之间的普通 race window，但不被描述为原子锁。
+- Persist-before-publish：guard failure 不调用 S2-05；underlying commit failure 沿用 S2-05 failure；只有最终 committed result 携带 candidate。Recovered backup 的 revision 可继续作为 authority，并在结果中保留 `head-backup` provenance。
+- Race regression evidence：first guarded lease read 为 original session，第二次 read 前 deterministic hook 注入 racer，second verification 拒绝且旧 committed snapshot 保持；mutation sanity check 证明移除 second verification 时测试 FAIL，恢复 production 后 PASS，生产文件哈希恢复且 mutation 未提交。
+- Concurrency limitation：localStorage 无 atomic CAS；当前只能提供 MVP best-effort ownership gate 与 stale-write rejection，不提供 race-free mutex、强事务或分布式锁。
+- 自动证据：Architecture PASS、TypeScript PASS、Unit 385/385、Integration 16/16、Total 401/401、production build 与 Playwright PASS；GitHub Actions Linux `Quality` run `33997625427` Success。
+- 回滚方法：优先 revert `e1b3d161f7cb8e7211fdd8d3a2e73fc98bcfa2bb` 并推送；状态收尾使用独立 documentation/status-only commit 回滚，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档、Stage 1 Freeze contracts 与 S2-01 至 S2-05 已冻结 persistence contracts，只执行 Stage 2 / Task S2-06：Single-active-session 与 revision conflict gate。执行前先冻结本 Task 的具体实现合同；不得执行 S2-07。
+请读取最新控制文档、Stage 1 Freeze contracts 与 S2-01 至 S2-06 已冻结 persistence contracts，只执行 Stage 2 / Task S2-07：Refresh / reopen exact-restore integration。执行前先冻结本 Task 的具体实现合同；不得执行 S2-08。
 ```
 
 ## 阶段看板
@@ -459,7 +481,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
-| 2 | State + Save | IN PROGRESS（S2-01 至 S2-05 PASS；S2-06 NEXT；S2-07 至 S2-09 APPROVED/LOCKED） | Stage 1 FROZEN / PASS |
+| 2 | State + Save | IN PROGRESS（S2-01 至 S2-06 PASS；S2-07 NEXT；S2-08 至 S2-09 APPROVED/LOCKED） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
@@ -470,7 +492,8 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 
 - Windows 10 不在 Playwright 当前官方原生支持矩阵内；本地测试已实测可用，但正式 E2E 结果以 GitHub Actions Linux 为准。
 - Phaser 3 基线 bundle 当前超过 Vite 500 KB chunk 提示阈值；属于性能观察项，不在 Stage 0 无数据优化。
-- Stage 2 必须继续处理 revision/session conflict、multi-tab duplication 与刷新/恢复时奖励或援助复制风险；Save v1 mapping、version dispatch、crash-safe storage 与 persist-before-publish coordinator 已由 S2-02 至 S2-05 完成并冻结，当前只能执行 S2-06。
+- Stage 2 必须继续处理 refresh/reopen exact restore、Restart/Retry persistence semantics 与刷新/恢复时奖励或援助复制风险；Save v1 mapping、version dispatch、crash-safe storage、persist-before-publish 与 best-effort session/revision gate 已由 S2-02 至 S2-06 完成并冻结，当前只能执行 S2-07。
+- localStorage 不提供 atomic CAS；S2-06 的 best-effort lease 与两次 ownership verification 不能消除所有精确并发 race。若未来实测不足，必须单独评估更强协调机制，不得把当前实现描述为强事务或绝对互斥。
 - Reward farming/反自动化继续保留于 Future Requirements Registry；在出现真实经济破坏证据前不提前实现复杂防刷系统。
 - 游戏正式名称与域名未定。
 - 平衡参数（掉率、价格、援助阈值、障碍比例最终值）等待可玩原型数据。
