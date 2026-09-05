@@ -122,20 +122,26 @@
 - Recovery protocol 合同：valid head 必须优先于另一 slot；head 无效时才尝试 valid committed backup；head/backup 均无法证明 commit 时，即使裸 slot revision 更高也不得自动提升，必须返回 no-save、corruption 或 storage failure 的明确结果。
 - Data safety 合同：corruption 不自动 reset/delete；failed new save 不覆盖当前 committed slot，也不改变 authority head，last known committed snapshot 必须仍可恢复；storage unavailable/get/set/remove exception 使用结构化结果。
 - S2-04 延后边界：不负责 Save DTO validation、JSON payload parsing、Runtime publish、revision progression/transition、stale-writer/multi-tab conflict 或 gameplay。S2-04 只验证 revision 是非负 safe integer，不判断某 writer 是否有权提交下一 revision。
+- Stage 2 / Task S2-05 Persistence commit coordinator：产品经理人工验收 PASS（2026-09-06）。implementation stable point `e6b82fb831db87a24870c7fd39584dbf4c192359`；GitHub Actions Linux `Quality` run `33993518314` Success。
+- Candidate commit boundary 合同：`commitCandidateSaveV1(storage, candidate)` 是当前 candidate persistence boundary；调用方只能在 persistence commit 成功并收到 `committed` result 后 publish candidate，任何 persistence failure result 均不得携带 candidate；coordinator 不拥有或替换 global Runtime。
+- 正向持久化链：`candidate -> Save v1 serialization -> JSON -> crash-safe snapshot commit -> committed result`；Stage 1 Runtime 不因 persistence convenience 被修改，coordinator 当前不接 Scene、UI 或 gameplay autosave。
+- 反向恢复链：`committed snapshot -> JSON parse -> version dispatcher -> Save validation/reconstruction -> authoritative runtime`；JSON syntax failure 与 Save/version failure 必须分离，backup recovery provenance 必须保留，storage-valid backup 仍须通过 Save validation 才能成为成功恢复。
+- Cross-layer consistency 合同：storage envelope revision 与 SaveDocument revision 必须一致；successful new-head write 后的 backup update failure 只作为 warning 保留，不撤销已完成 commit。
+- Revision/session 未决边界：`structurally valid revision != authorized next revision`。S2-05 尚未处理 expected-current revision、next-revision progression、stale writer、writer ownership 或 multi-tab conflict；这些属于 S2-06。
 
 ## 当前阶段
 
 **STAGE 2 IN PROGRESS；STAGE 1 FROZEN / PASS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-04 已人工验收 PASS；Stage 2 保持 IN PROGRESS，当前只能执行唯一 Next Action S2-05。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-05 已人工验收 PASS；Stage 2 保持 IN PROGRESS，当前只能执行唯一 Next Action S2-06。
 
 ## 唯一下一行动
 
-**Stage 2 / Task S2-05 — Persistence commit coordinator。**
+**Stage 2 / Task S2-06 — Single-active-session 与 revision conflict gate。**
 
-目标：建立 candidate authoritative state 到 persistence commit，再到 Runtime publish 的最小协调边界。
+目标：建立最小 single-active-session、writer ownership 与 revision conflict gate，阻止 stale writer 或多标签页静默覆盖已提交状态。
 
-边界：本 Task 的具体实现合同必须在执行前由产品经理批准；不得提前执行 multi-tab session/revision conflict gate、refresh/reopen orchestration、Restart/Retry 或 Stage 3/4 facts；不得执行 S2-06。
+边界：本 Task 的具体实现合同必须在执行前由产品经理批准；session identity 不得复用或污染 Stage 1 gameplay deterministic RandomSource；不得提前执行 refresh/reopen orchestration、Restart/Retry 或 Stage 3/4 facts；不得执行 S2-07。
 
 ## 最近完成任务
 
@@ -426,12 +432,25 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 - 自动证据：Architecture PASS、TypeScript PASS、Unit 355/355、Integration 4/4、Total 359/359、production build 与 Playwright PASS；GitHub Actions Linux `Quality` run `33992963965` Success。
 - 回滚方法：优先 revert `88cb86a34b4c1bd5684f1251ad9448b977f5fee7` 并推送；状态收尾使用独立 documentation/status-only commit 回滚，禁止 `reset --hard`。
 
+### Stage 2 / Task S2-05 — PASS
+
+- 人工验收：产品经理于 2026-09-06 明确确认 `PASS`；接受 candidate persistence boundary、persist-before-publish、JSON/load orchestration 与 backup recovery provenance 合同。
+- implementation stable point：commit `e6b82fb831db87a24870c7fd39584dbf4c192359`。
+- Commit API：`commitCandidateSaveV1(storage, candidate)` 组合 Save v1 serialization、JSON serialization 与 S2-04 crash-safe commit；只有 `committed` result 携带 candidate，使调用方获得合法 publish 路径，失败不携带 candidate。
+- Runtime ownership：coordinator 不拥有、不替换 global Runtime，也不执行 movement、Flag、Victory/Failure 或其他 gameplay；Stage 1 Runtime 模型保持不变。
+- Load API：`loadPersistedSave(storage)` 组合 committed snapshot、JSON parse、S2-03 version dispatch 与 S2-02 validation/reconstruction；明确区分 no-save、storage failure/corruption、malformed JSON、version failure、invalid current document、revision mismatch、normal load 与 backup recovery。
+- Recovery correctness：backup 来源在成功结果中保真；storage-valid backup 的 payload 若 JSON 或 Save validation 失败，不得称为成功恢复，也不得继续提升裸 slot。
+- Commit correctness：storage revision 与 SaveDocument revision 必须一致；post-commit backup update failure 保留 warning，但 successful new-head commit 仍有效。
+- Revision 延后边界：`structurally valid revision != authorized next revision`；expected-current、next-revision progression、stale writer、writer ownership 与 multi-tab conflict 留给 S2-06，S2-05 未引入 session/lease。
+- 自动证据：Architecture PASS、TypeScript PASS、Unit 364/364、Integration 15/15、Total 379/379、production build 与 Playwright PASS；GitHub Actions Linux `Quality` run `33993518314` Success。
+- 回滚方法：优先 revert `e6b82fb831db87a24870c7fd39584dbf4c192359` 并推送；状态收尾使用独立 documentation/status-only commit 回滚，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档、Stage 1 Freeze contracts 与 S2-01 至 S2-04 已冻结 persistence contracts，只执行 Stage 2 / Task S2-05：Persistence commit coordinator。执行前先冻结本 Task 的具体实现合同；不得执行 S2-06。
+请读取最新控制文档、Stage 1 Freeze contracts 与 S2-01 至 S2-05 已冻结 persistence contracts，只执行 Stage 2 / Task S2-06：Single-active-session 与 revision conflict gate。执行前先冻结本 Task 的具体实现合同；不得执行 S2-07。
 ```
 
 ## 阶段看板
@@ -440,7 +459,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
-| 2 | State + Save | IN PROGRESS（S2-01 至 S2-04 PASS；S2-05 NEXT；S2-06 至 S2-09 APPROVED/LOCKED） | Stage 1 FROZEN / PASS |
+| 2 | State + Save | IN PROGRESS（S2-01 至 S2-05 PASS；S2-06 NEXT；S2-07 至 S2-09 APPROVED/LOCKED） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
@@ -451,7 +470,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 
 - Windows 10 不在 Playwright 当前官方原生支持矩阵内；本地测试已实测可用，但正式 E2E 结果以 GitHub Actions Linux 为准。
 - Phaser 3 基线 bundle 当前超过 Vite 500 KB chunk 提示阈值；属于性能观察项，不在 Stage 0 无数据优化。
-- Stage 2 必须继续处理 persist-before-publish coordination、revision/session conflict、multi-tab duplication 与刷新/恢复时奖励或援助复制风险；Save v1 mapping、version dispatch 与 crash-safe storage 已由 S2-02 至 S2-04 完成并冻结，当前只能执行 S2-05。
+- Stage 2 必须继续处理 revision/session conflict、multi-tab duplication 与刷新/恢复时奖励或援助复制风险；Save v1 mapping、version dispatch、crash-safe storage 与 persist-before-publish coordinator 已由 S2-02 至 S2-05 完成并冻结，当前只能执行 S2-06。
 - Reward farming/反自动化继续保留于 Future Requirements Registry；在出现真实经济破坏证据前不提前实现复杂防刷系统。
 - 游戏正式名称与域名未定。
 - 平衡参数（掉率、价格、援助阈值、障碍比例最终值）等待可玩原型数据。
