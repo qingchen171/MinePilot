@@ -141,20 +141,28 @@
 - Restore pipeline 合同：ordinary restore 不调用 gameplay RNG、Mine Placement 或 Initial Board assembly，不写 gameplay snapshot，不递增 revision，也不创建新 runId/new attempt；generation provenance 仅保留为 metadata，不参与 Board 再生成。重建结果必须是新的 immutable authoritative objects，不依赖旧 Runtime reference。
 - Reopen session 合同：browser session identity 与 persisted attempt identity 分离，`sessionId` / `leaseToken` 不进入 SaveDocument；新 session 在旧 lease 活跃时可读取但不得取得 writer authority 或提交，lease expiry 后可接管并从 restored revision 执行 `N -> N+1`。
 - Recovery/error 合同：backup recovery 必须保留 `recovered-from-backup` provenance；malformed JSON、invalid v1、unsupported future version、unprovable corruption 与真实 `no-save` 必须保持区分；corruption 不得自动 reset、生成新游戏或覆盖旧数据。localStorage 非原子 CAS limitation 与 S2-06 best-effort single-writer/stale-write rejection 边界不变。
+- Stage 2 / Task S2-08 Restart / Retry persistence semantics：产品经理人工验收 PASS（2026-09-06）。implementation stable point `356fc477af8fed7b608c21e9c29a1dafb0aab095`；GitHub Actions Linux `Quality` run `34000030504` Success。
+- Restart/Retry lifecycle 合同：refresh/reopen 保持 same attempt；explicit Restart 与 post-failure Retry 创建 new attempt。`restartCurrentAttempt` 仅允许 active/pending，`retryFailedAttempt` 仅允许 failed；Retry 对 active、pending、won 结构化拒绝，不发明 won-to-Retry 行为。
+- New-attempt 合同：成功后保持同 `levelId`、dimensions、mineCount 与 obstacles，必须产生新 `runId`、revision `N -> N+1` 及与直接上一 attempt 不同的实际 Mine coordinate set；角色回到 waiting、`hasTakenStep = false`、phase active，且不继承 explored、Flag、Revealed Mine 或 pending encounter。
+- Generation policy 合同：seed progression 位于 systems/policy 层，从 previous provenance seed 的下一 uint32 seed 开始；每个 candidate 复用冻结的 Mulberry32、rejection sampling 与 partial Fisher-Yates，并比较实际 Mine set。碰撞继续搜索，默认上限 4096；数学唯一布局返回 `no-alternative-mine-layout`，搜索耗尽返回 `generation-search-exhausted`，均不得 commit/publish；成功 provenance 保存实际采用 seed。
+- Generation limitation：4096 次 search budget 不保证对所有理论上存在 alternate layout 的 configuration 都找到 alternate；当前安全保证是 exhausted 时明确失败，而不是接受相同雷图。禁止无界循环、仅凭 seed 不同宣称雷图不同，或通过改变 difficulty/mineCount/obstacles 制造差异。
+- Identity/atomicity 合同：runId source 与 gameplay RNG 分离，same/invalid runId 必须拒绝；new attempt identity 与 generation identity 分离。流程固定为 old authority -> candidate generation/validation -> guarded persistence commit -> success 后方可 publish；任一步失败均保持旧内存及旧 persisted authority，失败结果不携带 publish-capable candidate。
+- Revision/integration 合同：Restart/Retry 不重置 revision；stale expected revision、lost ownership 与 storage failure 继续由 S2-06/S2-05 边界拒绝，不得留下半个 attempt；成功后通过 S2-07 reopen path 只能恢复新的 runId、Board 与 revision，旧 attempt 不得重新成为 authority。
+- Future new-attempt boundary：未来 attempt-local reward placement、Lucky/run-local facts、item usage 与 assistance 应接入同一 new-attempt boundary，但 S2-08 不创建假 Reward、Item、Account 或 Stage 3/4 Save 数据。
 
 ## 当前阶段
 
 **STAGE 2 IN PROGRESS；STAGE 1 FROZEN / PASS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-07 已人工验收 PASS；Stage 2 保持 IN PROGRESS，当前只能执行唯一 Next Action S2-08。
+Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-08 已人工验收 PASS；Stage 2 保持 IN PROGRESS，当前只能执行唯一 Next Action S2-09。
 
 ## 唯一下一行动
 
-**Stage 2 / Task S2-08 — Restart / Retry persistence semantics。**
+**Stage 2 / Task S2-09 — Stage 2 Persistence Integration + Freeze Gate。**
 
-目标：冻结并验证 Restart/Retry 作为 future new attempt 的持久化语义，并与 refresh/reopen exact restore 严格分离。
+目标：对 Stage 2 persistence 全链路、跨模块不变量与恢复能力进行最终集成验证，并判定 Stage 2 是否具备 Freeze 条件。
 
-边界：本 Task 的具体实现合同必须在执行前由产品经理批准；不得破坏 S2-07 same-attempt restore 合同，不得提前实现 Stage 3/4 facts 或 UI；不得执行 S2-09。
+边界：本 Task 的具体实现合同必须在执行前由产品经理批准；不得借 Freeze Gate 新增未批准玩法、Stage 3/4 facts 或 UI；完成后先提交人工验收报告，不得自动 Freeze 或进入 Stage 3。
 
 ## 最近完成任务
 
@@ -484,12 +492,25 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 - 并发限制：localStorage 非原子 CAS limitation 不变；S2-06 仍只保证 best-effort single writer 与 stale-write rejection。
 - 回滚方法：优先 revert `53cfc41fb7f6b38c94b31a7843c588d135456f4d` 并推送；状态收尾使用独立 documentation/status-only commit 回滚，禁止 `reset --hard`。
 
+### Stage 2 / Task S2-08 — PASS
+
+- 人工验收：产品经理于 2026-09-06 明确确认 `PASS`；接受 Restart/Retry new-attempt semantics、bounded generation policy、persist-before-publish 与并发失败边界。
+- implementation stable point：commit `356fc477af8fed7b608c21e9c29a1dafb0aab095`。
+- API/phase：`restartCurrentAttempt` 仅允许 active/pending；`retryFailedAttempt` 仅允许 failed，active/pending/won 均拒绝。Refresh/reopen 继续是 same attempt，Restart/Retry 才是显式 new attempt。
+- Successful new attempt：same level/config/obstacles，new runId，revision N+1，实际 Mine set 必须不同；新 Run 为 waiting、未走步、active，且无上一 attempt 的 explored/Flag/Revealed Mine/pending facts。
+- Generation：systems/policy 执行 uint32 seed progression，复用 Stage 1 frozen RNG/placement；逐次比较实际 Mine set。默认 bounded budget 4096；唯一布局与搜索耗尽均结构化失败且不 commit。4096 budget 不保证在所有理论可替代 configuration 中找到 alternate，但保证绝不接受相同布局。
+- Persist-before-publish/concurrency：generation、runId、revision、ownership 或 storage 任一步失败时旧内存和旧 persisted snapshot 保持，结果不可 publish；stale tab 不能覆盖新 attempt。成功后 S2-07 reopen 只恢复新 runId、Board、revision。
+- Mutation evidence：临时绕过 previous-layout rejection 后 deterministic collision test FAIL；恢复 production 后 PASS，临时 mutation 未提交。
+- 自动证据：Architecture PASS、TypeScript PASS、Unit 385/385、Integration 34/34、Total 419/419、production build 与 Playwright PASS；GitHub Actions Linux `Quality` run `34000030504` Success。
+- Future boundary：attempt-local rewards、Lucky/run-local facts、item usage 与 assistance 后续接入同一 boundary；当前未新增 Reward/Item/Account 或 Stage 3/4 Save facts。
+- 回滚方法：优先 revert `356fc477af8fed7b608c21e9c29a1dafb0aab095` 并推送；状态收尾使用独立 documentation/status-only commit 回滚，禁止 `reset --hard`。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档、Stage 1 Freeze contracts 与 S2-01 至 S2-07 已冻结 persistence contracts，只执行 Stage 2 / Task S2-08：Restart / Retry persistence semantics。执行前先冻结本 Task 的具体实现合同；不得执行 S2-09。
+请读取最新控制文档、Stage 1 Freeze contracts 与 S2-01 至 S2-08 已冻结 persistence contracts，只执行 Stage 2 / Task S2-09：Stage 2 Persistence Integration + Freeze Gate。执行前先冻结本 Task 的具体实现合同；完成后停止等待人工验收，不得自动 Freeze 或进入 Stage 3。
 ```
 
 ## 阶段看板
@@ -498,7 +519,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 |---|---|---|---|
 | 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
-| 2 | State + Save | IN PROGRESS（S2-01 至 S2-07 PASS；S2-08 NEXT；S2-09 APPROVED/LOCKED） | Stage 1 FROZEN / PASS |
+| 2 | State + Save | IN PROGRESS（S2-01 至 S2-08 PASS；S2-09 NEXT / FREEZE GATE） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | LOCKED | Stage 2 PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
@@ -509,7 +530,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 
 - Windows 10 不在 Playwright 当前官方原生支持矩阵内；本地测试已实测可用，但正式 E2E 结果以 GitHub Actions Linux 为准。
 - Phaser 3 基线 bundle 当前超过 Vite 500 KB chunk 提示阈值；属于性能观察项，不在 Stage 0 无数据优化。
-- Stage 2 必须继续处理 Restart/Retry persistence semantics 与刷新/恢复时奖励或援助复制风险；Save v1 mapping、version dispatch、crash-safe storage、persist-before-publish、best-effort session/revision gate 与 refresh/reopen exact restore 已由 S2-02 至 S2-07 完成并冻结，当前只能执行 S2-08。
+- Stage 2 的 S2-02 至 S2-08 已冻结 Save mapping、version dispatch、crash-safe storage、persist-before-publish、best-effort session/revision gate、exact restore 与 Restart/Retry new-attempt semantics；当前只剩 S2-09 Persistence Integration + Freeze Gate。刷新/恢复时未来奖励或援助复制风险继续作为 Stage 3/4 扩展约束，不得在 Stage 2 伪造尚不存在的状态。
 - localStorage 不提供 atomic CAS；S2-06 的 best-effort lease 与两次 ownership verification 不能消除所有精确并发 race。若未来实测不足，必须单独评估更强协调机制，不得把当前实现描述为强事务或绝对互斥。
 - Reward farming/反自动化继续保留于 Future Requirements Registry；在出现真实经济破坏证据前不提前实现复杂防刷系统。
 - 游戏正式名称与域名未定。
