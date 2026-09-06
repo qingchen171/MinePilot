@@ -3,7 +3,7 @@
 **项目：MinePilot / Minesweeper Product**  
 **状态更新时间：2026-09-06**
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core implementation 已完成；S1-01 至 S1-13 全部人工验收 PASS，Stage 1 FROZEN / PASS**
+**正式游戏代码：Stage 1 core implementation 与 Stage 2 persistence implementation 已完成；Stage 1、Stage 2 均已 FROZEN / PASS**
 
 ## 当前事实
 
@@ -152,17 +152,15 @@
 
 ## 当前阶段
 
-**STAGE 2 IN PROGRESS；STAGE 1 FROZEN / PASS**
+**STAGE 2 FROZEN / PASS；STAGE 1 FROZEN / PASS**
 
-Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-08 已人工验收 PASS；Stage 2 保持 IN PROGRESS，当前只能执行唯一 Next Action S2-09。
+Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-09 已人工验收 PASS，并正式 FROZEN。Stage 2 Freeze Candidate 为 `c549ef847b8a85f0a143772c15228d9283dfa915`；本次 closeout commit 为 Stage 2 frozen repository baseline。
 
 ## 唯一下一行动
 
-**Stage 2 / Task S2-09 — Stage 2 Persistence Integration + Freeze Gate。**
+**Stage 3 — Item Systems: define and approve Stage 3 task decomposition before implementation。**
 
-目标：对 Stage 2 persistence 全链路、跨模块不变量与恢复能力进行最终集成验证，并判定 Stage 2 是否具备 Freeze 条件。
-
-边界：本 Task 的具体实现合同必须在执行前由产品经理批准；不得借 Freeze Gate 新增未批准玩法、Stage 3/4 facts 或 UI；完成后先提交人工验收报告，不得自动 Freeze 或进入 Stage 3。
+边界：这里只进入 Stage 3 planning；在产品经理批准具体 Task decomposition 前，不得定义或执行 Stage 3 implementation，不得修改 Frozen Stage 2 contracts。
 
 ## 最近完成任务
 
@@ -505,22 +503,70 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 - Future boundary：attempt-local rewards、Lucky/run-local facts、item usage 与 assistance 后续接入同一 boundary；当前未新增 Reward/Item/Account 或 Stage 3/4 Save facts。
 - 回滚方法：优先 revert `356fc477af8fed7b608c21e9c29a1dafb0aab095` 并推送；状态收尾使用独立 documentation/status-only commit 回滚，禁止 `reset --hard`。
 
+### Stage 2 / Task S2-09 — PASS / STAGE 2 FREEZE GATE
+
+- 人工验收：产品经理于 2026-09-06 明确确认 `PASS` 与 `READY FOR STAGE 2 FREEZE`。
+- Freeze Candidate / implementation evidence：commit `c549ef847b8a85f0a143772c15228d9283dfa915`；production code changes `0`；新增 4 个 Stage 2 freeze integration tests。
+- 自动证据：Architecture、TypeScript、production build、Playwright 全部 PASS；Unit 385/385、Integration 38/38、Total 423/423 PASS；GitHub Actions Linux `Quality` run `34001125054` Success。
+- Recovery Test：PASS。仅依据 repository、控制文档、`PROJECT_STATUS`、tests 与 Git history，可以恢复 Stage 0/1/2 状态、Stage 2 authority chain、兼容合同、限制、未来 persistence obligations 与唯一 Next Action。
+- Stage 2 frozen repository baseline：本次 Stage 2 Freeze closeout documentation/status-only commit；同时保留 `c549ef847b8a85f0a143772c15228d9283dfa915` 作为 S2-09 Freeze Candidate。
+
+### Stage 2 Frozen Authority Chain
+
+`Runtime authoritative state -> Save v1 DTO -> JSON serialization -> version dispatcher -> crash-safe A/B snapshot storage -> persistence coordinator -> writer lease + revision gate -> guarded commit -> committed persisted authority -> validation/reconstruction -> authoritative Runtime`
+
+- 任何未来 persistence feature 必须接入该权威链，不得建立第二套 gameplay persistence authority、Save system 或绕过 validation/reconstruction 的恢复路径。
+
+### Stage 2 Frozen Compatibility Contracts
+
+- Runtime State 不等于 Serialized DTO；Save v1 保存完整 authoritative Board snapshot，Board row-major 顺序属于兼容合同。
+- SaveDocument revision 属于 persisted authority：fresh save revision 固定为 `0`；已有 revision `N` 只允许提交 `N + 1`。
+- `saveVersion`、`rngVersion` 与 `generationVersion` 彼此独立；Stage 1 deterministic RNG golden behavior、candidate ordering 与 generation compatibility 不得静默修改。
+- crash-safe storage commit point 是 successful new-head write；post-commit backup maintenance 失败不撤销已经完成的 commit。
+- revision 更高的裸 slot 不代表 authority；backup recovery 必须由可证明的 committed pointer 授权。
+- storage recovery 与 payload semantic validation 是不同层；corrupt、invalid 或 unsupported persistence 不等于 no-save，且不得自动 reset、delete、overwrite 或生成新游戏。
+- load/reopen 不执行 gameplay write、不递增 revision、不重新生成 Board；Refresh/reopen 是 same attempt。
+- Restart/Retry 是 new attempt；成功结果必须保持同一 `levelId`，产生 new `runId`、实际不同 Mine layout 与 revision `N + 1`。
+- 仅 seed 变化不能证明 Mine layout 变化；same Mine layout 永远不得接受。`no-alternative-mine-layout` 与 `generation-search-exhausted` 均为安全失败。
+- new-attempt generation 使用 deterministic bounded search；任一 generation、identity、revision、ownership 或 storage failure 都必须保留旧 authority。
+- persist-before-publish：只有 persistence commit 成功后的 candidate 才可成为 runtime/visual authority；失败结果不携带 publish-capable candidate。
+- writer lease 是 persistence coordination metadata，不进入 SaveDocument；session identity 与 gameplay attempt identity、gameplay RNG 相互独立。
+- localStorage lease 仅提供 best-effort coordination 与 stale-write rejection，不是 atomic CAS；第二次 ownership verification 只缩小 race window，不提供绝对 mutex。
+
+### Stage 2 Frozen Limitations
+
+- localStorage 没有 atomic CAS，也不提供 database-level mutual exclusion。
+- 默认 4096 次 generation search budget 可能在理论存在 alternative layout 时安全耗尽；此时明确失败，不违反“新 attempt 雷图必须不同”的合同。
+- Save v1 当前没有真实 migration history；未来 schema 演进必须显式处理 version compatibility 与 migration。
+- Phaser production bundle 超过 Vite 500 KB warning threshold，继续仅作为 observation，不是 Stage 2 blocker。
+
+### Future Persistence Obligations
+
+- Stage 3/4 未来真实的 inventory、item consumption/per-run caps、Lucky、Revive、Detection、Airplane、rewards/reward claims、coins/account facts、Benben assistance、tutorial 与 skins 状态，必须扩展同一个 versioned persistence aggregate，不得建立第二套 Save system。
+- 每次扩展必须作出明确 schema/version compatibility decision，继续执行 persist-before-publish 与 refresh exact restore，并正确区分 Restart/Retry 的 run-local facts 和 account-persistent facts。
+- 涉及上述扩展时必须重新运行完整 Stage 2 persistence regression suite。
+
+### Stage 2 Freeze Change Control
+
+- 修改 Save v1 interpretation、persistence authority chain、A/B snapshot format、commit point、revision/lease ownership semantics、refresh/reopen、Restart/Retry、RNG/generation compatibility 或 corruption recovery policy，均属于 frozen-boundary change。
+- 未来确需修改时，必须显式记录 reason、affected frozen contract、compatibility impact、migration/version requirement 与 regression plan；不得静默修改。
+
 ## 用户现在要做什么
 
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档、Stage 1 Freeze contracts 与 S2-01 至 S2-08 已冻结 persistence contracts，只执行 Stage 2 / Task S2-09：Stage 2 Persistence Integration + Freeze Gate。执行前先冻结本 Task 的具体实现合同；完成后停止等待人工验收，不得自动 Freeze 或进入 Stage 3。
+请读取最新控制文档与 Stage 1/Stage 2 Frozen contracts，只执行 Stage 3 Item Systems 的 Task decomposition 规划并提交产品经理批准；不得实现 Stage 3 代码，不得重新执行 S2-01 至 S2-09。
 ```
 
 ## 阶段看板
 
 | Stage | 名称 | 状态 | 进入条件 |
 |---|---|---|---|
-| 0 | 工程骨架 | PASS（S0-01 至 S0-07） | 控制文档冻结 |
+| 0 | 工程骨架 | FROZEN / PASS（S0-01 至 S0-07） | 控制文档冻结 |
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
-| 2 | State + Save | IN PROGRESS（S2-01 至 S2-08 PASS；S2-09 NEXT / FREEZE GATE） | Stage 1 FROZEN / PASS |
-| 3 | 四大道具 | LOCKED | Stage 2 PASS |
+| 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
+| 3 | 四大道具 | PLANNING ENTRY ONLY（implementation 尚未批准） | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
@@ -530,7 +576,7 @@ Stage 0 工程骨架 PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS�
 
 - Windows 10 不在 Playwright 当前官方原生支持矩阵内；本地测试已实测可用，但正式 E2E 结果以 GitHub Actions Linux 为准。
 - Phaser 3 基线 bundle 当前超过 Vite 500 KB chunk 提示阈值；属于性能观察项，不在 Stage 0 无数据优化。
-- Stage 2 的 S2-02 至 S2-08 已冻结 Save mapping、version dispatch、crash-safe storage、persist-before-publish、best-effort session/revision gate、exact restore 与 Restart/Retry new-attempt semantics；当前只剩 S2-09 Persistence Integration + Freeze Gate。刷新/恢复时未来奖励或援助复制风险继续作为 Stage 3/4 扩展约束，不得在 Stage 2 伪造尚不存在的状态。
+- Stage 2 的 S2-01 至 S2-09 已全部 PASS 并 FROZEN；不得重新执行。未来奖励、道具与援助的持久化扩展必须遵守 Stage 2 Frozen contracts，防止刷新/恢复复制，并不得建立第二套 persistence authority。
 - localStorage 不提供 atomic CAS；S2-06 的 best-effort lease 与两次 ownership verification 不能消除所有精确并发 race。若未来实测不足，必须单独评估更强协调机制，不得把当前实现描述为强事务或绝对互斥。
 - Reward farming/反自动化继续保留于 Future Requirements Registry；在出现真实经济破坏证据前不提前实现复杂防刷系统。
 - 游戏正式名称与域名未定。
