@@ -101,10 +101,19 @@ tests/
 ## 7. Git 与恢复
 
 - 开始任务前确认工作区状态并保护用户现有改动。
-- 一个稳定任务一个 commit；提交前必须通过本任务门禁。
+- 正常实现流程固定为：stable `main` -> `task/<task-id>-<short-description>` -> Builder implementation/tests -> 本地 `npm run quality` -> push task branch -> branch Linux `Quality` -> independent read-only Reviewer -> PR -> merge protected `main` -> main Linux `Quality` -> stable baseline -> `PROJECT_STATUS` closeout。
+- Builder 可以修改当前 Task scope 内的代码/测试及修复 Reviewer 指出的已批准问题；不得直接 push implementation 到 `main`、绕过失败 CI、把自己的报告当作 independent review 或 merge `BLOCKED` Task。
+- Reviewer 必须独立重读 Task/frozen contracts，检查实际 diff、测试是否真正证明合同、遗漏分支、回归、scope creep 与 frozen-boundary violation，并只输出 `PASS`、`BLOCKED` 或 `NEEDS DECISION`。Reviewer 默认只读且不直接 Patch；问题返回 Builder 修复后重新 Review。
+- Elio 不承担 diff、CI、Git、merge conflict、branch strategy、测试框架或技术 Reviewer 判断；这些由技术负责人/coding agents 完成。
+- 同一时间原则上只有一个 active implementation Task；不建立 develop/release/hotfix 分支体系。
+- 一个稳定任务一个 main commit；只有 branch/main CI 与 Reviewer gate 通过后才可成为稳定 baseline。
 - 建议提交格式：`feat(scope): ...`、`fix(scope): ...`、`test(scope): ...`、`docs(scope): ...`。
-- 稳定里程碑标签候选：`v0.1-core-board`、`v0.2-save-system`、`v0.3-items`、`v0.4-game-loop`、`v1.0-mvp`。
+- 冻结 Stage 使用 annotated tag 作为不可歧义恢复入口；tag target 错误时必须 STOP，不得静默重写。版本发布标签仍按实际发布 Task 决定。
 - 回滚优先使用可恢复、非破坏性方式；未经用户明确要求不得 `reset --hard` 或删除未提交工作。
+
+### 7.1 Frozen boundary change control
+
+对已冻结 Stage 的 architecture、schema、authority、persistence、RNG、gameplay contract 或兼容语义的修改，必须在 Task 开始前显式列出 reason、affected frozen contract、compatibility impact、migration/version requirement 与 regression plan。未经批准不得静默修改。
 
 ## 8. Bug 协议
 

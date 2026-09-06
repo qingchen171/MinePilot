@@ -156,6 +156,15 @@
 
 Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-09 已人工验收 PASS，并正式 FROZEN。Stage 2 Freeze Candidate 为 `c549ef847b8a85f0a143772c15228d9283dfa915`；本次 closeout commit 为 Stage 2 frozen repository baseline。
 
+### Engineering Reliability / ER-01
+
+- ER-01 — Minimal AI Development Reliability Upgrade：独立工程可靠性 Task；不改变 Stage 0/1/2 frozen 状态，不开始 Stage 3 gameplay。
+- 永久 AI 入口：repository-root `AGENTS.md` 只定位正式 authority 与不可绕过流程，不复制 Specification 或状态正文。
+- Git integration：stable `main` -> `task/<task-id>-<short-description>` -> Builder implementation/tests -> local quality -> branch Linux Quality -> independent read-only Reviewer -> PR -> protected main -> main Linux Quality -> stable baseline -> status closeout。Implementation 不得直接 push 到 `main`。
+- Builder/Reviewer gate：Builder 不得自证为 independent review；Reviewer 只读检查实际 diff、tests、scope 与 frozen contracts，输出 PASS/BLOCKED/NEEDS DECISION，不直接 Patch。Elio 不承担 Git、CI、diff、merge 或技术 review。
+- Frozen recovery tags：`stage-0-frozen` -> `8b31b011b188914837e20bd68ae0f5082b3ccecd`；`stage-1-frozen` -> `156edeecc478be2013ac0f1e691293a747bbce82`；`stage-2-frozen` -> `1e14a0fff02359658a6b0c8f9e67d5f5576f41cc`。
+- `main` 必须由 GitHub protection/ruleset 要求 PR 与 Linux `Quality` 成功后才能正常合入；不要求 Elio code approval，不引入多人、signed commit、linear history 或 conversation-resolution 企业流程。
+
 ## 唯一下一行动
 
 **Stage 3 — Item Systems: define and approve Stage 3 task decomposition before implementation。**
