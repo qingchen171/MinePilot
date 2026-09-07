@@ -152,9 +152,9 @@
 
 ## 当前阶段
 
-**STAGE 2 FROZEN / PASS；STAGE 1 FROZEN / PASS**
+**STAGE 3 IN PROGRESS；STAGE 2 FROZEN / PASS；STAGE 1 FROZEN / PASS**
 
-Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-09 已人工验收 PASS，并正式 FROZEN。Stage 2 Freeze Candidate 为 `c549ef847b8a85f0a143772c15228d9283dfa915`；本次 closeout commit 为 Stage 2 frozen repository baseline。
+Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-09 已人工验收 PASS，并正式 FROZEN。Stage 2 Freeze Candidate 为 `c549ef847b8a85f0a143772c15228d9283dfa915`；本次 closeout commit 为 Stage 2 frozen repository baseline。Stage 3 已完成 S3-01 只读设计与产品决策冻结，进入 S3-02 implementation。
 
 ### Engineering Reliability / ER-01
 
@@ -167,11 +167,24 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 
 ## 唯一下一行动
 
-**Stage 3 — Item Systems: define and approve Stage 3 task decomposition before implementation。**
+**Stage 3 / Task S3-02 — Item Aggregate Foundation & Revealed-Mine Occupancy Frozen-Boundary Extension。**
 
-边界：这里只进入 Stage 3 planning；在产品经理批准具体 Task decomposition 前，不得定义或执行 Stage 3 implementation，不得修改 Frozen Stage 2 contracts。
+边界：只建立最小 Item/Inventory 权威模型、Run item state 基础容器、GameState candidate boundary、`revealed-mine-occupancy` CharacterPosition 扩展、相关 runtime validation，以及 Save v1 对新 runtime 的明确拒绝保护。不得实现 Detection、Airplane、Lucky、Revive gameplay、Save v2 migration、Shop、Reward、Tutorial、UI/Phaser、Command Bus、Manager framework 或第二套 RNG framework。
 
 ## 最近完成任务
+
+### Stage 3 / Task S3-01 — PASS
+
+- 人工验收：产品经理于 2026-09-07 批准 Item Domain、State Ownership 与 Persistence Contract 最终设计；本 Task 为只读设计，production/source/test changes 均为 `0`。
+- State ownership：四种 MVP item inventory 是跨 attempt 的 Account authority；Detection/Airplane/Revive successful-use counters 与 Detection deterministic RNG state 是 attempt-local authority；Lucky 不建立普通 usage counter，继续使用冻结的 first-step/pending-encounter 事实。
+- Persistence direction：Stage 3 新事实必须进入同一 versioned persistence aggregate；Save v1 interpretation 保持冻结，后续显式引入 Save v2 与 v1-to-v2 pure load-time migration，不建立第二套 Save authority。
+- Atomicity：inventory consumption、run-local usage/state、Board/phase/position gameplay result 必须形成单一 candidate，并沿 Stage 2 guarded persistence coordinator 执行 persist-before-publish；任何失败不携带 publishable candidate。
+- Frozen-boundary decision：`CharacterPosition` 后续增加唯一通用 `revealed-mine-occupancy(coordinate)` variant，只允许 Lucky/Revive 成功产生且必须指向 Revealed Mine；普通 `on-board -> explored Safe` 不变量与 Revealed Mine 普通不可进入规则保持不变。该状态当前数字 unavailable，refresh 精确恢复，Restart/Retry 清除。
+- Lucky product decision：首步踩雷并成功触发 Lucky 后，Mine 变为 Revealed Mine，角色停留在该格并进入通用 revealed-mine occupancy；Lucky 消耗，Revive 不消耗。
+- Airplane product decision：active waiting 允许使用，玩家选择合法 target coordinate；角色保持 waiting、`hasTakenStep` 保持 false，3x3 transition 与 Victory 检查保持原子；pending/failed/won 禁止。
+- Stage 3 implementation sequence：S3-02 foundation；后续按依赖顺序分别实现 Save v2/migration、统一 reveal primitives、Detection、Airplane、Lucky、Revive，最后执行 Stage 3 integration/freeze gate。除唯一 Next Action 外不得提前执行。
+- 审计基线：`8255e0fa25061660e9d982980a7bb93fcb4c323d`；S3-01 无 implementation commit。本 status-only closeout commit 仅记录人工验收、冻结决定与 S3-02 入口。
+- 回滚：优先 revert 本 status-only closeout commit；不得修改或重写 Stage 0/1/2 frozen tags。
 
 ### Stage 0 / Task S0-01 — PASS
 
@@ -565,7 +578,7 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档与 Stage 1/Stage 2 Frozen contracts，只执行 Stage 3 Item Systems 的 Task decomposition 规划并提交产品经理批准；不得实现 Stage 3 代码，不得重新执行 S2-01 至 S2-09。
+请读取最新控制文档、S3-01 frozen design decisions 与 Stage 1/Stage 2 Frozen contracts，只执行 Stage 3 / Task S3-02 — Item Aggregate Foundation & Revealed-Mine Occupancy Frozen-Boundary Extension；不得执行后续 item gameplay Task，不得重新执行 S2-01 至 S2-09。
 ```
 
 ## 阶段看板
@@ -575,7 +588,7 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 | 0 | 工程骨架 | FROZEN / PASS（S0-01 至 S0-07） | 控制文档冻结 |
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
-| 3 | 四大道具 | PLANNING ENTRY ONLY（implementation 尚未批准） | Stage 2 FROZEN / PASS |
+| 3 | 四大道具 | IN PROGRESS（S3-01 PASS；S3-02 为唯一 Next Action） | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
