@@ -1,9 +1,9 @@
-import { type SaveDocumentPersistenceInputV1 } from '../../core/persistence/save-v1';
+import { type SaveDocumentPersistenceInputV2 } from '../../core/persistence/save-v2';
 import { type StringKeyValueStorage } from './key-value-storage';
 import {
-  commitCandidateSaveV1,
+  commitCandidateSaveV2,
   loadPersistedSave,
-  type CommitCandidateSaveV1Result,
+  type CommitCandidateSaveV2Result,
   type LoadPersistedSaveResult,
 } from './persistence-coordinator';
 import {
@@ -23,20 +23,20 @@ type LoadFailure = Exclude<
 >;
 
 type CommitFailure = Exclude<
-  CommitCandidateSaveV1Result,
+  CommitCandidateSaveV2Result,
   { readonly status: 'committed' }
 >;
 
 export type GuardedCommitResult =
   | {
       readonly status: 'committed';
-      readonly candidate: SaveDocumentPersistenceInputV1;
+      readonly candidate: SaveDocumentPersistenceInputV2;
       readonly revision: number;
       readonly slot: 'A' | 'B';
       readonly backupUpdate: 'updated' | 'failed';
       readonly previousAuthority: 'no-save' | 'head' | 'head-backup';
       readonly backupFailure?: Extract<
-        CommitCandidateSaveV1Result,
+        CommitCandidateSaveV2Result,
         { readonly status: 'committed' }
       >['backupFailure'];
     }
@@ -93,7 +93,7 @@ export function commitCandidateWithWriterLease(
   identity: WriterIdentity,
   clock: Clock,
   expectedRevision: number | null,
-  candidate: SaveDocumentPersistenceInputV1,
+  candidate: SaveDocumentPersistenceInputV2,
 ): GuardedCommitResult {
   const firstOwnership = checkOwnership(storage, identity, clock);
   if (firstOwnership !== undefined) return firstOwnership;
@@ -125,7 +125,7 @@ export function commitCandidateWithWriterLease(
   const secondOwnership = checkOwnership(storage, identity, clock);
   if (secondOwnership !== undefined) return secondOwnership;
 
-  const committed = commitCandidateSaveV1(storage, candidate);
+  const committed = commitCandidateSaveV2(storage, candidate);
   if (committed.status !== 'committed') {
     return { status: 'persistence-commit-failure', failure: committed };
   }

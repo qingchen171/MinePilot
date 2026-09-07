@@ -106,11 +106,11 @@ describe('Stage 2 persistence coordinator integration', () => {
     }
     expect(result.source).toBe('head');
     expect(result.revision).toBe(candidate.revision);
-    expect(result.save.activeRun.run).toEqual(candidate.activeRun?.run);
+    expect(result.save.activeRun.gameState.run).toEqual(candidate.activeRun?.run);
     expect(result.save.activeRun.generationProvenance).toEqual(
       candidate.activeRun?.generationProvenance,
     );
-    expect(result.save.activeRun.run).not.toBe(candidate.activeRun?.run);
+    expect(result.save.activeRun.gameState.run).not.toBe(candidate.activeRun?.run);
   });
 
   it('distinguishes malformed committed JSON from storage-envelope corruption', () => {
@@ -133,11 +133,11 @@ describe('Stage 2 persistence coordinator integration', () => {
 
   it.each([
     ['missing version', { revision: 1, activeRun: null }, 'missing-version'],
-    ['future version', { saveVersion: 2, revision: 1, activeRun: null }, 'unsupported-future-version'],
+    ['future version', { saveVersion: 3, revision: 1, activeRun: null }, 'unsupported-future-version'],
     [
       'v1 structural corruption',
       { saveVersion: 1, revision: 1, activeRun: null, unexpected: true },
-      'invalid-current-version-document',
+      'invalid-old-version-document',
     ],
   ] as const)('preserves %s classification after storage and JSON boundaries', (_name, payload, status) => {
     const storage = new MemoryStorage();

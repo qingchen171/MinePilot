@@ -4,6 +4,7 @@ import { createInitialBoard } from '../../src/core/initial-board';
 import { selectMineCoordinates } from '../../src/core/mine-placement';
 import { moveCharacter } from '../../src/core/movement';
 import type { ActiveRunPersistenceInputV1 } from '../../src/core/persistence/save-v1';
+import type { ActiveRunPersistenceInputV2 } from '../../src/core/persistence/save-v2';
 import { createSeededRandomSource } from '../../src/core/random';
 import { setRunFlagged } from '../../src/core/run-flag';
 import { createRunState, createWaitingPosition, createWaitingRunState, type RunPhase } from '../../src/core/run';
@@ -17,6 +18,7 @@ import {
 import { loadPersistedSave } from '../../src/systems/persistence/persistence-coordinator';
 import { acquireWriterLease, type Clock, type WriterIdentity } from '../../src/systems/persistence/writer-lease';
 import { MemoryStorage } from '../helpers/memory-storage';
+import { activeRunV2FromV1 } from '../helpers/save-v2';
 
 class FakeClock implements Clock {
   nowMs(): number { return 0; }
@@ -45,9 +47,10 @@ function minesForSeed(seed: number, config = configuration): readonly Coordinate
   return result.coordinates;
 }
 
-function mineKeys(attempt: ActiveRunPersistenceInputV1): string[] {
-  const width = attempt.run.board.dimensions.width;
-  return attempt.run.board.cells.flatMap((cell, index) =>
+function mineKeys(attempt: ActiveRunPersistenceInputV1 | ActiveRunPersistenceInputV2): string[] {
+  const run = 'gameState' in attempt ? attempt.gameState.run : attempt.run;
+  const width = run.board.dimensions.width;
+  return run.board.cells.flatMap((cell, index) =>
     cell.kind === 'mine' ? [`${index % width},${Math.floor(index / width)}`] : [],
   );
 }
@@ -97,14 +100,14 @@ function setup(currentAttempt: ActiveRunPersistenceInputV1) {
   const clock = new FakeClock();
   expect(acquireWriterLease(storage, writer, clock).status).toBe('acquired');
   expect(commitCandidateWithWriterLease(storage, writer, clock, null, {
-    revision: 0, activeRun: currentAttempt,
+    revision: 0, activeRun: activeRunV2FromV1(currentAttempt),
   }).status).toBe('committed');
   return { storage, clock };
 }
 
 function request(currentAttempt: ActiveRunPersistenceInputV1, runId = 'new-run') {
   return {
-    currentAttempt,
+    currentAttempt: activeRunV2FromV1(currentAttempt),
     currentRevision: 0,
     generationConfiguration: configuration,
     runIdSource: { nextRunId: () => runId },
@@ -121,16 +124,16 @@ function expectCleanNewAttempt(result: ReturnType<typeof restartCurrentAttempt>,
   expect(next.runId).not.toBe(old.runId);
   expect(next.levelId).toBe(old.levelId);
   expect(result.revision).toBe(1);
-  expect(next.run).toMatchObject({
+  expect(next.gameState.run).toMatchObject({
     characterPosition: { kind: 'waiting' }, hasTakenStep: false, phase: { kind: 'active' },
   });
-  expect(next.run.board.cells.every((cell) =>
+  expect(next.gameState.run.board.cells.every((cell) =>
     cell.kind === 'obstacle' ||
     (cell.kind === 'safe' && cell.exploration === 'unexplored' && !cell.flagged) ||
     (cell.kind === 'mine' && cell.revelation === 'hidden' && !cell.flagged),
   )).toBe(true);
   expect(mineKeys(next)).not.toEqual(mineKeys(old));
-  expect(next.run.board.cells.map((cell) => cell.kind === 'obstacle'))
+  expect(next.gameState.run.board.cells.map((cell) => cell.kind === 'obstacle'))
     .toEqual(old.run.board.cells.map((cell) => cell.kind === 'obstacle'));
   expect(next.generationProvenance?.seed).toBe(result.selectedSeed);
   return next;
@@ -270,6 +273,6 @@ describe('Restart and Retry persistence semantics', () => {
     expect(reopened).toMatchObject({ status: 'loaded', revision: 1 });
     if (!('save' in reopened) || reopened.save.activeRun === null) throw new Error('Expected reopened attempt.');
     expect(reopened.save.activeRun.runId).toBe(next.runId);
-    expect(reopened.save.activeRun.run.board).toEqual(next.run.board);
+    expect(reopened.save.activeRun.gameState.run.board).toEqual(next.gameState.run.board);
   });
 });

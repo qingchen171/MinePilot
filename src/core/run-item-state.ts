@@ -4,7 +4,7 @@ export interface RunItemState {
   readonly successfulDetectionUses: number;
   readonly successfulAirplaneUses: number;
   readonly successfulReviveUses: number;
-  readonly detectionRandomSeed: number;
+  readonly detectionRandomSeed: number | null;
 }
 
 function requireUseCount(value: number, maximum: number, name: string): void {
@@ -18,11 +18,12 @@ export function createRunItemState(input: RunItemState): RunItemState {
   requireUseCount(input.successfulAirplaneUses, 1, 'Successful Airplane uses');
   requireUseCount(input.successfulReviveUses, 1, 'Successful Revive uses');
   if (
-    !Number.isInteger(input.detectionRandomSeed) ||
-    input.detectionRandomSeed < 0 ||
-    input.detectionRandomSeed > UINT32_MAX
+    input.detectionRandomSeed !== null &&
+    (!Number.isInteger(input.detectionRandomSeed) ||
+      input.detectionRandomSeed < 0 ||
+      input.detectionRandomSeed > UINT32_MAX)
   ) {
-    throw new RangeError('Detection random seed must be a non-negative uint32 integer.');
+    throw new RangeError('Detection random seed must be null or a non-negative uint32 integer.');
   }
 
   return Object.freeze({
@@ -33,7 +34,7 @@ export function createRunItemState(input: RunItemState): RunItemState {
   });
 }
 
-export function createInitialRunItemState(detectionRandomSeed: number): RunItemState {
+export function createInitialRunItemState(detectionRandomSeed: number | null): RunItemState {
   return createRunItemState({
     successfulDetectionUses: 0,
     successfulAirplaneUses: 0,

@@ -6,8 +6,10 @@ import {
   createCoordinate,
   type BoardState,
 } from '../../src/core/board';
+import { createGameState } from '../../src/core/game-state';
 import { moveCharacter } from '../../src/core/movement';
-import { type SaveDocumentPersistenceInputV1 } from '../../src/core/persistence/save-v1';
+import { type SaveDocumentPersistenceInputV2 } from '../../src/core/persistence/save-v2';
+import { createInitialRunItemState } from '../../src/core/run-item-state';
 import { setRunFlagged } from '../../src/core/run-flag';
 import {
   createOnBoardPosition,
@@ -22,7 +24,7 @@ import {
 } from '../../src/systems/persistence/crash-safe-snapshot-store';
 import { commitCandidateWithWriterLease } from '../../src/systems/persistence/guarded-persistence';
 import {
-  commitCandidateSaveV1,
+  commitCandidateSaveV2,
   loadPersistedSave,
 } from '../../src/systems/persistence/persistence-coordinator';
 import {
@@ -31,6 +33,7 @@ import {
   type WriterIdentity,
 } from '../../src/systems/persistence/writer-lease';
 import { MemoryStorage } from '../helpers/memory-storage';
+import { createTestAccount } from '../helpers/save-v2';
 
 class FakeClock implements Clock {
   constructor(public value = 1_000) {}
@@ -75,13 +78,17 @@ function exactRestoreBoard(): BoardState {
 }
 
 function candidate(run: RunState, revision: number, runId = 'run-exact-restore'):
-SaveDocumentPersistenceInputV1 {
+SaveDocumentPersistenceInputV2 {
   return {
     revision,
     activeRun: {
       runId,
       levelId: 'level-17',
-      run,
+      gameState: createGameState({
+        account: createTestAccount(),
+        run,
+        runItems: createInitialRunItemState(provenance.seed),
+      }),
       generationProvenance: provenance,
     },
   };
@@ -98,7 +105,7 @@ function loadedActiveRun(storage: MemoryStorage) {
 
 function committedFixture(run: RunState, revision = 0): MemoryStorage {
   const storage = new MemoryStorage();
-  expect(commitCandidateSaveV1(storage, candidate(run, revision)).status).toBe('committed');
+  expect(commitCandidateSaveV2(storage, candidate(run, revision)).status).toBe('committed');
   return storage;
 }
 
@@ -131,16 +138,16 @@ describe('Stage 2 refresh and reopen exact-restore integration', () => {
       levelId: 'level-17',
       generationProvenance: provenance,
     });
-    expect(reopened.activeRun.run).toEqual(instanceARun);
-    expect(reopened.activeRun.run.board).toEqual(instanceARun.board);
-    expect(reopened.activeRun.run.characterPosition).toEqual(instanceARun.characterPosition);
-    expect(reopened.activeRun.run.hasTakenStep).toBe(true);
-    expect(reopened.activeRun.run.phase).toEqual({ kind: 'active' });
-    expect(reopened.activeRun.run).not.toBe(instanceARun);
-    expect(reopened.activeRun.run.board).not.toBe(instanceARun.board);
-    expect(reopened.activeRun.run.board.cells).not.toBe(instanceARun.board.cells);
-    expect(Object.isFrozen(reopened.activeRun.run)).toBe(true);
-    expect(Object.isFrozen(reopened.activeRun.run.board)).toBe(true);
+    expect(reopened.activeRun.gameState.run).toEqual(instanceARun);
+    expect(reopened.activeRun.gameState.run.board).toEqual(instanceARun.board);
+    expect(reopened.activeRun.gameState.run.characterPosition).toEqual(instanceARun.characterPosition);
+    expect(reopened.activeRun.gameState.run.hasTakenStep).toBe(true);
+    expect(reopened.activeRun.gameState.run.phase).toEqual({ kind: 'active' });
+    expect(reopened.activeRun.gameState.run).not.toBe(instanceARun);
+    expect(reopened.activeRun.gameState.run.board).not.toBe(instanceARun.board);
+    expect(reopened.activeRun.gameState.run.board.cells).not.toBe(instanceARun.board.cells);
+    expect(Object.isFrozen(reopened.activeRun.gameState.run)).toBe(true);
+    expect(Object.isFrozen(reopened.activeRun.gameState.run.board)).toBe(true);
 
     const reopenOperations = storage.operations.slice(operationsBeforeReopen);
     expect(reopenOperations.every((operation) => operation.startsWith('read:'))).toBe(true);
@@ -152,13 +159,13 @@ describe('Stage 2 refresh and reopen exact-restore integration', () => {
       status: 'owned-by-another-session', ownerSessionId: writerA.sessionId,
     });
     expect(commitCandidateWithWriterLease(
-      storage, writerB, clock, 0, candidate(reopened.activeRun.run, 1),
+      storage, writerB, clock, 0, candidate(reopened.activeRun.gameState.run, 1),
     )).toEqual({ status: 'writer-not-owner', reason: 'different-owner' });
 
     clock.value += 100;
     expect(acquireWriterLease(storage, writerB, clock, 100).status).toBe('acquired');
     expect(commitCandidateWithWriterLease(
-      storage, writerB, clock, 0, candidate(reopened.activeRun.run, 1),
+      storage, writerB, clock, 0, candidate(reopened.activeRun.gameState.run, 1),
     )).toMatchObject({ status: 'committed', revision: 1 });
     expect(loadPersistedSave(storage)).toMatchObject({ status: 'loaded', revision: 1 });
   });
@@ -177,13 +184,13 @@ describe('Stage 2 refresh and reopen exact-restore integration', () => {
     });
     const restored = loadedActiveRun(committedFixture(pending));
 
-    expect(restored.activeRun.run).toEqual(pending);
-    expect(restored.activeRun.run.characterPosition).toEqual({ kind: 'waiting' });
-    expect(restored.activeRun.run.phase).toEqual({
+    expect(restored.activeRun.gameState.run).toEqual(pending);
+    expect(restored.activeRun.gameState.run.characterPosition).toEqual({ kind: 'waiting' });
+    expect(restored.activeRun.gameState.run.phase).toEqual({
       kind: 'pending-mine-encounter',
       encounter: { target: { x: 1, y: 0 }, occurredOnFirstStep: true },
     });
-    expect(restored.activeRun.run.board.cells[1]).toEqual({
+    expect(restored.activeRun.gameState.run.board.cells[1]).toEqual({
       kind: 'mine', revelation: 'hidden', flagged: false,
     });
   });
@@ -208,7 +215,7 @@ describe('Stage 2 refresh and reopen exact-restore integration', () => {
           },
     });
 
-    expect(loadedActiveRun(committedFixture(run)).activeRun.run).toEqual(run);
+    expect(loadedActiveRun(committedFixture(run)).activeRun.gameState.run).toEqual(run);
   });
 
   it('preserves exact Save facts and backup-recovery provenance', () => {
@@ -222,20 +229,20 @@ describe('Stage 2 refresh and reopen exact-restore integration', () => {
     expect(restored.result).toMatchObject({
       status: 'recovered-from-backup', source: 'head-backup', revision: 7,
     });
-    expect(restored.activeRun.run).toEqual(run);
+    expect(restored.activeRun.gameState.run).toEqual(run);
     expect(restored.activeRun.generationProvenance).toEqual(provenance);
   });
 
   it.each([
     ['malformed JSON', '{not-json', 'malformed-json'],
     [
-      'invalid current v1',
+      'invalid old v1',
       JSON.stringify({ saveVersion: 1, revision: 0, activeRun: null, unexpected: true }),
-      'invalid-current-version-document',
+      'invalid-old-version-document',
     ],
     [
       'unsupported future version',
-      JSON.stringify({ saveVersion: 2, revision: 0, activeRun: null }),
+      JSON.stringify({ saveVersion: 3, revision: 0, activeRun: null }),
       'unsupported-future-version',
     ],
   ] as const)('keeps %s distinct from no-save and performs no recovery write', (_name, payload, status) => {
