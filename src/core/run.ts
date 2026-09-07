@@ -10,7 +10,15 @@ export interface OnBoardPosition {
   readonly coordinate: Coordinate;
 }
 
-export type CharacterPosition = WaitingPosition | OnBoardPosition;
+export interface RevealedMineOccupancyPosition {
+  readonly kind: 'revealed-mine-occupancy';
+  readonly coordinate: Coordinate;
+}
+
+export type CharacterPosition =
+  | WaitingPosition
+  | OnBoardPosition
+  | RevealedMineOccupancyPosition;
 
 export interface MineEncounter {
   readonly target: Coordinate;
@@ -46,6 +54,24 @@ export function createOnBoardPosition(coordinate: Coordinate): OnBoardPosition {
   });
 }
 
+export function createRevealedMineOccupancyPosition(
+  coordinate: Coordinate,
+): RevealedMineOccupancyPosition {
+  return Object.freeze({
+    kind: 'revealed-mine-occupancy',
+    coordinate: createCoordinate(coordinate.x, coordinate.y),
+  });
+}
+
+function copyCharacterPosition(position: CharacterPosition): CharacterPosition {
+  if (position.kind === 'waiting') return createWaitingPosition();
+  if (position.kind === 'on-board') return createOnBoardPosition(position.coordinate);
+  if (position.kind === 'revealed-mine-occupancy') {
+    return createRevealedMineOccupancyPosition(position.coordinate);
+  }
+  throw new Error('Character position kind is invalid.');
+}
+
 function copyEncounter(encounter: MineEncounter): MineEncounter {
   return Object.freeze({
     target: createCoordinate(encounter.target.x, encounter.target.y),
@@ -65,11 +91,8 @@ export function createRunState(
   characterPosition: CharacterPosition,
   options: RunStateOptions = {},
 ): RunState {
-  const position =
-    characterPosition.kind === 'waiting'
-      ? createWaitingPosition()
-      : createOnBoardPosition(characterPosition.coordinate);
-  const hasTakenStep = options.hasTakenStep ?? position.kind === 'on-board';
+  const position = copyCharacterPosition(characterPosition);
+  const hasTakenStep = options.hasTakenStep ?? position.kind !== 'waiting';
   const phase = copyPhase(options.phase ?? { kind: 'active' });
 
   if (position.kind === 'on-board') {
@@ -79,6 +102,19 @@ export function createRunState(
       throw new Error('An on-board character position must reference an explored safe cell.');
     }
     if (!hasTakenStep) throw new Error('An on-board character must have taken a step.');
+  }
+
+  if (position.kind === 'revealed-mine-occupancy') {
+    const cell = getCellAt(board, position.coordinate);
+    if (cell === undefined) {
+      throw new Error('A revealed-mine occupancy position must be inside the board.');
+    }
+    if (cell.kind !== 'mine' || cell.revelation !== 'revealed') {
+      throw new Error('A revealed-mine occupancy position must reference a revealed mine.');
+    }
+    if (!hasTakenStep) {
+      throw new Error('A revealed-mine occupancy position requires a recorded step.');
+    }
   }
 
   if (phase.kind === 'pending-mine-encounter' || phase.kind === 'failed') {

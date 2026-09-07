@@ -11,6 +11,7 @@ import { settleMineEncounterAsFailure } from '../../../src/core/encounter';
 import { moveCharacter, type MoveCharacterResult } from '../../../src/core/movement';
 import {
   createOnBoardPosition,
+  createRevealedMineOccupancyPosition,
   createRunState,
   createWaitingRunState,
   type RunState,
@@ -66,6 +67,16 @@ describe('current cell mine count query', () => {
     expect(getCurrentCellMineCount(createWaitingRunState(board(1, 1, [safe()])))).toEqual({
       status: 'unavailable',
     });
+  });
+
+  it('returns unavailable while the character occupies a Revealed Mine', () => {
+    const targetBoard = board(2, 1, [mine(true), mine()]);
+    const run = createRunState(
+      targetBoard,
+      createRevealedMineOccupancyPosition(createCoordinate(0, 0)),
+    );
+
+    expect(getCurrentCellMineCount(run)).toEqual({ status: 'unavailable' });
   });
 
   it('counts all eight neighbors around an on-board center safe cell', () => {
