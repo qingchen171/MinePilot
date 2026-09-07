@@ -14,6 +14,7 @@ import {
   serializeSaveDocumentV1,
   type SaveDocumentV1,
 } from '../../../../src/core/persistence/save-v1';
+import { migrateValidatedSaveDocumentV1ToV2 } from '../../../../src/core/persistence/save-v2';
 import {
   createOnBoardPosition,
   createRunState,
@@ -83,15 +84,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 describe('Save version dispatcher', () => {
-  it('loads a valid v1 document through the current Save v1 boundary', () => {
+  it('loads a current v2 document without migration', () => {
+    const document = migrateValidatedSaveDocumentV1ToV2(documentForPhase({ kind: 'active' }));
+    const result = loadSaveDocument(document);
+
+    expect(result.status).toBe('loaded');
+    if (result.status !== 'loaded') throw new Error('Expected current v2 load.');
+    expect(result).toMatchObject({ saveVersion: 2, sourceSaveVersion: 2 });
+    expect(result.document).toEqual(document);
+  });
+
+  it('loads a valid v1 document through the single read-only v1-to-v2 migration branch', () => {
     const document = documentForPhase({ kind: 'active' });
     const result = loadSaveDocument(document);
 
     expect(result.status).toBe('loaded');
     if (result.status !== 'loaded') throw new Error('Expected a loaded Save.');
     expect(result.saveVersion).toBe(CURRENT_SAVE_VERSION);
-    expect(result.document).toEqual(document);
-    expect(result.activeRun?.run.phase).toEqual({ kind: 'active' });
+    expect(result.sourceSaveVersion).toBe(1);
+    expect(result.document.saveVersion).toBe(2);
+    expect(result.document.revision).toBe(document.revision);
+    expect(result.activeRun?.gameState.run.phase).toEqual({ kind: 'active' });
+    expect(result.account.inventory).toEqual({ lucky: 0, detection: 0, airplane: 0, revive: 0 });
+    expect(result.activeRun?.gameState.runItems).toMatchObject({
+      successfulDetectionUses: 0,
+      successfulAirplaneUses: 0,
+      successfulReviveUses: 0,
+      detectionRandomSeed: null,
+    });
   });
 
   it.each([
@@ -118,7 +138,7 @@ describe('Save version dispatcher', () => {
     if (result.status !== 'loaded' || result.activeRun === null) {
       throw new Error('Expected a loaded active Run.');
     }
-    expect(result.activeRun.run.phase).toEqual(phase);
+    expect(result.activeRun.gameState.run.phase).toEqual(phase);
   });
 
   it.each([
@@ -155,10 +175,10 @@ describe('Save version dispatcher', () => {
     });
   });
 
-  it('classifies a future version without attempting v1 validation', () => {
-    expect(loadSaveDocument({ saveVersion: 2, futureField: true })).toEqual({
+  it('classifies a future version without attempting current validation', () => {
+    expect(loadSaveDocument({ saveVersion: 3, futureField: true })).toEqual({
       status: 'unsupported-future-version',
-      saveVersion: 2,
+      saveVersion: 3,
     });
   });
 
@@ -198,7 +218,7 @@ describe('Save version dispatcher', () => {
       },
       { code: 'unknown-field', path: '$.futureField' },
     ],
-  ] as const)('preserves S2-02 issues for a v1 document with %s', (_description, mutate, issue) => {
+  ] as const)('preserves S2-02 issues for an invalid old v1 document with %s', (_description, mutate, issue) => {
     const input = clone(documentForPhase({ kind: 'active' }));
     if (!isRecord(input)) {
       throw new Error('Expected a document fixture.');
@@ -206,9 +226,9 @@ describe('Save version dispatcher', () => {
     mutate(input);
     const result = loadSaveDocument(input);
 
-    expect(result.status).toBe('invalid-current-version-document');
-    if (result.status !== 'invalid-current-version-document') {
-      throw new Error('Expected invalid current-version document.');
+    expect(result.status).toBe('invalid-old-version-document');
+    if (result.status !== 'invalid-old-version-document') {
+      throw new Error('Expected invalid old-version document.');
     }
     expect(result.issues[0]).toMatchObject(issue);
   });
@@ -220,5 +240,20 @@ describe('Save version dispatcher', () => {
     loadSaveDocument(input);
 
     expect(input).toEqual(before);
+  });
+
+  it('keeps current v2 validation issues distinct from invalid legacy v1', () => {
+    const input = {
+      ...migrateValidatedSaveDocumentV1ToV2(documentForPhase({ kind: 'active' })),
+      unexpected: true,
+    };
+
+    const result = loadSaveDocument(input);
+
+    expect(result).toMatchObject({
+      status: 'invalid-current-version-document',
+      saveVersion: 2,
+      issues: [{ code: 'unknown-field', path: '$.unexpected' }],
+    });
   });
 });

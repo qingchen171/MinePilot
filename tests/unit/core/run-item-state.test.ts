@@ -18,6 +18,10 @@ describe('attempt-local item state foundation', () => {
     expect(createInitialRunItemState(123)).toEqual(itemState());
   });
 
+  it('preserves an explicitly unknown Detection seed without fabricating a valid seed', () => {
+    expect(createInitialRunItemState(null)).toEqual(itemState({ detectionRandomSeed: null }));
+  });
+
   it('accepts the frozen per-attempt maximum successful-use counts', () => {
     const state = createRunItemState(itemState({
       successfulDetectionUses: 2,
@@ -49,7 +53,7 @@ describe('attempt-local item state foundation', () => {
     'rejects invalid Detection random seed %s',
     (seed) => {
       expect(() => createRunItemState(itemState({ detectionRandomSeed: seed }))).toThrow(
-        'Detection random seed must be a non-negative uint32 integer.',
+        'Detection random seed must be null or a non-negative uint32 integer.',
       );
     },
   );

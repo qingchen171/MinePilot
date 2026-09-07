@@ -7,10 +7,12 @@ import {
 import { createInitialBoard } from '../../core/initial-board';
 import { selectMineCoordinates } from '../../core/mine-placement';
 import {
-  type ActiveRunPersistenceInputV1,
-  type SaveDocumentPersistenceInputV1,
-} from '../../core/persistence/save-v1';
+  type ActiveRunPersistenceInputV2,
+  type SaveDocumentPersistenceInputV2,
+} from '../../core/persistence/save-v2';
 import { createSeededRandomSource } from '../../core/random';
+import { createGameState } from '../../core/game-state';
+import { createInitialRunItemState } from '../../core/run-item-state';
 import { createWaitingRunState } from '../../core/run';
 import { commitCandidateWithWriterLease, type GuardedCommitResult } from './guarded-persistence';
 import type { StringKeyValueStorage } from './key-value-storage';
@@ -30,7 +32,7 @@ export interface RunIdSource {
 }
 
 export interface NewAttemptRequest {
-  readonly currentAttempt: ActiveRunPersistenceInputV1;
+  readonly currentAttempt: ActiveRunPersistenceInputV2;
   readonly currentRevision: number;
   readonly generationConfiguration: LevelGenerationConfiguration;
   readonly runIdSource: RunIdSource;
@@ -52,7 +54,7 @@ export type NewAttemptFailureReason =
 export type NewAttemptResult =
   | {
       readonly status: 'committed';
-      readonly candidate: SaveDocumentPersistenceInputV1;
+      readonly candidate: SaveDocumentPersistenceInputV2;
       readonly revision: number;
       readonly selectedSeed: number;
       readonly generationAttempts: number;
@@ -64,16 +66,16 @@ function coordinateKey({ x, y }: Coordinate): string {
   return `${x},${y}`;
 }
 
-function mineKeys(attempt: ActiveRunPersistenceInputV1): Set<string> {
-  const width = attempt.run.board.dimensions.width;
-  return new Set(attempt.run.board.cells.flatMap((cell, index) =>
+function mineKeys(attempt: ActiveRunPersistenceInputV2): Set<string> {
+  const width = attempt.gameState.run.board.dimensions.width;
+  return new Set(attempt.gameState.run.board.cells.flatMap((cell, index) =>
     cell.kind === 'mine' ? [`${index % width},${Math.floor(index / width)}`] : [],
   ));
 }
 
-function obstacleKeys(attempt: ActiveRunPersistenceInputV1): Set<string> {
-  const width = attempt.run.board.dimensions.width;
-  return new Set(attempt.run.board.cells.flatMap((cell, index) =>
+function obstacleKeys(attempt: ActiveRunPersistenceInputV2): Set<string> {
+  const width = attempt.gameState.run.board.dimensions.width;
+  return new Set(attempt.gameState.run.board.cells.flatMap((cell, index) =>
     cell.kind === 'obstacle' ? [`${index % width},${Math.floor(index / width)}`] : [],
   ));
 }
@@ -127,7 +129,7 @@ function buildAndCommit(
   if (prepared === undefined) {
     return { status: 'rejected', reason: 'invalid-generation-configuration' };
   }
-  const currentBoard = request.currentAttempt.run.board;
+  const currentBoard = request.currentAttempt.gameState.run.board;
   if (
     currentBoard.dimensions.width !== request.generationConfiguration.dimensions.width ||
     currentBoard.dimensions.height !== request.generationConfiguration.dimensions.height ||
@@ -187,12 +189,16 @@ function buildAndCommit(
   if (board.status !== 'created') {
     return { status: 'rejected', reason: 'invalid-generation-configuration' };
   }
-  const candidate: SaveDocumentPersistenceInputV1 = {
+  const candidate: SaveDocumentPersistenceInputV2 = {
     revision: request.currentRevision + 1,
     activeRun: {
       runId,
       levelId: request.currentAttempt.levelId,
-      run: createWaitingRunState(board.board),
+      gameState: createGameState({
+        account: request.currentAttempt.gameState.account,
+        run: createWaitingRunState(board.board),
+        runItems: createInitialRunItemState(selectedSeed),
+      }),
       generationProvenance: { ...provenance, seed: selectedSeed },
     },
   };
@@ -214,8 +220,8 @@ export function restartCurrentAttempt(
   clock: Clock,
   request: NewAttemptRequest,
 ): NewAttemptResult {
-  if (request.currentAttempt.run.phase.kind !== 'active' &&
-      request.currentAttempt.run.phase.kind !== 'pending-mine-encounter') {
+  if (request.currentAttempt.gameState.run.phase.kind !== 'active' &&
+      request.currentAttempt.gameState.run.phase.kind !== 'pending-mine-encounter') {
     return { status: 'rejected', reason: 'restart-not-allowed' };
   }
   return buildAndCommit(storage, identity, clock, request);
@@ -227,7 +233,7 @@ export function retryFailedAttempt(
   clock: Clock,
   request: NewAttemptRequest,
 ): NewAttemptResult {
-  if (request.currentAttempt.run.phase.kind !== 'failed') {
+  if (request.currentAttempt.gameState.run.phase.kind !== 'failed') {
     return { status: 'rejected', reason: 'retry-not-allowed' };
   }
   return buildAndCommit(storage, identity, clock, request);

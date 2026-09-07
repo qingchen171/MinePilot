@@ -17,6 +17,7 @@ import {
 import { loadPersistedSave } from '../../src/systems/persistence/persistence-coordinator';
 import { acquireWriterLease, type Clock, type WriterIdentity } from '../../src/systems/persistence/writer-lease';
 import { MemoryStorage } from '../helpers/memory-storage';
+import { activeRunV2FromV1 } from '../helpers/save-v2';
 
 class FakeClock implements Clock {
   nowMs(): number { return 0; }
@@ -75,7 +76,7 @@ function ready(old: ActiveRunPersistenceInputV1) {
   expect(acquireWriterLease(storage, writer, clock).status).toBe('acquired');
   expect(commitCandidateWithWriterLease(storage, writer, clock, null, {
     revision: 0,
-    activeRun: old,
+    activeRun: activeRunV2FromV1(old),
   }).status).toBe('committed');
   return { storage, clock };
 }
@@ -86,7 +87,7 @@ function restartRequest(
   maxGenerationAttempts?: number,
 ) {
   return {
-    currentAttempt: old,
+    currentAttempt: activeRunV2FromV1(old),
     currentRevision: 0,
     generationConfiguration: configuration,
     runIdSource: { nextRunId: () => 'new-run' },
@@ -179,6 +180,6 @@ describe('Stage 2 persistence Freeze Gate', () => {
     );
     expect(restarted.selectedSeed).toBeGreaterThanOrEqual(0);
     expect(restarted.selectedSeed).toBeLessThanOrEqual(maxSeed);
-    expect(restarted.candidate.activeRun.run.board.cells).toHaveLength(3);
+    expect(restarted.candidate.activeRun.gameState.run.board.cells).toHaveLength(3);
   });
 });

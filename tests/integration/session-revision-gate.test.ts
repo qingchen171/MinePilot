@@ -5,7 +5,9 @@ import {
   createCellState,
   createCoordinate,
 } from '../../src/core/board';
-import { type SaveDocumentPersistenceInputV1 } from '../../src/core/persistence/save-v1';
+import { createGameState } from '../../src/core/game-state';
+import { type SaveDocumentPersistenceInputV2 } from '../../src/core/persistence/save-v2';
+import { createInitialRunItemState } from '../../src/core/run-item-state';
 import { createOnBoardPosition, createRunState } from '../../src/core/run';
 import { commitCandidateWithWriterLease } from '../../src/systems/persistence/guarded-persistence';
 import { loadPersistedSave } from '../../src/systems/persistence/persistence-coordinator';
@@ -15,13 +17,14 @@ import {
   type WriterIdentity,
 } from '../../src/systems/persistence/writer-lease';
 import { MemoryStorage } from '../helpers/memory-storage';
+import { createTestAccount } from '../helpers/save-v2';
 
 class FakeClock implements Clock {
   constructor(public value = 0) {}
   nowMs(): number { return this.value; }
 }
 
-function candidate(revision: number): SaveDocumentPersistenceInputV1 {
+function candidate(revision: number): SaveDocumentPersistenceInputV2 {
   const board = createBoard(createBoardDimensions({ width: 1, height: 1 }), [
     createCellState({
       terrain: 'playable', containsMine: false, explored: true,
@@ -32,8 +35,12 @@ function candidate(revision: number): SaveDocumentPersistenceInputV1 {
     revision,
     activeRun: {
       runId: 'run', levelId: 'level',
-      run: createRunState(board, createOnBoardPosition(createCoordinate(0, 0)), {
-        phase: { kind: 'won' },
+      gameState: createGameState({
+        account: createTestAccount(),
+        run: createRunState(board, createOnBoardPosition(createCoordinate(0, 0)), {
+          phase: { kind: 'won' },
+        }),
+        runItems: createInitialRunItemState(0),
       }),
     },
   };

@@ -8,6 +8,11 @@ import {
   type SaveV1ValidationIssue,
 } from '../../core/persistence/save-v1';
 import {
+  serializeSaveDocumentV2,
+  type SaveDocumentPersistenceInputV2,
+  type SaveV2ValidationIssue,
+} from '../../core/persistence/save-v2';
+import {
   commitSnapshot,
   loadCommittedSnapshot,
   type CommitSnapshotResult,
@@ -17,6 +22,7 @@ import {
 import { type StringKeyValueStorage } from './key-value-storage';
 
 export type CandidateSaveV1 = SaveDocumentPersistenceInputV1;
+export type CandidateSaveV2 = SaveDocumentPersistenceInputV2;
 
 type CommitFailure = Exclude<CommitSnapshotResult, { readonly status: 'committed' }>;
 
@@ -36,6 +42,31 @@ export type CommitCandidateSaveV1Result =
       readonly status: 'serialization-failure';
       readonly stage: 'save-document';
       readonly issues?: readonly SaveV1ValidationIssue[];
+      readonly cause?: unknown;
+    }
+  | {
+      readonly status: 'serialization-failure';
+      readonly stage: 'json';
+      readonly cause: unknown;
+    }
+  | { readonly status: 'persistence-failure'; readonly failure: CommitFailure };
+
+export type CommitCandidateSaveV2Result =
+  | {
+      readonly status: 'committed';
+      readonly candidate: CandidateSaveV2;
+      readonly slot: SnapshotSlot;
+      readonly revision: number;
+      readonly backupUpdate: 'updated' | 'failed';
+      readonly backupFailure?: Extract<
+        CommitSnapshotResult,
+        { readonly status: 'committed' }
+      >['backupFailure'];
+    }
+  | {
+      readonly status: 'serialization-failure';
+      readonly stage: 'save-document';
+      readonly issues?: readonly SaveV2ValidationIssue[];
       readonly cause?: unknown;
     }
   | {
@@ -74,6 +105,47 @@ export function commitCandidateSaveV1(
   let serializedDocument: ReturnType<typeof serializeSaveDocumentV1>;
   try {
     serializedDocument = serializeSaveDocumentV1(candidate);
+  } catch (cause) {
+    return { status: 'serialization-failure', stage: 'save-document', cause };
+  }
+  if (serializedDocument.status === 'invalid') {
+    return {
+      status: 'serialization-failure',
+      stage: 'save-document',
+      issues: serializedDocument.issues,
+    };
+  }
+
+  let serializedPayload: string;
+  try {
+    serializedPayload = JSON.stringify(serializedDocument.document);
+  } catch (cause) {
+    return { status: 'serialization-failure', stage: 'json', cause };
+  }
+
+  const committed = commitSnapshot(storage, serializedPayload, candidate.revision);
+  if (committed.status !== 'committed') {
+    return { status: 'persistence-failure', failure: committed };
+  }
+  return {
+    status: 'committed',
+    candidate,
+    slot: committed.slot,
+    revision: committed.revision,
+    backupUpdate: committed.backupUpdate,
+    ...(committed.backupFailure === undefined
+      ? {}
+      : { backupFailure: committed.backupFailure }),
+  };
+}
+
+export function commitCandidateSaveV2(
+  storage: StringKeyValueStorage,
+  candidate: CandidateSaveV2,
+): CommitCandidateSaveV2Result {
+  let serializedDocument: ReturnType<typeof serializeSaveDocumentV2>;
+  try {
+    serializedDocument = serializeSaveDocumentV2(candidate);
   } catch (cause) {
     return { status: 'serialization-failure', stage: 'save-document', cause };
   }
