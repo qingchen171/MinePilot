@@ -154,7 +154,7 @@
 
 **STAGE 3 IN PROGRESS；STAGE 2 FROZEN / PASS；STAGE 1 FROZEN / PASS**
 
-Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-09 已人工验收 PASS，并正式 FROZEN。Stage 2 Freeze Candidate 为 `c549ef847b8a85f0a143772c15228d9283dfa915`；本次 closeout commit 为 Stage 2 frozen repository baseline。Stage 3 已完成 S3-01 只读设计与产品决策冻结，进入 S3-02 implementation。
+Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-09 已人工验收 PASS，并正式 FROZEN。Stage 2 Freeze Candidate 为 `c549ef847b8a85f0a143772c15228d9283dfa915`；本次 closeout commit 为 Stage 2 frozen repository baseline。Stage 3 的 S3-01 与 S3-02 已人工验收 PASS，Stage 3 保持 IN PROGRESS。
 
 ### Engineering Reliability / ER-01
 
@@ -167,11 +167,25 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 
 ## 唯一下一行动
 
-**Stage 3 / Task S3-02 — Item Aggregate Foundation & Revealed-Mine Occupancy Frozen-Boundary Extension。**
+**Stage 3 / Task S3-03 — Save v2 DTO、Validation 与 v1-to-v2 Migration Boundary。**
 
-边界：只建立最小 Item/Inventory 权威模型、Run item state 基础容器、GameState candidate boundary、`revealed-mine-occupancy` CharacterPosition 扩展、相关 runtime validation，以及 Save v1 对新 runtime 的明确拒绝保护。不得实现 Detection、Airplane、Lucky、Revive gameplay、Save v2 migration、Shop、Reward、Tutorial、UI/Phaser、Command Bus、Manager framework 或第二套 RNG framework。
+边界：下一 Task 只允许在明确批准后，把 S3-02 已存在的 Account/Run item/revealed-mine occupancy runtime facts 接入同一个 versioned persistence aggregate，并保持 Stage 2 authority chain、persist-before-publish 与 exact-restore contracts。当前 closeout 不执行 S3-03，不实现任何 item gameplay。
 
 ## 最近完成任务
+
+### Stage 3 / Task S3-02 — PASS
+
+- 人工验收与独立审查：产品经理于 2026-09-07 验收 PASS；独立只读 Reviewer 对实际 diff、tests、scope 与 frozen contracts 判定 PASS，无 findings。
+- Item/Account boundary：`AccountState` 只持有 Lucky、Detection、Airplane、Revive 四种跨 attempt inventory；数量为无人工上限的非负 safe integer，不加入 coins、Shop、Reward 或通用 Account framework。
+- Run item boundary：`RunItemState` 只持有 Detection/Airplane/Revive successful-use counters 与显式 Detection uint32 seed；上限继续为 `2/1/1`。Lucky 不新增重复 usage counter；本 Task 不调用、不替换 Stage 1 deterministic RNG，也不建立第二套 RNG 或 item manager。
+- GameState boundary：最小 `GameState` 只聚合 `account / run / runItems` 并通过现有 constructors 重建、校验、冻结嵌套 authority；`ItemTransactionResult` 只规定 candidate/rejected 结果形状。只有 candidate 可进入未来 persistence 流程，任何 rejected result 不携带 publishable candidate；不引入 Command Bus、GameManager、DI、event bus 或通用 reducer/framework。
+- Revealed Mine occupancy frozen-boundary extension：`CharacterPosition` 新增唯一通用 `revealed-mine-occupancy(coordinate)`；运行时必须位于 Board 内、指向统一 Board truth 中的 Revealed Mine，且 `hasTakenStep = true`。普通 `on-board -> explored Safe` 不变量不变；普通移动可以离开该位置，但不能进入其他 Revealed Mine，离开后不能返回；选择当前占位格为 unchanged；`getCurrentCellMineCount` 返回 unavailable。当前没有实现产生该状态的 Lucky/Revive gameplay。
+- Save v1 rejection boundary：Save v1 schema/loader interpretation 保持冻结，`serializeSaveDocumentV1` 遇到 `revealed-mine-occupancy` 必须在 DTO/storage 前结构化返回 `invalid-character-position`，不得静默 downcast、丢失或覆盖新 runtime；coordinator regression test 证明失败不触碰 storage 且不携带 candidate。Account/Run item 新事实必须等待显式 Save v2 接入同一 Stage 2 authority chain。
+- Frozen-contract impact：Stage 1 `BoardState`/`CellState` truth、普通 movement/victory/number semantics 均未被替换；Stage 2 storage、revision、lease、commit point、coordinator 与 corruption policies 均未修改。Runtime candidate 仍必须 persist-before-publish。
+- Tests：新增 `35` 个 unit tests；定向 `118/118` PASS；最终 Unit `420/420`、Integration `38/38`、Total `458/458` PASS；Architecture、TypeScript、production build 与 Playwright 均 PASS。
+- Stable points：task branch implementation commit `41a4827454a9f9d9f341d694ea316d4afe2ac358`；Reviewer PASS 后经 PR #3 合并，main implementation baseline `33fdb3f6fdef741ffb11ba49c628bb9f1c6a5ada`。
+- Linux evidence：branch Quality run `34082747494` Success；PR Quality run `34083127157` Success；main Quality run `34083209297` Success。
+- 回滚：revert main implementation commit `33fdb3f6fdef741ffb11ba49c628bb9f1c6a5ada`；不得改写 Stage 0/1/2 frozen tags 或通过放宽 Save v1 schema 消除明确 rejection。
 
 ### Stage 3 / Task S3-01 — PASS
 
@@ -578,7 +592,7 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档、S3-01 frozen design decisions 与 Stage 1/Stage 2 Frozen contracts，只执行 Stage 3 / Task S3-02 — Item Aggregate Foundation & Revealed-Mine Occupancy Frozen-Boundary Extension；不得执行后续 item gameplay Task，不得重新执行 S2-01 至 S2-09。
+请读取最新控制文档、S3-01/S3-02 frozen contracts 与 Stage 1/Stage 2 Frozen contracts，只执行 Stage 3 / Task S3-03 — Save v2 DTO、Validation 与 v1-to-v2 Migration Boundary；不得执行后续 item gameplay Task，不得重新执行 S2-01 至 S2-09。
 ```
 
 ## 阶段看板
@@ -588,7 +602,7 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 | 0 | 工程骨架 | FROZEN / PASS（S0-01 至 S0-07） | 控制文档冻结 |
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
-| 3 | 四大道具 | IN PROGRESS（S3-01 PASS；S3-02 为唯一 Next Action） | Stage 2 FROZEN / PASS |
+| 3 | 四大道具 | IN PROGRESS（S3-01、S3-02 PASS；S3-03 为唯一 Next Action） | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
