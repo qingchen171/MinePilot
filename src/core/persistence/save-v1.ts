@@ -346,9 +346,11 @@ function coordinateToDto(coordinate: Coordinate): CoordinateSaveV1 {
 }
 
 function positionToDto(position: CharacterPosition): CharacterPositionSaveV1 {
-  return position.kind === 'waiting'
-    ? { kind: 'waiting' }
-    : { kind: 'on-board', coordinate: coordinateToDto(position.coordinate) };
+  if (position.kind === 'waiting') return { kind: 'waiting' };
+  if (position.kind === 'on-board') {
+    return { kind: 'on-board', coordinate: coordinateToDto(position.coordinate) };
+  }
+  throw new Error('Save v1 cannot represent revealed-mine occupancy.');
 }
 
 function encounterToDto(encounter: MineEncounter): MineEncounterSaveV1 {
@@ -558,6 +560,12 @@ export function validateAndLoadSaveDocumentV1(
 export function serializeSaveDocumentV1(
   input: SaveDocumentPersistenceInputV1,
 ): SerializeSaveDocumentV1Result {
+  if (input.activeRun?.run.characterPosition.kind === 'revealed-mine-occupancy') {
+    return {
+      status: 'invalid',
+      issues: [issue('invalid-character-position', 'activeRun.characterPosition')],
+    };
+  }
   const document = buildDocument(input);
   const validation = validateAndLoadSaveDocumentV1(document);
   return validation.status === 'invalid'

@@ -48,7 +48,7 @@ export function moveCharacter(run: RunState, target: Coordinate): MoveCharacterR
   if (targetCell === undefined) return { outcome: 'rejected', reason: 'out-of-bounds' };
 
   if (
-    run.characterPosition.kind === 'on-board' &&
+    run.characterPosition.kind !== 'waiting' &&
     coordinatesEqual(run.characterPosition.coordinate, target)
   ) {
     return { outcome: 'unchanged', reason: 'already-at-target' };

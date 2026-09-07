@@ -10,6 +10,7 @@ import {
 import { moveCharacter, type MoveCharacterResult } from '../../../src/core/movement';
 import {
   createOnBoardPosition,
+  createRevealedMineOccupancyPosition,
   createRunState,
   createWaitingRunState,
   type RunState,
@@ -73,6 +74,58 @@ describe('run position invariants', () => {
     expect(() =>
       createRunState(boardOf(cell), createOnBoardPosition(createCoordinate(0, 0))),
     ).toThrow('An on-board character position must reference an explored safe cell.');
+  });
+
+  it('constructs a distinct revealed-mine occupancy only on a Revealed Mine', () => {
+    const run = createRunState(
+      boardOf(mine(true)),
+      createRevealedMineOccupancyPosition(createCoordinate(0, 0)),
+    );
+
+    expect(run.characterPosition).toEqual({
+      kind: 'revealed-mine-occupancy',
+      coordinate: { x: 0, y: 0 },
+    });
+    expect(run.hasTakenStep).toBe(true);
+  });
+
+  it.each([
+    ['unexplored Safe', safe()],
+    ['explored Safe', safe(true)],
+    ['Hidden Mine', mine()],
+    ['Obstacle', obstacle()],
+  ])('rejects revealed-mine occupancy on a %s', (_description, cell) => {
+    expect(() =>
+      createRunState(
+        boardOf(cell),
+        createRevealedMineOccupancyPosition(createCoordinate(0, 0)),
+      ),
+    ).toThrow('A revealed-mine occupancy position must reference a revealed mine.');
+  });
+
+  it('rejects revealed-mine occupancy outside the Board or before any step', () => {
+    expect(() =>
+      createRunState(
+        boardOf(mine(true)),
+        createRevealedMineOccupancyPosition(createCoordinate(1, 0)),
+      ),
+    ).toThrow('A revealed-mine occupancy position must be inside the board.');
+    expect(() =>
+      createRunState(
+        boardOf(mine(true)),
+        createRevealedMineOccupancyPosition(createCoordinate(0, 0)),
+        { hasTakenStep: false },
+      ),
+    ).toThrow('A revealed-mine occupancy position requires a recorded step.');
+  });
+
+  it('rejects an unknown runtime position kind instead of treating it as mine occupancy', () => {
+    expect(() =>
+      createRunState(
+        boardOf(mine(true)),
+        { kind: 'future-position', coordinate: createCoordinate(0, 0) } as never,
+      ),
+    ).toThrow('Character position kind is invalid.');
   });
 });
 
@@ -153,6 +206,40 @@ describe('ordinary movement transitions', () => {
     expect(moveCharacter(createWaitingRunState(boardOf(mine(true))), createCoordinate(0, 0))).toEqual({
       outcome: 'rejected',
       reason: 'revealed-mine',
+    });
+  });
+
+  it('can leave revealed-mine occupancy for a Safe but cannot enter another Revealed Mine', () => {
+    const targetBoard = boardOf(mine(true), safe(), mine(true));
+    const run = createRunState(
+      targetBoard,
+      createRevealedMineOccupancyPosition(createCoordinate(0, 0)),
+    );
+    const moved = movedState(moveCharacter(run, createCoordinate(1, 0)));
+
+    expect(moved.characterPosition).toEqual({
+      kind: 'on-board',
+      coordinate: { x: 1, y: 0 },
+    });
+    expect(moveCharacter(run, createCoordinate(2, 0))).toEqual({
+      outcome: 'rejected',
+      reason: 'revealed-mine',
+    });
+    expect(run.characterPosition).toEqual({
+      kind: 'revealed-mine-occupancy',
+      coordinate: { x: 0, y: 0 },
+    });
+  });
+
+  it('treats selecting the occupied Revealed Mine as unchanged, not re-entry', () => {
+    const run = createRunState(
+      boardOf(mine(true)),
+      createRevealedMineOccupancyPosition(createCoordinate(0, 0)),
+    );
+
+    expect(moveCharacter(run, createCoordinate(0, 0))).toEqual({
+      outcome: 'unchanged',
+      reason: 'already-at-target',
     });
   });
 

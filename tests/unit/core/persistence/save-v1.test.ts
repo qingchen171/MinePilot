@@ -10,6 +10,7 @@ import {
 } from '../../../../src/core/board';
 import {
   createOnBoardPosition,
+  createRevealedMineOccupancyPosition,
   createRunState,
   createWaitingPosition,
   type RunState,
@@ -418,6 +419,25 @@ describe('Save v1 pure DTO boundary', () => {
     expect(result).toEqual({
       status: 'invalid',
       issues: [{ code: 'invalid-run-id', path: 'activeRun.runId' }],
+    });
+  });
+
+  it('explicitly rejects new revealed-mine occupancy instead of silently downcasting Save v1', () => {
+    const board = createBoard({ width: 1, height: 1 }, [mine(true)]);
+    const run = createRunState(
+      board,
+      createRevealedMineOccupancyPosition(createCoordinate(0, 0)),
+    );
+
+    expect(serializeSaveDocumentV1({
+      revision: 1,
+      activeRun: { runId: 'run-001', levelId: 'level-001', run },
+    })).toEqual({
+      status: 'invalid',
+      issues: [{
+        code: 'invalid-character-position',
+        path: 'activeRun.characterPosition',
+      }],
     });
   });
 });

@@ -7,7 +7,7 @@ export type CurrentCellMineCountResult =
   | { readonly status: 'unavailable' };
 
 export function getCurrentCellMineCount(run: RunState): CurrentCellMineCountResult {
-  if (run.characterPosition.kind === 'waiting') return { status: 'unavailable' };
+  if (run.characterPosition.kind !== 'on-board') return { status: 'unavailable' };
 
   const coordinate = run.characterPosition.coordinate;
   const currentCell = getCellAt(run.board, coordinate);

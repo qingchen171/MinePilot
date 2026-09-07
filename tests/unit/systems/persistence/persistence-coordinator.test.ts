@@ -8,6 +8,7 @@ import {
 import { type SaveDocumentPersistenceInputV1 } from '../../../../src/core/persistence/save-v1';
 import {
   createOnBoardPosition,
+  createRevealedMineOccupancyPosition,
   createRunState,
 } from '../../../../src/core/run';
 import {
@@ -87,6 +88,44 @@ describe('persistence commit coordinator', () => {
       status: 'serialization-failure',
       stage: 'save-document',
       issues: [{ code: 'invalid-revision' }],
+    });
+    expect(storage.operations).toEqual([]);
+    expectNotPublishable(result);
+  });
+
+  it('does not commit or expose a new-runtime candidate that Save v1 cannot represent', () => {
+    const storage = new MemoryStorage();
+    const input = candidate();
+    if (input.activeRun === null) throw new Error('Expected an active Run fixture.');
+    const occupancyBoard = createBoard({ width: 1, height: 1 }, [
+      createCellState({
+        terrain: 'playable',
+        containsMine: true,
+        explored: false,
+        mineRevealed: true,
+        flagged: false,
+      }),
+    ]);
+    const newRuntimeCandidate: SaveDocumentPersistenceInputV1 = {
+      ...input,
+      activeRun: {
+        ...input.activeRun,
+        run: createRunState(
+          occupancyBoard,
+          createRevealedMineOccupancyPosition(createCoordinate(0, 0)),
+        ),
+      },
+    };
+
+    const result = commitCandidateSaveV1(storage, newRuntimeCandidate);
+
+    expect(result).toEqual({
+      status: 'serialization-failure',
+      stage: 'save-document',
+      issues: [{
+        code: 'invalid-character-position',
+        path: 'activeRun.characterPosition',
+      }],
     });
     expect(storage.operations).toEqual([]);
     expectNotPublishable(result);
