@@ -1,9 +1,9 @@
 # PROJECT_STATUS
 
 **项目：MinePilot / Minesweeper Product**  
-**状态更新时间：2026-09-06**
+**状态更新时间：2026-09-07**
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core implementation 与 Stage 2 persistence implementation 已完成；Stage 1、Stage 2 均已 FROZEN / PASS**
+**正式游戏代码：Stage 1 core implementation、Stage 2 persistence implementation 与 Stage 3 S3-02/S3-03 foundation/persistence extension 已完成；Stage 1、Stage 2 均已 FROZEN / PASS**
 
 ## 当前事实
 
@@ -154,7 +154,7 @@
 
 **STAGE 3 IN PROGRESS；STAGE 2 FROZEN / PASS；STAGE 1 FROZEN / PASS**
 
-Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-09 已人工验收 PASS，并正式 FROZEN。Stage 2 Freeze Candidate 为 `c549ef847b8a85f0a143772c15228d9283dfa915`；本次 closeout commit 为 Stage 2 frozen repository baseline。Stage 3 的 S3-01 与 S3-02 已人工验收 PASS，Stage 3 保持 IN PROGRESS。
+Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-09 已人工验收 PASS，并正式 FROZEN。Stage 2 Freeze Candidate 为 `c549ef847b8a85f0a143772c15228d9283dfa915`；本次 closeout commit 为 Stage 2 frozen repository baseline。Stage 3 的 S3-01 至 S3-03 已人工验收 PASS，Stage 3 保持 IN PROGRESS。
 
 ### Engineering Reliability / ER-01
 
@@ -167,11 +167,25 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 
 ## 唯一下一行动
 
-**Stage 3 / Task S3-03 — Save v2 DTO、Validation 与 v1-to-v2 Migration Boundary。**
+**Stage 3 / Task S3-04 — Unified Revealed-Mine Transition Primitives。**
 
-边界：下一 Task 只允许在明确批准后，把 S3-02 已存在的 Account/Run item/revealed-mine occupancy runtime facts 接入同一个 versioned persistence aggregate，并保持 Stage 2 authority chain、persist-before-publish 与 exact-restore contracts。当前 closeout 不执行 S3-03，不实现任何 item gameplay。
+边界：S3-04 只允许在独立 Design Review 与明确批准后，为 Detection、Airplane、Lucky、Revive 建立复用同一 `Revealed Mine` Board truth 的最小统一转换 primitive；不得实现任何具体 Item gameplay，不得建立第二套 reveal truth、Manager、Command Bus 或通用 framework。本次 closeout 不执行 S3-04。
 
 ## 最近完成任务
+
+### Stage 3 / Task S3-03 — PASS
+
+- 人工验收与独立审查：产品经理于 2026-09-07 确认 implementation 已通过 Technical Review；独立只读 Reviewer 对实际 diff、tests、scope 与 Stage 1/2 frozen contracts 判定 PASS。
+- Save v2 frozen boundary：`CURRENT_SAVE_VERSION = 2`；`SaveDocumentV2` 通过显式 DTO 保存 revision、Account inventory 与可选 active Run 的完整权威事实，包括 full Board snapshot、`CharacterPosition`（含 `revealed-mine-occupancy`）、Run phase、`RunItemState` 与可选 generation provenance。未知 Detection provenance 必须保持 `null`，不得伪造 `seed = 0`。
+- Runtime/DTO separation：禁止直接 JSON serialization `GameState`；写入路径固定为 `GameState candidate -> explicit Save v2 mapper -> SaveDocumentV2 DTO -> JSON`。读取必须经 strict DTO validation、Stage 1 Board/Run constructors 与 `createGameState` 重建新的 immutable authoritative Runtime，DTO/Runtime 不共享可变引用。
+- v1-to-v2 migration contract：唯一函数 `migrateValidatedSaveDocumentV1ToV2` 只执行纯 DTO-to-DTO migration；流程为 `strict v1 validation -> pure v1-to-v2 migration -> strict v2 validation/reconstruction`。读取 v1 不自动写回、不增加 revision、不修改 A/B slot、head/headBackup，也不发布 migrated save；只有第一次真实 gameplay mutation 才能沿 guarded persistence 路径提交 v2。当前不得建立 migration registry、graph 或 generic migration engine。
+- Persistence authority：Stage 2 frozen authority chain 保持唯一且不变；v2 candidate 继续经 JSON serialization、crash-safe A/B snapshot、persistence coordinator、writer lease/revision gate 与 guarded commit，只有 committed success 才可 publish。Storage、commit point、backup recovery、corruption policy、refresh/reopen、Restart/Retry 与 best-effort concurrency contracts 均未被替换；不得建立第二套 gameplay persistence authority。
+- 范围控制：未实现 Lucky、Revive、Detection、Airplane gameplay，未新增 Shop、Reward、Tutorial、UI/Phaser 或 migration framework；Stage 1 Board/Cell truth 与 deterministic RNG contract 未修改。
+- Tests/evidence：Unit `435/435`、Integration `42/42`、Total `477/477` PASS；Architecture、TypeScript、production build、Playwright 均 PASS。覆盖 v1 read-only migration、migration 后首次真实 mutation 提交 v2 并 refresh/reopen exact restore、DTO/Runtime aliasing、missing Detection provenance、revealed-mine occupancy、strict unknown fields 及 Stage 2 persistence regression。
+- Stable points：task branch implementation commit `15bc7aaea46b73b236de0ee5a62701ef327d143f`；Reviewer PASS 后经 PR #5 合并，main implementation baseline `4e850a6be6f963fddb8e31d9db98d55ebe21995b`。
+- Linux evidence：branch Quality run `34085547189` Success；PR Quality run `34085974276` Success；main Quality run `34086051800` Success。
+- Reverse Scan：未发现第二套 Runtime/Save truth、直接 GameState JSON serialization、fake fallback seed、migration framework、Stage 3 item gameplay 泄漏、Stage 1 RNG 修改或绕过 Stage 2 coordinator 的路径。
+- 回滚：通过 PR revert main implementation commit `4e850a6be6f963fddb8e31d9db98d55ebe21995b`；不得放宽 Save v2 strict validation、静默改写 Save v1 或修改 Stage 0/1/2 frozen tags。
 
 ### Stage 3 / Task S3-02 — PASS
 
@@ -592,7 +606,7 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档、S3-01/S3-02 frozen contracts 与 Stage 1/Stage 2 Frozen contracts，只执行 Stage 3 / Task S3-03 — Save v2 DTO、Validation 与 v1-to-v2 Migration Boundary；不得执行后续 item gameplay Task，不得重新执行 S2-01 至 S2-09。
+请读取最新控制文档、S3-01 至 S3-03 frozen contracts 与 Stage 1/Stage 2 Frozen contracts，先执行 Stage 3 / Task S3-04 — Unified Revealed-Mine Transition Primitives 的 Design Review；未经批准不得编码，不得实现 Detection、Airplane、Lucky 或 Revive gameplay，也不得重新执行 S2-01 至 S2-09。
 ```
 
 ## 阶段看板
@@ -602,7 +616,7 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 | 0 | 工程骨架 | FROZEN / PASS（S0-01 至 S0-07） | 控制文档冻结 |
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
-| 3 | 四大道具 | IN PROGRESS（S3-01、S3-02 PASS；S3-03 为唯一 Next Action） | Stage 2 FROZEN / PASS |
+| 3 | 四大道具 | IN PROGRESS（S3-01 至 S3-03 PASS；S3-04 为唯一 Next Action） | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
