@@ -1,9 +1,9 @@
 # PROJECT_STATUS
 
 **项目：MinePilot / Minesweeper Product**  
-**状态更新时间：2026-09-07**
+**状态更新时间：2026-09-08**
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core implementation、Stage 2 persistence implementation 与 Stage 3 S3-02/S3-03 foundation/persistence extension 已完成；Stage 1、Stage 2 均已 FROZEN / PASS**
+**正式游戏代码：Stage 1 core、Stage 2 persistence 及 Stage 3 S3-02/S3-03 foundation/persistence extension、S3-04 unified mine transition primitives 已完成；Stage 1、Stage 2 均已 FROZEN / PASS**
 
 ## 当前事实
 
@@ -154,7 +154,7 @@
 
 **STAGE 3 IN PROGRESS；STAGE 2 FROZEN / PASS；STAGE 1 FROZEN / PASS**
 
-Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-09 已人工验收 PASS，并正式 FROZEN。Stage 2 Freeze Candidate 为 `c549ef847b8a85f0a143772c15228d9283dfa915`；本次 closeout commit 为 Stage 2 frozen repository baseline。Stage 3 的 S3-01 至 S3-03 已人工验收 PASS，Stage 3 保持 IN PROGRESS。
+Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-09 已人工验收 PASS，并正式 FROZEN。Stage 2 Freeze Candidate 为 `c549ef847b8a85f0a143772c15228d9283dfa915`；本次 closeout commit 为 Stage 2 frozen repository baseline。Stage 3 的 S3-01 至 S3-04 已人工验收 PASS，Stage 3 保持 IN PROGRESS。
 
 ### Engineering Reliability / ER-01
 
@@ -167,11 +167,24 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 
 ## 唯一下一行动
 
-**Stage 3 / Task S3-04 — Unified Revealed-Mine Transition Primitives。**
+**Stage 3 / Task S3-05 — Detection Design Review。**
 
-边界：S3-04 只允许在独立 Design Review 与明确批准后，为 Detection、Airplane、Lucky、Revive 建立复用同一 `Revealed Mine` Board truth 的最小统一转换 primitive；不得实现任何具体 Item gameplay，不得建立第二套 reveal truth、Manager、Command Bus 或通用 framework。本次 closeout 不执行 S3-04。
+边界：按已批准 Stage 3 sequence，下一步仅进行 Detection 独立 Design Review；实现必须另获批准，并复用统一八邻域、reveal primitive、GameState candidate、Save v2 与 Stage 2 guarded persistence authority。未知 Detection provenance 的处理须在设计中明确，不得伪造 seed。本次 closeout 不执行 S3-05。
 
 ## 最近完成任务
+
+### Stage 3 / Task S3-04 — PASS
+
+- 验收：产品经理于 2026-09-08 确认 implementation 通过 Technical Review 并批准 closeout；独立 Reviewer PASS，无 findings。
+- revealMine frozen boundary：`revealMine(board, target)` 仅将 Hidden Mine（可带普通 Flag）转换为 Revealed Mine，移除 Flag，保持真实 Mine 身份、Safe exploration 与非目标 Cell 引用；已 Revealed Mine 返回 unchanged，Safe/Obstacle 返回 not-mine，非法或越界目标返回 out-of-bounds，拒绝/unchanged 不产生新 Board。
+- Pending survival frozen boundary：`resolvePendingMineEncounterAsSurvived(run)` 只消费当前 pending encounter 的 target，不接受外部任意 target；目标必须仍是未插旗 Hidden Mine。一次构造目标已揭示、position 为 revealed-mine-occupancy、phase active、hasTakenStep 保持 true 的 Run；不得生成 revealed Board 搭配旧 pending phase 的中间状态。active/failed/won 与重复结算拒绝；不触发 Victory，不扣库存或额度。
+- Authority ownership：Board/Cell 是 Mine/reveal/Flag 唯一真值；Run 拥有 encounter、position、phase 与 first-step facts；GameState 聚合 account/run/runItems。Primitive 返回值仅为纯组合材料，不是 publishable persistence success；未来 Item command 负责 eligibility、inventory/runItem update 与完整 GameState candidate，再沿既有 guarded coordinator commit 成功后 publish。
+- Authority Reuse First：优先复用已有状态、transaction boundary、persistence aggregate；不创建 LuckyState、ReviveState、ItemManager、EncounterManager 或第二套 Mine/Board truth，不建立单 Item 保存、commit 或 migration path。
+- Frozen compatibility：Board/Cell truth、RNG、Mine placement、Save v2 schema、Stage 2 coordinator、lease/revision 与 persistence path 均无修改；无新增长期状态或 migration。普通 on-board 仍仅指向 explored Safe；特殊 occupancy 数字 unavailable，离开后不能重新进入 Revealed Mine。
+- Tests：新增 unit 19、integration 1，共 20/20 PASS；完整 Unit 454/454、Integration 43/43、Total 497/497 PASS，Architecture、TypeScript、Build、Playwright PASS。覆盖首步/后续/既有 occupancy 的 encounter、拒绝与不可变性、Save v2 explicit mapper round-trip 及无 storage 调用；既有 persistence regression 保持通过。
+- Stable baseline：branch `365b03680eb9e854aa9fcff8343f2a3ec7b0b470`，PR #7 合并后 main implementation baseline `0e4c95e04208f10c3f317cc45d3adceaf4d12a25`；branch/PR/main Linux Quality runs `34110395408` / `34110561350` / `34110720466` 均 Success。
+- Reverse Scan：无 Item gameplay、UI/animation、Shop/Reward/Stage 4 leakage、通用 framework、新 Save schema 或 persistence path。本次 closeout 仅修改 PROJECT_STATUS；production/test/config changes = 0。
+- 回滚：implementation 使用针对 `0e4c95e04208f10c3f317cc45d3adceaf4d12a25` 的 revert PR；本次状态收尾可独立 revert，不改写 frozen tags。
 
 ### Stage 3 / Task S3-03 — PASS
 
@@ -606,7 +619,7 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档、S3-01 至 S3-03 frozen contracts 与 Stage 1/Stage 2 Frozen contracts，先执行 Stage 3 / Task S3-04 — Unified Revealed-Mine Transition Primitives 的 Design Review；未经批准不得编码，不得实现 Detection、Airplane、Lucky 或 Revive gameplay，也不得重新执行 S2-01 至 S2-09。
+请读取最新控制文档、S3-01 至 S3-04 frozen contracts 与 Stage 1/Stage 2 Frozen contracts，只进行 Stage 3 / Task S3-05 — Detection Design Review；未经批准不得编码，不得执行其他 Item Task，也不得重新执行已完成 Task。
 ```
 
 ## 阶段看板
@@ -616,7 +629,7 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 | 0 | 工程骨架 | FROZEN / PASS（S0-01 至 S0-07） | 控制文档冻结 |
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
-| 3 | 四大道具 | IN PROGRESS（S3-01 至 S3-03 PASS；S3-04 为唯一 Next Action） | Stage 2 FROZEN / PASS |
+| 3 | 四大道具 | IN PROGRESS（S3-01 至 S3-04 PASS；S3-05 Design Review 为唯一 Next Action） | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
