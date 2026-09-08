@@ -3,7 +3,7 @@
 **项目：MinePilot / Minesweeper Product**  
 **状态更新时间：2026-09-08**
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core、Stage 2 persistence 及 Stage 3 S3-02/S3-03 foundation/persistence extension、S3-04 unified mine transition primitives、S3-05 Detection 已完成；Stage 1、Stage 2 均已 FROZEN / PASS**
+**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item foundation/Save v2/统一揭雷、Lucky/Detection/Revive/Airplane 及跨 Item 生命周期集成均已完成。Stage 3 FROZEN CANDIDATE；最终冻结状态按下方标签与门禁规则确认。**
 
 ## 当前事实
 
@@ -152,9 +152,39 @@
 
 ## 当前阶段
 
-**STAGE 3 IN PROGRESS；STAGE 2 FROZEN / PASS；STAGE 1 FROZEN / PASS**
+**STAGE 3 FROZEN CANDIDATE；STAGE 0/1/2 FROZEN / PASS**
 
-Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-09 已人工验收 PASS，并正式 FROZEN。Stage 2 Freeze Candidate 为 `c549ef847b8a85f0a143772c15228d9283dfa915`；本次 closeout commit 为 Stage 2 frozen repository baseline。Stage 3 的 S3-01 至 S3-05 已人工验收 PASS，Stage 3 保持 IN PROGRESS。
+Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN / PASS，既有冻结标签保持不变。Stage 3 四大道具实现与生命周期集成已完成，产品经理批准执行正式 Freeze closeout。最终 implementation baseline 为 `d15add3ba83196c8b0ea6fabaeddf4e76b27eb1a`，不将本轮状态文档变更误记为 gameplay implementation。
+
+### Stage 3 Freeze Closeout — FROZEN CANDIDATE
+
+- 冻结确认规则：本状态提交在 PR/main Linux Quality 成功、独立 Reviewer PASS、Final Recovery Test PASS 后，以 annotated tag `stage-3-frozen` 指向最终 main closeout commit。标签存在且指向包含本段的已验证 closeout commit 时，Stage 3 正式状态为 **FROZEN / PASS**；标签创建前仅为 FROZEN CANDIDATE。通过 `git rev-parse stage-3-frozen^{commit}` 恢复 frozen repository baseline，避免在提交正文中伪造自引用 hash。不得移动或覆盖既有 frozen tag。
+- 已完成范围：S3-01 Item boundary；S3-02 GameState/Account inventory/RunItemState/occupancy foundation；S3-03 Save v2 与只读 v1-to-v2 migration；S3-04 unified reveal/survival；S3-05 Detection；S3-06 Revive；S3-07 Airplane；S3-08 Benben boundary review（仅边界，不是实现）；Lucky automatic rescue；Stage 3 Item Lifecycle Integration。不得重新执行上述实现。
+- 实现证据：Detection main `b367fa0`（PR #9）；Revive main `3e121ca116af959cba3be1851897dc4baccb24e3`（PR #11）；Airplane main `e104dd02b8dbfdfe174e7477a82d1d00386a00a3`（PR #12）；Lucky main `2d6c63d13664639edd9f3173bffbb2fdc3275364`（PR #14）；集成 main `d15add3ba83196c8b0ea6fabaeddf4e76b27eb1a`（PR #15）。本次统一收尾补齐 Revive、Lucky 与集成的完成记录，不改历史实现。
+- 测试证据：最终 implementation baseline 本地完整 quality 为 Unit 522/522、Integration 81/81、Total 603/603 PASS，Architecture/TypeScript/Build/Playwright PASS；main Linux Quality run `34179859313` Success。新增 Stage 3 lifecycle 文件包含 7 个集成用例，使用真实 commands/coordinator/Save v2/guarded persistence，不 mock 权威转换。
+- Reviewer evidence：Lucky branch `623c4b6ce3d76fcba254b1c4acf569234bec4668`、集成 branch `65687412d8b78a2ffa445007158a281e19695a45` 均经独立只读 Reviewer PASS 后进入 PR；集成审查核验真实测试断言与底层调用，未声称 Reviewer 重跑了 Builder 全部门禁。本次 closeout Reviewer/CI 必须另行实际执行，不能复用此记录冒充。
+- 跨 Item evidence：首步 Lucky -> reopen -> 后续 pending -> Revive；Detection -> reopen -> Airplane -> won -> reopen；四道具消耗后 Restart/Retry 保留账户消耗且重置 attempt-local facts；旧请求不能覆盖新 attempt；Lucky/Revive storage、revision、ownership 失败保持旧 authority。每次成功提交后从完整 Save 重建，load 无写盘。
+- Reverse Scan：已实现范围无第二套 Board/Cell/Mine/encounter truth、Item-specific 长期 State、Manager/Bus/framework、独立 Save 或 commit path、UI/Phaser gameplay 泄漏。本次 closeout 限状态文档，production/test/config 修改为 0。
+
+### Stage 3 Frozen Item Contracts
+
+- 共同 ownership：Board/Cell 只拥有真实格子事实；Run 拥有 phase/position/pending/first-step；Account inventory 跨 attempt；RunItemState 仅拥有 Detection/Revive/Airplane successful uses 与 Detection seed。GameState 是统一聚合，不建立 LuckyState、ReviveState、DetectionState、AirplaneState 或第二套 authority。
+- Lucky：仅 pending + occurredOnFirstStep + lucky > 0 自动触发；复用 resolvePendingMineEncounterAsSurvived，Lucky -1，Revive 不消耗，不探索 Safe/不判胜/不调用 RNG。成功为 active + revealed-mine-occupancy；实际 gameplay 移动使用 moveCharacterWithAutomaticLucky。not-applicable 不等于无条件允许 Failure；technical error 不回退 Revive/Failure。load 不自动触发 Lucky，已恢复 pending 的 gameplay continuation 使用明确入口。
+- Revive：仅 pending；首步且 Lucky 可用时拒绝 lucky-priority；inventory > 0、successfulReviveUses < 1。复用同一 survival primitive，Revive -1、uses +1；不改变 Safe exploration、不判胜。failed 不可 Revive，仍使用 Retry。
+- Detection：active on-board/occupancy，非 waiting；周围八格排除中心；优先未插旗 Hidden Mine，否则 flagged Hidden Mine，复用 revealMine。无候选不消耗；每 attempt 最多成功 2 次。seed null 仅在有效候选中初始化，失败不提交 seed；当前选择使用该 seed，下一次 seed 为 uint32 +1，不是 generation RNG continuation，不能静默更改兼容合同。
+- Airplane：active 三种位置均可用，pending/failed/won 拒绝；合法中心 + clipped 八邻域，不平移；Hidden Mine reveal 并移旗，Safe explored 并清除错误旗，Obstacle/已揭示雷保持。角色与 hasTakenStep 不变；统一 Victory settlement 可导致 waiting -> won。每 attempt 最多成功 1 次，无收益合法区域仍消耗。
+- Occupancy：Lucky/Revive 共用 revealed-mine-occupancy，必须指向真实 Revealed Mine；普通 on-board 仍只能指向 explored Safe。当前数字 unavailable；可离开，不可普通重新进入；Refresh 恢复，Restart/Retry 清除。
+
+### Stage 3 Frozen Save / Persistence / Recovery Contracts
+
+- 唯一写链：GameState candidate -> explicit Save v2 mapper -> DTO/JSON -> existing guarded persistence/coordinator -> A/B committed head -> publish。资源与 Board/Run 在 candidate 内一起变化，禁止 commit 后补扣、UI 提前发布或 Item 直接写 storage。
+- 唯一读链：committed snapshot -> JSON parse -> version dispatch -> strict validation/map -> Board/Run/GameState reconstruction。Runtime != DTO；full Board snapshot；unknown fields 拒绝；generation provenance 不用于普通 restore 重生成。
+- v1 -> v2 为单一纯 DTO migration：验证 v1 -> DTO migration -> 验证/重建 v2；load 不写 slot/head、不递增 revision。未知 Detection provenance 为 null，不伪造 seed=0。首次真实 mutation 才提交 v2，无 migration framework，也没有待补的假旧 schema。
+- Refresh/reopen = same attempt：runId/levelId/revision/Board/position/phase/inventory/usage/seed 原样恢复；不复制库存、不重置 usage。Restart/Retry = new attempt：库存保留真实消耗，本局 usage/position/progress 重置；same level/new runId/实际不同雷图/N+1；禁止用旧状态配新 revision 冒充当前权威。
+- Stage 2 authority 不变：fresh revision 0，existing N only N+1；lease/revision gate、second ownership verification、new head commit point、backup committed pointer、非破坏性 corruption handling 继续有效；裸 slot 高 revision 不代表 authority。失败无 publishable candidate，不自动 Failure/reset。
+- Known limitations：localStorage 无 atomic CAS/绝对 mutex；4096 generation search budget 可安全耗尽；Detection null seed 失败时只丢弃内部候选，不保证外部 entropy source 未被调用；Phaser >500 KB 为 observation；Reward farming 留风险 registry。本 Stage 不宣称真实 UI 游戏闭环已完成。
+- 未来 State 扩展必须进入同一 versioned aggregate，显式说明 schema/version/migration compatibility，并回归 Stage 1/2/3；不得新建 persistence authority 或静默改 RNG/Save/Item 合同。
+- Recovery checklist：仅从本文件、Specification、Development Protocol 与 Git history，必须恢复 Stage 0/1/2 frozen tags、Stage 3 完成范围/Item 合同、implementation 与 frozen baseline、限制及 Stage 4 planning 入口。若任一关键事实缺失，停止冻结并报告 GAP，不借聊天补设计。
 
 ### Engineering Reliability / ER-01
 
@@ -167,9 +197,9 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 
 ## 唯一下一行动
 
-**Stage 3 / Task S3-08 — Benben Assistance Design Review。**
+**Stage 4 — 定义并批准游戏循环任务拆分，再进入 implementation。**
 
-边界：产品经理明确指定 S3-08 Benben Assistance Design Review 为唯一下一行动，仅授权后续设计审查，不授权 implementation 或提前改变 Stage 4 的功能边界。设计必须复用现有 Runtime/Save/Persistence authority；本次 closeout 不执行 S3-08。此入口取代此前 Revive Design Review 入口及历史 sequence 的下一行动，不代表其他未收尾 Task 自动 PASS。
+进入条件：Stage 3 Final Recovery/CI/Reviewer 与 stage-3-frozen 标签全部确认；此前只完成本次 Freeze closeout，不执行 Stage 4。Stage 4 范围为 Reward、Inventory 经济扩展、Shop、Level/progression、Tutorial 与原规格 Benben 临时援助；Benben boundary review 不等于实现，不得替换为只读聊天助手。具体实现 Task 尚未定义，不自行发明。UI/Phaser presentation/animation/audio 属于 Stage 5，本次不提前进入。
 
 ## 最近完成任务
 
@@ -648,7 +678,7 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档、Stage 3 已完成合同与 Stage 1/Stage 2 Frozen contracts，只进行 Stage 3 / Task S3-08 — Benben Assistance Design Review；未经批准不得编码，不得执行其他 Task，也不得重新执行已完成实现。
+请读取最新控制文档与冻结标签，确认 Stage 3 已完成正式冻结后，只提出 Stage 4 游戏循环的任务拆分供产品经理批准；不要编码，不要重新执行 Stage 0/1/2/3 已完成实现。
 ```
 
 ## 阶段看板
@@ -658,8 +688,8 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 | 0 | 工程骨架 | FROZEN / PASS（S0-01 至 S0-07） | 控制文档冻结 |
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
-| 3 | 四大道具 | IN PROGRESS（S3-01 至 S3-05、S3-07 PASS；唯一 Next Action 为 S3-08 Benben Assistance Design Review；S3-06 不在本轮补做 closeout） | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
+| 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
+| 4 | 关卡/奖励/商店/笨笨 | PLANNING ENTRY ONLY；implementation 未授权 | Stage 3 正式 FROZEN；Task 拆分需批准 |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
