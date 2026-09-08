@@ -3,7 +3,7 @@
 **项目：MinePilot / Minesweeper Product**  
 **状态更新时间：2026-09-08**
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core、Stage 2 persistence 及 Stage 3 S3-02/S3-03 foundation/persistence extension、S3-04 unified mine transition primitives 已完成；Stage 1、Stage 2 均已 FROZEN / PASS**
+**正式游戏代码：Stage 1 core、Stage 2 persistence 及 Stage 3 S3-02/S3-03 foundation/persistence extension、S3-04 unified mine transition primitives、S3-05 Detection 已完成；Stage 1、Stage 2 均已 FROZEN / PASS**
 
 ## 当前事实
 
@@ -154,7 +154,7 @@
 
 **STAGE 3 IN PROGRESS；STAGE 2 FROZEN / PASS；STAGE 1 FROZEN / PASS**
 
-Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-09 已人工验收 PASS，并正式 FROZEN。Stage 2 Freeze Candidate 为 `c549ef847b8a85f0a143772c15228d9283dfa915`；本次 closeout commit 为 Stage 2 frozen repository baseline。Stage 3 的 S3-01 至 S3-04 已人工验收 PASS，Stage 3 保持 IN PROGRESS。
+Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZEN / PASS。Stage 2 的 S2-01 至 S2-09 已人工验收 PASS，并正式 FROZEN。Stage 2 Freeze Candidate 为 `c549ef847b8a85f0a143772c15228d9283dfa915`；本次 closeout commit 为 Stage 2 frozen repository baseline。Stage 3 的 S3-01 至 S3-05 已人工验收 PASS，Stage 3 保持 IN PROGRESS。
 
 ### Engineering Reliability / ER-01
 
@@ -167,11 +167,25 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 
 ## 唯一下一行动
 
-**Stage 3 / Task S3-05 — Detection Design Review。**
+**Stage 3 / Task S3-06 — Revive Design Review。**
 
-边界：按已批准 Stage 3 sequence，下一步仅进行 Detection 独立 Design Review；实现必须另获批准，并复用统一八邻域、reveal primitive、GameState candidate、Save v2 与 Stage 2 guarded persistence authority。未知 Detection provenance 的处理须在设计中明确，不得伪造 seed。本次 closeout 不执行 S3-05。
+边界：产品经理本次明确指定 Revive Design Review 为唯一下一行动；只进行设计审查，实现必须另获批准，继续复用 pending encounter、revealed-mine-occupancy、GameState candidate、Save v2 与 Stage 2 guarded persistence authority。本次 closeout 不执行 S3-06，不重新执行 S3-05；此入口优先于下方历史 S3-01 sequence 中尚未执行道具的顺序。
 
 ## 最近完成任务
+
+### Stage 3 / Task S3-05 — Detection Implementation PASS
+
+- 验收：产品经理确认 Implementation、Independent Reviewer、branch/main Linux Quality 均 PASS，并批准状态收尾；Stage 3 保持 IN PROGRESS。
+- Detection frozen contract：`createDetectionCandidate` 仅允许 active + on-board 或 revealed-mine-occupancy；waiting/pending/failed/won 拒绝，库存必须大于 0，successfulDetectionUses 必须小于 2。复用统一八邻域且排除中心，只选 Hidden Mine，优先未插旗组，否则从 flagged Hidden Mine 组选择；复用 `revealMine` 揭示并移除目标 Mine Flag，不复制 Cell legality/reveal truth。
+- Atomic candidate：经 `createGameState` 验证，原子包含 detection inventory -1、successfulDetectionUses +1、下一次 Detection seed 与一个 Revealed Mine；保持 characterPosition、phase、hasTakenStep、Safe exploration、其他库存/Item facts 不变，不触发 Victory。
+- Seed lifecycle frozen contract：`RunItemState.detectionRandomSeed` 为独立 Detection next-use uint32 seed；已有 seed 用冻结的 `createSeededRandomSource(seed).nextInt(candidateCount)` 选择，候选组保留统一邻域顺序；下一次 seed 为 `(selectionSeed + 1) mod 2^32`，不是 Mulberry32 internal continuation。相同 seed/Board/order 可重放；不得静默改变此合同。Stage 1 RNG algorithm、rejection sampling、Mine placement 与 generation RNG/provenance 均未修改。
+- Unknown seed：null 不伪造为 0；通过可注入 initializer（生产使用独立 crypto entropy）在临时候选中取样，只有成功 committed authority 才记录初始化及推进后的 seed。状态/库存/额度拒绝或无候选不调用 initializer；commit failure 丢弃临时候选，旧 authoritative seed 仍为 null，不承诺临时 entropy 调用可回滚。
+- Save v2 persistence chain：`useDetection` -> GameState candidate -> explicit Save v2 mapper -> existing guarded persistence coordinator -> successful commit -> publish；维持 same runId/levelId/provenance 与 revision N+1。没有新 schema、migration、storage/commit path；refresh/reopen 恢复 Board、inventory、usage 与 Detection seed。
+- Failure atomicity：拒绝、无候选、seed failure、storage failure、stale revision 或 lost ownership 均不返回 publishable candidate；commit failure 不公开 target，旧 Board/inventory/usage/seed authority 保持。Core candidate 仅为内部组合材料，不可在 commit 前发布。
+- Evidence：新增 unit 22 + integration 7 = 29/29 PASS；Independent Reviewer PASS 并独立复跑 29/29。完整 Unit 476/476、Integration 50/50、Total 526/526，Architecture/TypeScript/Build/Playwright PASS。
+- Stable baseline：branch `0a767f0bd398511ecb4b6670b3bb4efe05f4e0d5`；PR #9 合并后 main implementation `b367fa04f80ce3bff954c533c081ec35214e02e4`；branch/PR/main Linux Quality runs `34171926068` / `34172070180` / `34172206171` 全部 Success。
+- Reverse Scan：无 DetectionState/Manager、Item/RNG framework、第二套 Board/Mine truth、其他 Item gameplay、UI 或 Stage 4 leakage。Known limitation：沿用 localStorage 非原子 CAS、best-effort single writer + stale-write rejection；不提供绝对互斥。Phaser >500 KB 仍为 observation。
+- 本次 closeout 仅修改 PROJECT_STATUS；production/test/config/architecture changes = 0。回滚通过独立 revert closeout PR；implementation 回滚点为上述 main implementation commit，不重写 frozen tags。
 
 ### Stage 3 / Task S3-04 — PASS
 
@@ -619,7 +633,7 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档、S3-01 至 S3-04 frozen contracts 与 Stage 1/Stage 2 Frozen contracts，只进行 Stage 3 / Task S3-05 — Detection Design Review；未经批准不得编码，不得执行其他 Item Task，也不得重新执行已完成 Task。
+请读取最新控制文档、S3-01 至 S3-05 frozen contracts 与 Stage 1/Stage 2 Frozen contracts，只进行 Stage 3 / Task S3-06 — Revive Design Review；未经批准不得编码，不得执行其他 Item Task，也不得重新执行已完成 Task。
 ```
 
 ## 阶段看板
@@ -629,7 +643,7 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 | 0 | 工程骨架 | FROZEN / PASS（S0-01 至 S0-07） | 控制文档冻结 |
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
-| 3 | 四大道具 | IN PROGRESS（S3-01 至 S3-04 PASS；S3-05 Design Review 为唯一 Next Action） | Stage 2 FROZEN / PASS |
+| 3 | 四大道具 | IN PROGRESS（S3-01 至 S3-05 PASS；S3-06 Revive Design Review 为唯一 Next Action） | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
