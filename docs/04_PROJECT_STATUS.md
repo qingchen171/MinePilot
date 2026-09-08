@@ -167,11 +167,26 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 
 ## 唯一下一行动
 
-**Stage 3 / Task S3-06 — Revive Design Review。**
+**Stage 3 / Task S3-08 — Benben Assistance Design Review。**
 
-边界：产品经理本次明确指定 Revive Design Review 为唯一下一行动；只进行设计审查，实现必须另获批准，继续复用 pending encounter、revealed-mine-occupancy、GameState candidate、Save v2 与 Stage 2 guarded persistence authority。本次 closeout 不执行 S3-06，不重新执行 S3-05；此入口优先于下方历史 S3-01 sequence 中尚未执行道具的顺序。
+边界：产品经理明确指定 S3-08 Benben Assistance Design Review 为唯一下一行动，仅授权后续设计审查，不授权 implementation 或提前改变 Stage 4 的功能边界。设计必须复用现有 Runtime/Save/Persistence authority；本次 closeout 不执行 S3-08。此入口取代此前 Revive Design Review 入口及历史 sequence 的下一行动，不代表其他未收尾 Task 自动 PASS。
 
 ## 最近完成任务
+
+### Stage 3 / Task S3-07 — Airplane Implementation PASS
+
+- 验收：implementation 经 PR #12 合并；产品经理接受 Post-merge Acceptance Audit PASS，并批准本次状态收尾。Stage 3 保持 IN PROGRESS。
+- Stable implementation baseline：`e104dd02b8dbfdfe174e7477a82d1d00386a00a3`；PR branch `f75d40519bd54c41ebceb434ea86e58d1dd330f8`。Main Linux Quality run `34176075785` Success，完整 quality 步骤已实际核验。
+- Authority reuse：`createAirplaneCandidate` / `useAirplane` 复用 Board/Cell truth、RunState、GameState、Account inventory、RunItemState、Save v2 explicit mapper 与 Stage 2 guarded persistence。无 AirplaneState、长期历史、新 position/phase、Save schema change、RNG、Item framework 或新 persistence path。
+- Eligibility frozen contract：仅 active 的 waiting/on-board/revealed-mine-occupancy 可用；pending/failed/won 拒绝；inventory.airplane > 0 且 successfulAirplaneUses < 1。
+- Region frozen contract：center 必须是棋盘内合法整数坐标，允许 Safe、Hidden/Revealed Mine、Obstacle、Flagged 或未探索 Cell；区域为 center + 既有八邻域，center 只包含一次，超出棋盘部分裁剪，不平移、不要求完整 9 格；不修改 getNeighborCoordinates 排除中心的原语义。
+- Transformation frozen contract：Hidden Mine 通过 revealMine 转为 Revealed Mine 并移旗；unexplored Safe 转 explored 且清除错误旗；Obstacle、Revealed Mine、已 explored Safe 保持。Mine identity、区域外 Cell 及 generation 不变，不创建第二套 truth。
+- Character/Victory：不调用 moveCharacter，不移动角色，保留 characterPosition 与 hasTakenStep；区域转换全部完成后调用既有 settleRunAsWon，不复制 Victory 判断。允许 waiting + false 在本次原子转换后直接 won。
+- Transaction：完整 GameState candidate 同时包含 inventory.airplane -1、successfulAirplaneUses +1、Board 与必要 phase 变化；其他库存/usage/Detection seed 保持。合法无收益区域仍消耗，不返还。Same runId/levelId/provenance、revision N+1，通过 Save v2 与同一 guarded commit 成功后才可 publish。
+- Failure atomicity：资格/目标拒绝与 storage/revision/lease failure 不返回 publishable candidate；旧 Runtime 和旧 committed authority 保持。失败可能留下未提交 inactive slot 字节，不将其提升为 authority；不承诺底层存储字节完全未变。
+- Audit evidence：实际 diff 仅 2 个实现文件、1 个 helper、2 个测试文件；覆盖三种位置、phase/resource 拒绝、内部/边缘/角落/1x1/窄棋盘、Cell 转换、center 一次、无收益消耗、Victory、一次 guarded commit、三种位置 won reopen 与提交失败恢复。审计只读，未重新运行写盘测试。
+- Reverse Scan/limitations：无 Reward/Coins/Tutorial/UI/Phaser 泄漏；无新 schema、RNG、manager/framework 或 storage authority。LocalStorage 非原子 CAS、best-effort single writer 限制不变；Phaser >500 KB 仍为 observation。Active reopen 后再次使用的显式回归可后续增强，当前由 restore 与额度测试组合证明，非 blocker。
+- 本次 closeout 仅修改 PROJECT_STATUS，production/test/config/architecture changes = 0。回滚采用独立 revert closeout PR；implementation 可通过 revert 上述 main baseline 的 PR 回滚，不改写 frozen tags。
 
 ### Stage 3 / Task S3-05 — Detection Implementation PASS
 
@@ -633,7 +648,7 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档、S3-01 至 S3-05 frozen contracts 与 Stage 1/Stage 2 Frozen contracts，只进行 Stage 3 / Task S3-06 — Revive Design Review；未经批准不得编码，不得执行其他 Item Task，也不得重新执行已完成 Task。
+请读取最新控制文档、Stage 3 已完成合同与 Stage 1/Stage 2 Frozen contracts，只进行 Stage 3 / Task S3-08 — Benben Assistance Design Review；未经批准不得编码，不得执行其他 Task，也不得重新执行已完成实现。
 ```
 
 ## 阶段看板
@@ -643,7 +658,7 @@ Stage 0 工程骨架 FROZEN / PASS。Stage 1 的 S1-01 至 S1-13 已正式 FROZE
 | 0 | 工程骨架 | FROZEN / PASS（S0-01 至 S0-07） | 控制文档冻结 |
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
-| 3 | 四大道具 | IN PROGRESS（S3-01 至 S3-05 PASS；S3-06 Revive Design Review 为唯一 Next Action） | Stage 2 FROZEN / PASS |
+| 3 | 四大道具 | IN PROGRESS（S3-01 至 S3-05、S3-07 PASS；唯一 Next Action 为 S3-08 Benben Assistance Design Review；S3-06 不在本轮补做 closeout） | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | LOCKED | Stage 3 PASS |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
