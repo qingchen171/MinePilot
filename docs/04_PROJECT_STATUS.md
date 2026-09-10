@@ -1,7 +1,7 @@
 # PROJECT_STATUS
 
 **项目：MinePilot / Minesweeper Product**  
-**状态更新时间：2026-09-08**
+**状态更新时间：2026-09-10**
 **控制文档版本：v1.0 FROZEN**  
 **正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item foundation/Save v2/统一揭雷、Lucky/Detection/Revive/Airplane 及跨 Item 生命周期集成均已完成。Stage 3 FROZEN CANDIDATE；最终冻结状态按下方标签与门禁规则确认。**
 
@@ -197,9 +197,23 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 — 定义并批准游戏循环任务拆分，再进入 implementation。**
+**Stage 4 / S4-02 — Authoritative Aggregate & Lifecycle Foundation Design Review**
 
-进入条件：Stage 3 Final Recovery/CI/Reviewer 与 stage-3-frozen 标签全部确认；此前只完成本次 Freeze closeout，不执行 Stage 4。Stage 4 范围为 Reward、Inventory 经济扩展、Shop、Level/progression、Tutorial 与原规格 Benben 临时援助；Benben boundary review 不等于实现，不得替换为只读聊天助手。具体实现 Task 尚未定义，不自行发明。UI/Phaser presentation/animation/audio 属于 Stage 5，本次不提前进入。
+先随 Specification 阅读正式批准补充合同 [Stage 4 Product Contract Addendum v1.0](09_Stage_4_Product_Contract_Addendum_v1.0.md)。S4-02 仅为 DESIGN REVIEW，Stage 4 implementation 尚未授权。设计范围为 account-only/nullable attempt、Account 最小扩展、attempt facts、Stage 3 Item API 兼容、Restart/Retry/Replay/Abandon 与 Save v3 foundation 输入模型；不得在 S4-01B 提前执行。UI/Phaser presentation/animation/audio 仍属于 Stage 5。
+
+### Stage 4 / S4-01B — Product Contract Freeze Closeout
+
+- S4-01 Architecture Review、S4-01A Product Contract Review 已完成；Elio 于 2026-09-10 明确批准 P1–P4，产品合同 FROZEN。S4-01B 仅文档收尾，不代表 Stage 4 implementation 或 S4-02 已完成。
+- Reality sync：Stage 0–3 FROZEN；已核验 main/origin/main/远程 main 与 annotated `stage-3-frozen` 均为 `063ae81c9d49306f69d5d728ba4fcb03ea9687cc`，起始工作区 clean。保留 Stage 3 原标签不移动。
+- 正式 authority：`09_Stage_4_Product_Contract_Addendum_v1.0.md` 为经批准的 Specification §§5–9 补充；不改写 frozen Specification v1.0，其余合同继续有效。
+- P1：首关开放，完成开放 catalog 下一关，completed 永久/可 Replay，末关无 Next；unlocked 派生，权威 start 验证资格，不保存双份 progression truth。
+- P2：Benben 按 levelId、连续最终失败阈值取得一次资格；救济/pending/restart/abandon 不算失败；未使用资格保留、不跨关不复制；完成清 streak 不撤销资格；成功使用永久 used，Replay 不再发。
+- P3：仅 active on-board/occupancy，八邻域排除中心、边缘裁剪，复用 Mine truth/revealMine；不耗 Detection 库存/额度；无新目标不耗资格、不改 used、不推进随机生命周期；无地图缓存/Solver/独立保存链。
+- P4：最多一个 current/resumable attempt；菜单不 abandon；跨关先无副作用预检，再 abandon committed 后 start；资产保留、attempt facts 不转移；start 失败留无 attempt，不复活旧局；禁止局中 Shop 补货再回来。
+- 技术结论：无独立 completion payout；显式 Save v3 方向（尚未实现），v1/v2 解释不变；v2 迁移保留真实有效 facts、不补 Coins/Reward、不猜 completion/Benben/历史结算，只读，首次真实 mutation 才写新版本。
+- Ownership direction：Account 拥有库存/未来 Coins/completed/永久 claims/按关 Benben；attempt 拥有 Board/Run/RunItem/rewards/terminal settlement；unlocked/eligibility/affordability/remaining quotas 派生。字段尚未实现；继续单一 GameState -> explicit DTO -> guarded persistence -> committed -> publish。
+- 风险：部分领 Reward 后 abandon/restart/replay 的新随机收益属于 balance/farming risk，不是同一 Reward duplicate-claim bug；FR-014 保留观察，不新增任何限额或防刷策略。
+- 验证/恢复：本 Task 使用 docs-only diff、完整 quality、独立 Reviewer/Recovery、branch/PR/main Linux gate；实际结果由本 closeout PR 与对应 CI/Git history 检索，不以旧 Stage 3 证据冒充。回滚为独立 revert closeout PR，不改 frozen tags。
 
 ## 最近完成任务
 
@@ -678,7 +692,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取最新控制文档与冻结标签，确认 Stage 3 已完成正式冻结后，只提出 Stage 4 游戏循环的任务拆分供产品经理批准；不要编码，不要重新执行 Stage 0/1/2/3 已完成实现。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md、Protocol 和最新 PROJECT_STATUS，只执行 S4-02 Authoritative Aggregate & Lifecycle Foundation Design Review；不要编码，不要重新执行已完成任务。
 ```
 
 ## 阶段看板
@@ -689,7 +703,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | PLANNING ENTRY ONLY；implementation 未授权 | Stage 3 正式 FROZEN；Task 拆分需批准 |
+| 4 | 关卡/奖励/商店/笨笨 | PRODUCT CONTRACT FROZEN；DESIGN ONLY；implementation 未授权 | P1–P4 已批准；唯一入口 S4-02 Design Review |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |

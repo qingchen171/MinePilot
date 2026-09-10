@@ -38,6 +38,12 @@
 
 ## 新条目模板
 
+### FR-014 — S4-01B approved risk clarification (2026-09-10)
+
+现有产品规则允许 Replay 已完成关获得新正常随机 Reward、Retry/Restart 生成新 attempt rewards，以及 Failure 后保留合法取得的资产。部分领取 -> abandon/restart/replay -> 新随机 Reward 属于 balance/farming risk，不等于 duplicate-claim bug。普通操作中同一 Reward 重复领取仍必须由 Stage 4 实现阻止。
+
+本记录不授权 cooldown、reward cap、diminishing return、daily limit 或 server anti-cheat，也不取消规格允许的重复游玩收益。localStorage 本地篡改及非 atomic CAS 限制保留；产品 authority 见 `09_Stage_4_Product_Contract_Addendum_v1.0.md`，Registry 自身不授权实现。
+
 ```text
 ID：FR-XXX
 需求名称：
@@ -56,4 +62,3 @@ ID：FR-XXX
 ## MVP 防膨胀规则
 
 Registry 中的条目不能因为“以后肯定要做”而提前开发。MVP 只允许建立低成本、已知必要的扩展边界；不得提前实现未来业务逻辑、数据库字段大全、空系统或通用化框架。
-
