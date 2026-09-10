@@ -69,7 +69,7 @@
 | Attempt | Board/Run、RunItemState、Reward placement/payload/claimed、terminal settlement fact |
 | Derived | unlocked levels、eligibility queries、shop affordability、remaining quotas |
 
-不得建立 separate LevelProgress aggregate、Reward store、Shop state、Benben save 或 second Account truth。保持 Runtime 与 DTO 分离。具体 nullable attempt、字段结构及 frozen Item API 兼容方案留给 S4-02 设计，不在本轮决定。
+不得建立 separate LevelProgress aggregate、Reward store、Shop state、Benben save 或 second Account truth。保持 Runtime 与 DTO 分离。原 S4-01B 未决定的 nullable attempt 与 Item API 兼容方向现已由 S4-02 批准，见 §9；具体 persistent facts / Save 编码留 S4-03 设计，当前均未实现。
 
 ## 8. Reward farming / known limitations
 
@@ -77,10 +77,26 @@ Replay 已完成关可获得新的正常随机 Reward；Retry/Restart 产生新 
 
 同一 Reward 在普通路径中重复领取仍必须阻止。不得借本收尾新增 cooldown、reward cap、diminishing return、daily limit 或 server anti-cheat。localStorage 非 atomic CAS、无绝对 mutex、本地篡改限制、4096 generation search budget 与 Phaser >500 KB observation 均保留。
 
-## 9. 唯一后续入口 / Recovery checklist
+## 9. S4-02 Design Contract — PASS / CLOSED (2026-09-10)
 
-**Stage 4 / S4-02 — Authoritative Aggregate & Lifecycle Foundation Design Review**
+Elio 已人工验收批准 S4-02 Authoritative Aggregate & Lifecycle Foundation Design Review。本节仅记录 DESIGN CONTRACT APPROVED，不修改 P1–P4，不表示 Runtime 或 Save 已实施。
 
-仅设计：account-only GameState、nullable current attempt、Account 最小扩展、attempt facts、Stage 3 Item API 兼容、Restart/Retry/Replay/Abandon、字段延期及 Save v3 foundation 输入模型。不得直接 implementation。
+- Runtime authority：未来 GameState 始终含 Account，且仅含一个 `currentAttempt: AttemptState | null`。null 为真实 account-only，object 为完整 attempt；禁止 fake waiting Run、run/runItems 各自 nullable、多个 resumable attempts 或第二套 aggregate。
+- Attempt ownership：runId、levelId、RunState、RunItemState 与必要 generation provenance 同属 attempt；Run/RunItemState 同生共存。revision 继续属于 persistence context，不进入 Account/Run/Attempt。
+- Frozen-boundary impact：未来 aggregate shape 是显式 Stage 3 TypeScript API change，不是产品语义变化。Board/Cell truth、movement、occupancy、Lucky priority、Detection/Revive/Airplane、RNG、Refresh、Restart/Retry 行为保持不变。实施前须明确 API 迁移、兼容影响与回归；不是“只是重构所以不需 change control”。
+- Item compatibility：未来新增 Account facts 后，库存消耗必须保留其余所有账户事实；禁止仅传 inventory 重建并覆盖完整 Account。不得以临时兼容 view 创建第二份长期 authority。
+- Account-only：允许 Shop、level selection/start、Replay eligibility/progression query；禁止 movement、四 Item、current-cell gameplay query、Retry。Shop 最小 gate 为 `currentAttempt === null`。
+- Lifecycle：返回菜单本身不修改 authority；active/pending abandon 经 guarded commit 成功后为 null。failed Retry 保留既有原子 replacement，不先清空再生成。won/failed 须完成适用的 terminal settlement 处理后才可 dismiss/Retry/Next；Replay 创建新 attempt，不将旧 won 改 active。
+- Terminal settlement：Run.phase 是唯一 gameplay outcome truth；未来最小 settlement fact 仅表示经济/progression 处理情况，不复制 won/failed。旧 terminal migration 必须支持 legacy-excluded，防止追溯补经济、进度或 failure streak；该排除语义不是伪造已发生结算。确切编码留 S4-03。
+- Save timing：不得开放临时 v3 writer。首次 authoritative v3 write 前先冻结已批准 persistent facts、validation、migration 与合法组合；不采用“一功能一版本”的机械策略，也不加入 reserved metadata/futureData 万能字段。
+- Identity defense：未来公共 Stage 4 mutation 不信任任意旧 GameState 配新 revision。接口方向为 intent + expected revision + expected runId/null -> read committed authority -> validate identity -> build pure candidate -> existing guarded commit -> publish。不建立 Repository/Manager/Bus/framework。
+- 尚未实现：nullable currentAttempt Runtime、AttemptState、expanded Account、Coins、completedLevelIds、Reward facts、terminal settlement、Benben persistent facts、Save v3、新 Stage 4 mutation boundary。Save v3 尚不可写，本轮不提前冻结 schema 或创建字段。
+- Validation/recovery：未来回归须覆盖 Stage 3 Item 行为、Account 非库存字段保留、account-only、旧对象配新 revision、终局幂等/legacy exclusion、Refresh/Restart/Retry。此次 production/test/config/schema changes = 0；文档收尾经 local quality、独立 Reviewer、PR/Linux/main gate。可独立 revert closeout 文档提交，不移动 frozen tags。
 
-新 AI 从 AGENTS -> Specification + 本批准合同 -> Protocol -> PROJECT_STATUS -> Git history/tag，应能恢复 Stage 0–3 FROZEN、Stage 3 baseline、Stage 4 未实施、P1–P4、无 completion payout、Save v3/非追溯只读迁移方向、farming 风险与唯一 S4-02 设计入口。当前 S4-01B 仅冻结合同，不完成 S4-02。
+## 10. 唯一后续入口 / Recovery checklist
+
+**Stage 4 / S4-03 — Persistent Facts & Save v3 Contract Design Review**
+
+DESIGN ONLY / IMPLEMENTATION NOT AUTHORIZED。S4-02 已关闭，本次仅同步批准结论，不执行 S4-03 设计。
+
+新 AI 从 AGENTS -> Specification + 本批准合同 -> Protocol -> PROJECT_STATUS -> Git history/tag，应能恢复 Stage 0–3 FROZEN、Stage 3 baseline、Stage 4 产品合同、S4-02 PASS、future account + nullable currentAttempt、无 fake Run、Stage 3 行为不变、settlement 不复制 outcome、Save v3 未实现且不可写，以及唯一 S4-03 设计入口。既有 P1–P4、迁移方向和 farming 风险继续有效。

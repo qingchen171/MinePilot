@@ -197,9 +197,21 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-02 — Authoritative Aggregate & Lifecycle Foundation Design Review**
+**Stage 4 / S4-03 — Persistent Facts & Save v3 Contract Design Review**
 
-先随 Specification 阅读正式批准补充合同 [Stage 4 Product Contract Addendum v1.0](09_Stage_4_Product_Contract_Addendum_v1.0.md)。S4-02 仅为 DESIGN REVIEW，Stage 4 implementation 尚未授权。设计范围为 account-only/nullable attempt、Account 最小扩展、attempt facts、Stage 3 Item API 兼容、Restart/Retry/Replay/Abandon 与 Save v3 foundation 输入模型；不得在 S4-01B 提前执行。UI/Phaser presentation/animation/audio 仍属于 Stage 5。
+先随 Specification 阅读正式批准补充合同 [Stage 4 Product Contract Addendum v1.0](09_Stage_4_Product_Contract_Addendum_v1.0.md)，包括 §9 S4-02 已批准设计。DESIGN ONLY / IMPLEMENTATION NOT AUTHORIZED；S4-03 尚未开始，本次 closeout 不执行其设计。UI/Phaser presentation/animation/audio 仍属于 Stage 5。
+
+### Stage 4 / S4-02 — Authoritative Aggregate & Lifecycle Foundation Design Review — PASS / CLOSED
+
+- Elio 于 2026-09-10 人工验收批准：DESIGN CONTRACT APPROVED；production implementation = 0、tests implementation = 0、无 Save v3、无 Stage 4 gameplay implementation。
+- 起始 Reality sync：HEAD/origin/main/远程 main 为 `adec768ad12fc202022dc0cc57e31e905afd4be9`，工作区 clean；Stage 0–3 FROZEN，stage-3-frozen 保持 `063ae81c9d49306f69d5d728ba4fcb03ea9687cc`。此前 S4-02 仅只读设计，无 repository 修改。
+- 未来唯一 Runtime：GameState { account, currentAttempt: AttemptState | null }；Account 始终存在，无局不伪造 waiting Run，不做多个 nullable 或多 resumable attempts。Attempt 同时拥有 runId/levelId/Run/RunItemState/必要 provenance；revision 属于 persistence context。
+- 兼容：aggregate shape 是显式 frozen-boundary API change；Stage 3 gameplay/RNG/Refresh/Restart/Retry 行为不变。Item 更新库存必须保留 Account 其余事实，禁止 inventory-only 重建覆盖扩展账户。
+- account-only 允许局外 Shop/选关/start/progression/Replay eligibility；不允许 move/Item/current-cell gameplay query/Retry。Shop gate 为 currentAttempt null。菜单导航不改变 authority；abandon 成功提交才清 attempt；failed Retry 原子替换，不能先清空；Replay 新建 attempt。
+- terminal：Run.phase 仍是唯一 outcome；settlement 仅表示 Stage 4 经济/progression 处理，适用结算关闭后才能 dismiss/Retry/Next。旧 terminal 必须 legacy-excluded，不追溯补经济、进度、streak，不伪造已结算。
+- Save v3 未实现且尚不可写；先完成 persistent facts/validation/migration/合法组合设计，不开放临时 writer、不建 reserved/futureData。公共 mutation 方向为 intent + expected revision + expected runId/null -> read committed authority -> identity validation -> pure candidate -> existing guarded commit -> publish。
+- 明确尚未实现：nullable Runtime、AttemptState、expanded Account、Coins、completedLevelIds、Reward/terminal/Benben facts、Save v3、新 Stage 4 mutation boundary。完整批准合同见 Addendum §9；本次不修改 P1–P4，不执行 S4-03。
+- 收尾门禁：docs-only diff、完整 local quality、独立只读 Reviewer/Recovery、branch/PR/main Linux Quality；实际证据见本 closeout PR/CI/Git history，不以历史测试冒充。回滚使用独立 revert closeout PR，不移动 Stage 0–3 tags。
 
 ### Stage 4 / S4-01B — Product Contract Freeze Closeout
 
@@ -692,7 +704,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md、Protocol 和最新 PROJECT_STATUS，只执行 S4-02 Authoritative Aggregate & Lifecycle Foundation Design Review；不要编码，不要重新执行已完成任务。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（含 S4-02 已批准设计）、Protocol 和最新 PROJECT_STATUS，只执行 S4-03 Persistent Facts & Save v3 Contract Design Review；不要编码，不要重新执行已完成任务。
 ```
 
 ## 阶段看板
@@ -703,7 +715,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | PRODUCT CONTRACT FROZEN；DESIGN ONLY；implementation 未授权 | P1–P4 已批准；唯一入口 S4-02 Design Review |
+| 4 | 关卡/奖励/商店/笨笨 | PRODUCT CONTRACT FROZEN；S4-02 PASS/CLOSED；DESIGN ONLY；implementation 未授权 | 唯一入口 S4-03 Design Review |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
