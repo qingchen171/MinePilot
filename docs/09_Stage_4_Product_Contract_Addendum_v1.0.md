@@ -1,7 +1,9 @@
 # Stage 4 Product Contract Addendum v1.0
 
-**状态：PRODUCT CONTRACT FROZEN — Elio 已批准 P1–P4；implementation 未授权**  
-**Task：S4-01B；批准日期：2026-09-10**  
+**状态：PRODUCT CONTRACT FROZEN — Elio 已批准 P1–P4；implementation 未授权**
+
+**Task：S4-01B；批准日期：2026-09-10**
+
 **审计起点：063ae81c9d49306f69d5d728ba4fcb03ea9687cc（annotated stage-3-frozen）**
 
 ## 1. Authority / change control
