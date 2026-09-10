@@ -69,7 +69,7 @@
 | Attempt | Board/Run、RunItemState、Reward placement/payload/claimed、terminal settlement fact |
 | Derived | unlocked levels、eligibility queries、shop affordability、remaining quotas |
 
-不得建立 separate LevelProgress aggregate、Reward store、Shop state、Benben save 或 second Account truth。保持 Runtime 与 DTO 分离。具体 nullable attempt、字段结构及 frozen Item API 兼容方案留给 S4-02 设计，不在本轮决定。
+不得建立 separate LevelProgress aggregate、Reward store、Shop state、Benben save 或 second Account truth。保持 Runtime 与 DTO 分离。原 S4-01B 未决定的 nullable attempt 与 Item API 兼容方向现已由 S4-02 批准，见 §9；具体 persistent facts / Save 编码留 S4-03 设计，当前均未实现。
 
 ## 8. Reward farming / known limitations
 
