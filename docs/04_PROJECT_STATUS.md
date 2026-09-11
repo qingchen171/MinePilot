@@ -1,7 +1,7 @@
 # PROJECT_STATUS
 
 **项目：MinePilot / Minesweeper Product**  
-**状态更新时间：2026-09-10**
+**状态更新时间：2026-09-11**
 **控制文档版本：v1.0 FROZEN**  
 **正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item foundation/Save v2/统一揭雷、Lucky/Detection/Revive/Airplane 及跨 Item 生命周期集成均已完成。Stage 3 FROZEN CANDIDATE；最终冻结状态按下方标签与门禁规则确认。**
 
@@ -197,9 +197,26 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-03 — Persistent Facts & Save v3 Contract Design Review**
+**Stage 4 / S4-04 — Save v3 DTO, Strict Validation & Pure Migration Implementation**
 
-先随 Specification 阅读正式批准补充合同 [Stage 4 Product Contract Addendum v1.0](09_Stage_4_Product_Contract_Addendum_v1.0.md)，包括 §9 S4-02 已批准设计。DESIGN ONLY / IMPLEMENTATION NOT AUTHORIZED；S4-03 尚未开始，本次 closeout 不执行其设计。UI/Phaser presentation/animation/audio 仍属于 Stage 5。
+先随 Specification 阅读 [Stage 4 Product Contract Addendum v1.0](09_Stage_4_Product_Contract_Addendum_v1.0.md) §9–10。S4-02 与 S4-03 PASS/CLOSED；Save v3 CONTRACT FROZEN，implementation = NOT STARTED，authoritative write = DISABLED。S4-04 仅 DTO/strict validation/pure migration，不接 production writer、不切换当前 Runtime，production saves 继续 v2。本 S4-03 closeout 完成后停止等待人工验收，不执行 S4-04。UI/Phaser presentation/animation/audio 仍属于 Stage 5。
+
+### Stage 4 / S4-03 — Persistent Facts & Save v3 Contract — PASS / CLOSED
+
+- Elio 已人工审计批准：DESIGN CONTRACT APPROVED / SAVE V3 CONTRACT FROZEN（2026-09-11）。不是 implemented capability：Save v3 未实现、不可写、未接 production persistence；Reward/Coins/Shop/Level/Benben/新 Runtime 均未在此实现。
+- Reality sync：HEAD/origin/main/实际远程 main = `02ec62e0a643679ed68cbfb3d5675744b9034f9e`，工作区 clean；Stage 0–3 annotated frozen tags 不变，Stage 3 = `063ae81c9d49306f69d5d728ba4fcb03ea9687cc`；Stage 4 产品合同 FROZEN、S4-02 CLOSED。起始唯一 Next Action 为 S4-03 Design Review，现随批准更新。
+- 正式合同唯一正文：Addendum §10。未来 GameState 始终有 account + currentAttempt null/object；Attempt 同属 runId/levelId/provenance/Run/RunItem/rewards/terminalDisposition；revision 只在 persistence context。无 fake waiting Run、独立 nullable、多个 resumable attempts 或第二 aggregate。
+- 持久事实：Account inventory/coins/completedLevelIds/oneTimeClaimIds/benbenByLevel；Attempt identity/provenance/run/runItems/rewards/terminalDisposition。unlocked/affordability/remaining quotas/eligibility 派生；无 history/metadata/futureData。未知但合法历史 IDs 保留；库存更新必须保留完整 Account，允许 replaceInventory 等小型纯 helper，不建 framework。
+- Benben canonical：仅 unavailable 累计最终失败；到阈值 available 且 streak=0；available/used 必须 streak=0、不再累计，used 永久；完成清 streak 不撤销 entitlement。统一八邻域，Hidden Mine 未插旗优先、再已插旗，row-major 首个，通过 revealMine；无 persisted RNG，不读写 Detection seed/不消费 Mine RNG；无目标或 commit 失败不变。
+- Reward：attempt 内 coordinate 唯一，identity=runId+coordinate，无 rewardId；固定 coordinate/payload/claimed/oneTimeClaimId。仅 Safe；claimed/explored/Account one-time claim 交叉一致；非法数据拒绝，不修复/补发。Reward 从实际 generation seed domain separation 派生独立 stream，不消费 Mine RNG；无 reward seed/state/version 存档字段，具体常量留生成 Task。
+- Terminal：Run.phase 唯一 outcome；active/pending 为 not-applicable，新 won/failed 为原子 settled，旧 migrated terminal 为 legacy-excluded；无正常 committed unsettled，无 completion payout，不追溯补历史资产/completion/streak。
+- v3 完整 DTO/strict unknown fields/numeric/null/cross-field 解释见 Addendum §10.7–10.8。Runtime 与 DTO 显式映射/重建、不共享可变引用；account-only 为真实 null，不伪造 Run。
+- Migration：strict v2 -> pure v3 -> strict validation/reconstruction；保留 revision/inventory/Run/Item/identity/provenance，coins=0，completed/claims/Benben/rewards=[]，缺 provenance=null。v1 必经既有 v1→v2；只读、无 RNG/写盘/增 revision/历史伪造。v1/v2 旧解释不变。
+- Writer gate：CONTRACT FROZEN != WRITER ENABLED。完整 DTO/validation/migration/aggregate/mapper/reconstruction/Item Account 保留/no-loss/guarded v3/identity 防线与 quality/Reviewer/Linux gate 完成才最终原子接线；不得让新事实被 v2 丢弃、不得临时 v3。现 writer DISABLED。
+- Stage 3 gameplay/occupancy/RNG/Refresh/Restart/Retry 不变。未来 public mutation = intent + expectedRevision + expectedRunId/null -> read committed authority -> validate -> candidate -> existing guarded commit -> publish；不信任 old GameState + latest revision，不创建 Repository/Bus/engine。
+- 已批准顺序：S4-04 DTO/strict validation/pure migration（当前唯一 Next Action）；S4-05 aggregate/mapper/reconstruction/纯兼容；S4-06 atomic switch/authority defense/v3 coordinator；S4-07 lifecycle integration gate；之后 Level/Reward/Settlement/Shop/Benben 独立批准。任何 main commit 不得让 authority 无法无损保存；门禁依赖不足应停，不提前实现或开放 writer。
+- 本次 scope：仅本状态文件与现有 Addendum，production/tests/config/runtime/schema implementation/writer enablement = 0。Recovery 必须可从正式文档恢复 Addendum §11 全部 20 类事实；实际 local quality/independent Reviewer/branch-PR-main Linux 证据由本 closeout PR/Git history 与最终报告记录，不预称通过。
+- 已知限制保持：localStorage 非 atomic CAS、本地篡改、4096 搜索预算、catalog 兼容、farming/Phaser observation；不新增防刷或 speculative fields。回滚仅独立 revert 本 docs PR，不动 frozen tags。完成后停止，不进入 S4-04。
 
 ### Stage 4 / S4-02 — Authoritative Aggregate & Lifecycle Foundation Design Review — PASS / CLOSED
 
@@ -704,7 +721,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（含 S4-02 已批准设计）、Protocol 和最新 PROJECT_STATUS，只执行 S4-03 Persistent Facts & Save v3 Contract Design Review；不要编码，不要重新执行已完成任务。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（§9–10 frozen contracts）、Protocol 和最新 PROJECT_STATUS。唯一下一行动为 S4-04 Save v3 DTO, Strict Validation & Pure Migration Implementation；只做该 Task，不接 production writer、不切换 Runtime、不开始后续 Task。S4-03 closeout 本轮停止等待验收，不自动执行 S4-04。
 ```
 
 ## 阶段看板
@@ -715,7 +732,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | PRODUCT CONTRACT FROZEN；S4-02 PASS/CLOSED；DESIGN ONLY；implementation 未授权 | 唯一入口 S4-03 Design Review |
+| 4 | 关卡/奖励/商店/笨笨 | PRODUCT CONTRACT FROZEN；S4-02/03 PASS/CLOSED；SAVE V3 CONTRACT FROZEN；implementation NOT STARTED / writer DISABLED | 唯一入口 S4-04 DTO/Validation/Pure Migration；本轮不执行 |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
