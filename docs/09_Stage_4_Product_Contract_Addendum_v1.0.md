@@ -69,7 +69,7 @@
 | Attempt | Board/Run、RunItemState、Reward placement/payload/claimed、terminal settlement fact |
 | Derived | unlocked levels、eligibility queries、shop affordability、remaining quotas |
 
-不得建立 separate LevelProgress aggregate、Reward store、Shop state、Benben save 或 second Account truth。保持 Runtime 与 DTO 分离。原 S4-01B 未决定的 nullable attempt 与 Item API 兼容方向现已由 S4-02 批准，见 §9；具体 persistent facts / Save 编码留 S4-03 设计，当前均未实现。
+不得建立 separate LevelProgress aggregate、Reward store、Shop state、Benben save 或 second Account truth。保持 Runtime 与 DTO 分离。nullable attempt 与 Item API 兼容方向见 §9；S4-03 已批准的 persistent facts / Save 编码见 §10，当前均未实现。
 
 ## 8. Reward farming / known limitations
 
@@ -93,10 +93,218 @@ Elio 已人工验收批准 S4-02 Authoritative Aggregate & Lifecycle Foundation 
 - 尚未实现：nullable currentAttempt Runtime、AttemptState、expanded Account、Coins、completedLevelIds、Reward facts、terminal settlement、Benben persistent facts、Save v3、新 Stage 4 mutation boundary。Save v3 尚不可写，本轮不提前冻结 schema 或创建字段。
 - Validation/recovery：未来回归须覆盖 Stage 3 Item 行为、Account 非库存字段保留、account-only、旧对象配新 revision、终局幂等/legacy exclusion、Refresh/Restart/Retry。此次 production/test/config/schema changes = 0；文档收尾经 local quality、独立 Reviewer、PR/Linux/main gate。可独立 revert closeout 文档提交，不移动 frozen tags。
 
-## 10. 唯一后续入口 / Recovery checklist
+## 10. S4-03 Persistent Facts & Save v3 Contract — PASS / CLOSED (2026-09-11)
 
-**Stage 4 / S4-03 — Persistent Facts & Save v3 Contract Design Review**
+**DESIGN CONTRACT APPROVED / SAVE V3 CONTRACT FROZEN**。Elio 已人工审计批准设计，并批准本 documentation/freeze closeout。Save v3 implementation = **NOT STARTED**；authoritative write = **DISABLED**；尚未接入 production persistence。以下类型和转换仅是合同，不是已实现能力。
 
-DESIGN ONLY / IMPLEMENTATION NOT AUTHORIZED。S4-02 已关闭，本次仅同步批准结论，不执行 S4-03 设计。
+### 10.1 Change control / authority
 
-新 AI 从 AGENTS -> Specification + 本批准合同 -> Protocol -> PROJECT_STATUS -> Git history/tag，应能恢复 Stage 0–3 FROZEN、Stage 3 baseline、Stage 4 产品合同、S4-02 PASS、future account + nullable currentAttempt、无 fake Run、Stage 3 行为不变、settlement 不复制 outcome、Save v3 未实现且不可写，以及唯一 S4-03 设计入口。既有 P1–P4、迁移方向和 farming 风险继续有效。
+- 起始基线：`02ec62e0a643679ed68cbfb3d5675744b9034f9e`；Stage 3 annotated frozen tag 仍为 `063ae81c9d49306f69d5d728ba4fcb03ea9687cc`。Stage 0–3 tags 不移动。
+- Reason：在新账户/attempt 事实进入 Runtime 前冻结完整持久化解释，避免 inventory-only 重建丢字段、临时 v3、历史结算伪造与旧对象配新 revision。
+- Affected boundary：未来 Stage 3 aggregate/API shape 与新的 v3 显式 DTO；不是对 v1/v2 解释、Board/Cell、Item gameplay、RNG 或 Stage 2 authority 的静默变更。P1–P4 不变。
+- 本节为唯一 S4-03 合同正文，PROJECT_STATUS 仅索引/摘要；不另建重复 authority，不改 frozen Specification。
+- 兼容/迁移、验证/回归和首次 writer gate 见下文；未来实施逐 Task 经过 Design -> Attack -> Freeze -> Implementation -> Test -> Reverse Scan -> independent Reviewer -> PR/CI。
+- 本收尾只改 authority/status 文档，production/tests/config/runtime/schema implementation = 0。可独立 revert 文档 PR；不能移动 tags 或通过降级覆盖存档。实际 review/quality/CI 证据由 closeout PR/Git history 检索，不预称通过。
+
+### 10.2 Runtime ownership / persistent fact inventory
+
+未来唯一 Runtime 为 `GameState { account, currentAttempt: AttemptState | null }`。Account 始终存在；null 为真实 account-only，非 null 为唯一完整 current attempt。禁止 fake waiting Run、多 resumable attempts、run/runItems 各自 nullable 或第二套 aggregate。revision 属于 persistence context，不能进入 Account/Attempt/Run。
+
+| Fact / unique owner | Approved consumer / reason to persist | Migration default | Invariant |
+|---|---|---|---|
+| Account.inventory | 四 Item、Reward、Shop；资产跨局保留 | 保留真实库存 | 四种库存均 nonnegative safe integer |
+| Account.coins | Reward、Shop；资产跨局保留 | 0，新经济起点，不补发 | nonnegative safe integer |
+| Account.completedLevelIds | P1 解锁、Replay | []，不猜历史 | stable IDs unique |
+| Account.oneTimeClaimIds | 首次固定奖励防重复 | []，不猜领取 | stable IDs unique |
+| Account.benbenByLevel | P2/P3 按关永久援助资格 | []，无历史 | levelId unique，canonical status/streak |
+| Attempt.runId / levelId | 命令身份、同局恢复、新局替换 | 原值 | stable nonempty IDs |
+| Attempt.generationProvenance | 既有 generation/Restart/Retry 兼容 | 原值；缺失为 null | seed uint32，version IDs 合法 |
+| Attempt.run | Board、position、phase、encounter、first-step | 原样映射 | 复用唯一 Board/Run validators |
+| Attempt.runItems | 四 Item 额度、Detection 生命周期 | 原值，包括 null seed | 既有额度/seed invariant |
+| Attempt.rewards | 开局固定隐藏奖励及原子领取 | []，不补历史 Reward | 唯一 Safe coordinate、payload、claimed |
+| Attempt.terminalDisposition | terminal 处理一次或 legacy exclusion | 按 phase，见迁移表 | 不复制 outcome |
+
+所有事实在 Refresh/reopen 精确保持。Restart/Retry、Next Level、Replay 保留 Account，整体重建 Attempt；同关 Restart/Retry 保留既有不同雷图、新 runId、N+1。abandon 成功后只清 currentAttempt；返回菜单不改变 authority。Run 与 RunItemState 同生共存；run 内 Board/position/phase/encounter 不在 Attempt 再复制。
+
+unlocked levels、affordability、remaining item quotas、Benben eligibility queries 为 derived，不持久化。不增加 best score、purchase/transaction/gameplay/recommendation/multiple-run history、UI tutorial progress、animation state、generic metadata、futureData、extension bag。
+
+### 10.3 Account contract
+
+inventory 和 coins 的每次运算均检查 safe integer/非负；overflow 整笔拒绝，不 clamp、不部分结算。completed/claim IDs 与 Benben level records 不得重复，不静默去重。
+
+stable ID 是非空字符串，沿用既有非空验证含义并保持原值，不通过 trim/改名修复。未知但结构合法的历史 levelId/claim ID 必须保留；catalog 缺失不等于存档结构损坏，不能删除事实。依赖未知/已删除内容的 start/generation/eligibility 必须安全拒绝，不凭空解锁或补历史；catalog 重排/删除需独立兼容评估。
+
+未来 Item 库存更新必须保留 coins、completedLevelIds、oneTimeClaimIds、benbenByLevel。批准小型纯 immutable primitive（如 `replaceInventory(account, inventory)`）加完整 Account 验证；禁止只用 inventory 重建整个扩展 Account，也禁止 AccountManager、patch/deep-merge engine。当前 inventory-only 构造方式尚未在本 Task 修改。
+
+### 10.4 Benben canonical persisted model / deterministic selection
+
+每 level 一条 `{ levelId, failureStreak, status }`，status 仅 `unavailable | available | used`。缺失记录表示无已记录失败/资格，不伪造 history。
+
+- unavailable：failureStreak 为 nonnegative safe integer；**只有此状态继续累计最终 Failure**。达到配置阈值时同次转换为 available，且 failureStreak = 0。
+- available：failureStreak **必须为 0**；entitlement 已存在，后续失败不再累计。
+- used：failureStreak **必须为 0**；永久 used，后续 Failure/Replay 不得重新发 entitlement。
+- 完成该关：streak = 0；available/used 保持。Retry/Restart/abandon/pending/Lucky success/Revive success 不增加 streak。
+- load 不根据当前阈值撤销或自动生成 entitlement；canonical 验证不猜过去阈值。旧存档迁移不制造 Benben history。
+- 没有独立领取券状态：成功揭雷与 available -> used 同 candidate/commit；暂不使用保留 available。不存完整失败历史、地图缓存、推荐位置、对话。
+- 仅 active + on-board/occupancy；统一八邻域排除中心、边缘裁剪，Hidden Mine only；优先未插旗，否则已插旗；每组取 **deterministic row-major 第一个**，通过统一 revealMine。
+- 不新增 persisted RNG/seed/version；不消费 Mine RNG、不读取或推进 Detection seed。不把确定性顺序宣称为随机。
+- 无目标或 persistence failure：Board/entitlement/used 不变；不扣 Detection 库存、不占 Detection usage。
+
+### 10.5 Reward facts / RNG isolation
+
+- Reward 不进入 Cell。每 attempt 每 coordinate 最多一条；identity 为 `runId + coordinate`，无 rewardId。
+- 字段仅 coordinate、payload、claimed、`oneTimeClaimId: string | null`。null 为普通奖励；非 null 连接 Account 永久一次性领取事实，不是扩展袋。
+- payload 为 coins + positive safe integer amount，或 item（lucky/detection/airplane/revive）+ positive safe integer quantity。
+- coordinate/payload 在 attempt creation 时固定；Refresh 不重抽、不按 catalog/balance 变化重新解释。无 safe/mine/explored 副本，合法性查询同一 Board。
+- Reward generation 从实际采用的 generation seed 经固定 domain separation 派生独立 RandomSource 实例，不消费 Mine RandomSource，不改 Stage 1 调用顺序或 golden coordinates。常量/确定性向量留 Reward generation implementation Task 冻结。
+- 最终 coordinate + payload 已保存，因此 v3 不保存 reward seed、RNG internal state 或 RNG version。既有 provenance 字段的旧含义不变；缺失 provenance 不补 seed、不生成历史 Reward。
+
+### 10.6 Terminal / legacy contract
+
+Run.phase 是唯一 gameplay outcome。terminalDisposition 仅表示 Stage 4 账户/progression 是否处理，不复制 won/failed。
+
+| Run phase / source | Required disposition |
+|---|---|
+| active / pending | not-applicable |
+| 新 Stage 4 won / failed | settled |
+| 旧 v1/v2 migrated won / failed | legacy-excluded |
+
+无正常 committed won/failed + unsettled。新终局在同一 candidate 中完成 Run outcome + 适用 Reward settlement + Account/progression/failure-streak effect + settled；无独立 completion payout。失败不得发布任何半完成 candidate。
+
+legacy-excluded 是“不追溯 Stage 4 settlement”，不是已发奖励/completed/streak 的声明，也不是 pending。reopen 不补历史。legacy terminal 可菜单导航/dismiss；legacy failed Retry 仍受既有资格/生成检查；Replay/start 仍受 P1 资格检查，不能因旧 won 自动补 completed、解锁或改 active。新局不继承 disposition；旧非终局日后真实产生的新 outcome 与追溯旧终局不同。
+
+### 10.7 Complete Save v3 DTO interpretation (contract only)
+
+所有列出字段 required；只有显式 `| null` 可 null。所有对象/联合分支 strict unknown-field rejection，无 arbitrary object。以下记号不是 production TypeScript/validator：N = nonnegative safe integer；P = positive safe integer；U32 = integer 0..4294967295；ID = stable nonempty string。数组不得稀疏或含非法元素。
+
+```text
+SaveDocumentV3 {
+  saveVersion: literal 3,
+  revision: N,
+  account: AccountDTO,
+  currentAttempt: AttemptDTO | null
+}
+AccountDTO {
+  inventory: { lucky: N, detection: N, airplane: N, revive: N },
+  coins: N,
+  completedLevelIds: ID[],
+  oneTimeClaimIds: ID[],
+  benbenByLevel: { levelId: ID, failureStreak: N,
+                   status: unavailable | available | used }[]
+}
+AttemptDTO {
+  runId: ID,
+  levelId: ID,
+  generationProvenance: { seed: U32, rngVersion: ID, generationVersion: ID } | null,
+  run: RunDTO,
+  runItems: { successfulDetectionUses: integer 0..2,
+              successfulAirplaneUses: integer 0..1,
+              successfulReviveUses: integer 0..1,
+              detectionRandomSeed: U32 | null },
+  rewards: RewardDTO[],
+  terminalDisposition: not-applicable | settled | legacy-excluded
+}
+CoordinateDTO { x: N, y: N }
+BoardDTO {
+  dimensions: { width: P, height: P },
+  cells: { terrain: playable | obstacle, containsMine: boolean,
+           explored: boolean, mineRevealed: boolean, flagged: boolean }[]
+}
+RunDTO {
+  board: BoardDTO,
+  characterPosition:
+    { kind: waiting }
+    | { kind: on-board, coordinate: CoordinateDTO }
+    | { kind: revealed-mine-occupancy, coordinate: CoordinateDTO },
+  hasTakenStep: boolean,
+  phase:
+    { kind: active }
+    | { kind: pending-mine-encounter, encounter: EncounterDTO }
+    | { kind: failed, encounter: EncounterDTO }
+    | { kind: won }
+}
+EncounterDTO { target: CoordinateDTO, occurredOnFirstStep: boolean }
+RewardDTO {
+  coordinate: CoordinateDTO,
+  payload: { kind: coins, amount: P }
+           | { kind: item, item: lucky | detection | airplane | revive, quantity: P },
+  claimed: boolean,
+  oneTimeClaimId: ID | null
+}
+```
+
+Board cells 继续 row-major、精确 width * height 数量和现有 dimensions/Cell legality；这些不是第二套规则。NaN/Infinity/fractional/unsafe 数值拒绝。类型记号不能代替 runtime validation。
+
+### 10.8 Strict cross-field validation / reconstruction
+
+- 验证 Account 数值/ID unique/Benben level unique；available/used + 非零 streak 必须拒绝。
+- Attempt 必须 null 或完整；Run/RunItem 同时存在，identity/provenance 合法。复用现有 Board validator、Run constructors/invariants、RunItem validation，不复制 legality。
+- Reward 必须 inside Board 且位于 Safe；重复 coordinate、重复非 null oneTimeClaimId、非法 payload 拒绝。Reward 不复制底层 truth。
+- committed Reward 的 claimed 与该 Safe explored 必须一致。已领取 oneTime Reward 必须有 Account claim；未领取但 Account 已有对应 claim 拒绝。Account 中不属于当前 attempt 的历史 claims 可保留。
+- terminalDisposition 与 phase 按上表一致；新 settled won 必须记录该 level completed，当前该 level Benben streak 清零。won 不得留 unclaimed Safe Reward。
+- ordinary on-board -> explored Safe；occupancy -> Revealed Mine 且已 step；pending/failed encounter -> 真实未插旗 Hidden Mine；first-step、won 等复用冻结不变量，不从位置重猜历史。
+- 非法数据 reject，不 clamp、去重、auto repair、auto reward、auto completion。校验错误携带稳定 code/path，不塞 UX 文案。
+- claimed 后资产可能已消费，不能凭余额反推领取历史；原子资产变化由 command/commit 测试证明，不为此造账本。legacy-excluded 的历史真实性也不是本地 JSON 能密码学证明的；正常构造/迁移入口与回归保障，不宣称防篡改。
+
+### 10.9 Read-only migration / explicit mapping
+
+| v2 input | v3 result |
+|---|---|
+| revision / inventory | 原值完整复制 |
+| 新 Account facts | coins = 0；completedLevelIds/oneTimeClaimIds/benbenByLevel = [] |
+| activeRun null | currentAttempt null，无假 Run/Board/RunItemState |
+| activeRun object | 完整 Attempt；runId/levelId/Board/position/phase/encounter/hasTakenStep/RunItem usage/Detection seed 保留 |
+| existing provenance / absent | 原值 / null，不伪造 seed |
+| 历史 Reward | rewards = []，不生成/补发 |
+| active / pending | not-applicable |
+| won / failed | legacy-excluded |
+
+唯一 v2 migration：strict validated v2 -> pure v3 DTO -> strict v3 validation/reconstruction。v1 必须 strict v1 -> existing pure v1→v2 -> strict validated v2 -> pure v2→v3 -> strict v3 -> reconstruction；无 shortcut、registry/graph/generic migration engine。v1→v2、v1/v2 schema/byte interpretation 保持冻结。
+
+Migration 不调用 RNG、不增 revision、不写 storage/slot/head、不补 Reward/completion/assets/Benben history；load 是只读迁移，首次真实 mutation 且 writer gate 已完成后才提交 v3。保留 source version、migration issue 和 backup recovery provenance；invalid/corrupt/unsupported != no-save。
+
+Runtime -> explicit mapper -> DTO -> JSON；load JSON -> version dispatch -> strict version DTO validation -> 必要 migration -> strict current validation -> constructors -> Runtime。禁止 JSON.stringify(GameState)、JSON.parse(...) as GameState/BoardState；arrays/coordinates/payload/Benben records 无 shared mutable aliases。revision 与 storage envelope 一致。
+
+account-only 是完整合法 Save v3；未来支持 Shop/level selection/progression query/start-Replay eligibility，gameplay mutation/Retry/pending resolution 明确拒绝。无当前脚下数字，不伪造 waiting 局。
+
+### 10.10 First writable gate / Stage 3 compatibility / identity
+
+**CONTRACT FROZEN != WRITER ENABLED。本收尾后 authoritative v3 writes 仍 DISABLED。** 当前正式 Runtime/production saves 继续 v2；禁止临时 v3 writer，也禁止新增 Runtime 事实经 v2 丢字段保存。
+
+最终接线 Task 原子切换 Runtime 与完整 v3 persistence。首次 authoritative v3 write 必须完成全部门禁：
+
+1. 完整 DTO、strict structural/cross-field validation。
+2. 纯 v2→v3 及既有 v1→v2→v3 路径。
+3. Aggregate Runtime、mapper/reconstruction、account-only round-trip。
+4. Stage 3 Item 保留完整 Account；Reward/terminal 合法状态无丢失/半保存。
+5. 现有 guarded coordinator v3 接入；revision/lease/A-B regression；旧对象配新 revision 防线。
+6. full quality、independent Reviewer PASS、Linux Quality Success，按 PR/main gate 验证。
+
+可达转换必须满足本节的原子合法状态；不得用跳过验证/静默丢事实来通过 gate。若后续 Task 实施发现 gate 依赖未具备，停止报告，不提前开放 writer，也不越权实现后续玩法。完整解释在首次真实写入前冻结；写出真实 v3 后不得同号静默改义，真正新持久语义需显式 compatibility/version decision。
+
+Stage 3 保持 Lucky first-step automatic priority、Detection target priority/usage 2/seed lifecycle、Revive pending-only/usage 1、Airplane clipped 3×3/usage 1、occupancy/movement/Victory、Refresh、Restart/Retry 和 Mine RNG golden。任何 inventory update 保留 coins/completed/claims/Benben；无 Item 专属 State/Manager/framework/新 persistence。
+
+Stage 4 public mutation 仅以 intent + expectedRevision + expectedRunId/null -> read committed authority -> validate revision/attempt identity -> build candidate from current authority -> existing guarded commit -> publish after commit。不得接收 arbitrary old GameState + latest revision 覆盖 authority。revision gate 本身不证明 candidate 来源；fresh 0、existing N only N+1、second ownership verification 不变。此处仅接口原则，不实现 Repository/transaction engine/CommandBus。
+
+### 10.11 Approved implementation order / tests / risks
+
+| Task | Scope | Mandatory boundary |
+|---|---|---|
+| S4-04 | Save v3 DTO + strict structural/cross-field validation + pure v2→v3 migration | 不接 production writer、不切 Runtime；当前 runtime 继续工作、production saves 仍 v2 |
+| S4-05 | Aggregate Runtime + AttemptState + Account expansion + mapper/reconstruction + Stage 3 compatibility pure changes | 不开放半成品 writer；不能让 main 权威事实失去无损持久化能力 |
+| S4-06 | Runtime/persistence atomic switch；public mutation authority-source defense、coordinator v3 adaptation、authoritative writes、no-loss、old-version rejection | 必须先通过 §10.10 first writable gate，不得降级覆盖 |
+| S4-07 | v3 lifecycle / compatibility integration gate | 真实 migration/mutation/reopen/失败原子性证据 |
+
+之后按依赖批准 Level/Reward/Settlement/Shop/Benben 独立 tasks，不在本收尾执行。每个 Task 独立 review/PR/CI；先可独立验证的纯模块，最终原子接线，不能把 main 留成有损/不可用半成品。
+
+未来测试必须覆盖：strict unknown fields/数值/unique、Benben canonical states、Reward Mine/Obstacle/duplicate/claimed 冲突、terminal/legacy 组合、无追溯结算、account-only 无 fake Run、migration 零写盘/零增 revision/无 alias/无 seed 伪造、四 Item 完整 Account 保留、Reward RNG 不改 Mine golden、Benben 不改 Detection seed、旧 runId 配新 revision 拒绝、storage/lease/revision failure 无 candidate、backup provenance、Refresh/Restart/Retry/abandon-start。关键 mutation sanity（未来临时且必须恢复）需证明禁用 exclusion/identity、注入 migration 写盘、inventory-only 丢字段或共享 RNG 会让对应测试失败。
+
+保留限制：localStorage 无 atomic CAS/绝对 mutex、本地篡改不能彻底防止；4096 generation search 可安全耗尽；catalog 兼容需显式治理；farming 风险按 §8/FR-014，Phaser >500 KB 仍 observation。无 best score/history/metadata bags、第二套 Board/encounter truth 或 persistence。首次写 v3 后不能盲目回滚到 v2-only writer；旧版本不得把 unsupported v3 当 no-save 或用旧资产覆盖新数据。
+
+## 11. 唯一后续入口 / Recovery checklist
+
+**Stage 4 / S4-04 — Save v3 DTO, Strict Validation & Pure Migration Implementation**
+
+S4-02 与 S4-03 PASS/CLOSED；Save v3 CONTRACT FROZEN，implementation NOT STARTED，authoritative write DISABLED。本 S4-03 closeout 完成即停止，等待人工验收，不执行 S4-04。
+
+新 AI 仅从 AGENTS -> Specification + 本批准合同 -> Protocol -> PROJECT_STATUS -> Git history/tag，必须恢复：Stage 0–3 FROZEN、Stage 4 产品合同、S4-02 CLOSED、S4-03 CONTRACT FROZEN、未来 GameState/account-only、§10.2 exact facts、Benben canonical model/无 RNG、Reward/独立 RNG、terminal/legacy exclusion、v2 defaults/v1 chain、writer disabled、Stage 3 compatibility、identity/revision principle、S4-04 至 S4-07 顺序及唯一 S4-04 入口。缺口只修 authority docs，不借恢复检查开始实施。
