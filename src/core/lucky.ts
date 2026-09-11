@@ -1,4 +1,4 @@
-import { createAccountState } from './account';
+import { replaceInventory } from './account';
 import { resolvePendingMineEncounterAsSurvived } from './encounter';
 import { createGameState, type GameState } from './game-state';
 
@@ -26,7 +26,7 @@ export function createLuckyCandidate(input: GameState): LuckyCandidateResult {
   return {
     status: 'candidate',
     candidate: createGameState({
-      account: createAccountState({ ...account.inventory, lucky: account.inventory.lucky - 1 }),
+      account: replaceInventory(account, { ...account.inventory, lucky: account.inventory.lucky - 1 }),
       run: survival.state,
       runItems: game.runItems,
     }),

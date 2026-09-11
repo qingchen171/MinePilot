@@ -32,3 +32,14 @@ export function createItemInventoryState(input: ItemInventoryState): ItemInvento
 export function createAccountState(inventory: ItemInventoryState): AccountState {
   return Object.freeze({ inventory: createItemInventoryState(inventory) });
 }
+
+/** Replaces only inventory while preserving every fact owned by the account. */
+export function replaceInventory<TAccount extends AccountState>(
+  account: TAccount,
+  nextInventory: ItemInventoryState,
+): TAccount & { readonly inventory: ItemInventoryState } {
+  return Object.freeze({
+    ...account,
+    inventory: createItemInventoryState(nextInventory),
+  });
+}

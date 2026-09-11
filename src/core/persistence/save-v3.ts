@@ -1,4 +1,12 @@
-import { getCellAt, type Coordinate } from '../board';
+import type { Coordinate } from '../board';
+import {
+  createRewardState,
+  getRewardBoardCompatibilityIssue,
+  isPositiveSafeInteger,
+  isRewardItem,
+} from '../reward';
+import { isStableId } from '../stable-id';
+import { isTerminalDisposition, isTerminalDispositionLegalForRunPhase } from '../terminal-disposition';
 import type { BoardSaveV1, GenerationProvenanceSaveV1, RunPhaseSaveV1 } from './save-v1';
 import { loadSaveDocument } from './save-dispatcher';
 import {
@@ -86,7 +94,7 @@ function natural(input: unknown, path: string, positive = false): number {
   return input;
 }
 function stableId(input: unknown, path: string): string {
-  if (typeof input !== 'string' || input.trim().length === 0) reject('invalid-id', path);
+  if (!isStableId(input)) reject('invalid-id', path);
   return input;
 }
 function array(input: unknown, path: string): unknown[] {
@@ -130,16 +138,24 @@ function reward(input: unknown, i: number): RewardSaveV3 {
   let payload: RewardSaveV3['payload'];
   if (raw.kind === 'coins') {
     const parsed = record(raw, ['kind', 'amount'], `${path}.payload`);
-    payload = { kind: 'coins', amount: natural(parsed.amount, `${path}.payload.amount`, true) };
+    if (!isPositiveSafeInteger(parsed.amount)) reject('invalid-number', `${path}.payload.amount`);
+    payload = { kind: 'coins', amount: parsed.amount };
   } else if (raw.kind === 'item') {
     const parsed = record(raw, ['kind', 'item', 'quantity'], `${path}.payload`);
     const item = parsed.item;
-    if (item !== 'lucky' && item !== 'detection' && item !== 'airplane' && item !== 'revive') {
-      reject('invalid-reward', `${path}.payload.item`);
-    }
-    payload = { kind: 'item', item, quantity: natural(parsed.quantity, `${path}.payload.quantity`, true) };
+    if (!isRewardItem(item)) reject('invalid-reward', `${path}.payload.item`);
+    if (!isPositiveSafeInteger(parsed.quantity)) reject('invalid-number', `${path}.payload.quantity`);
+    payload = { kind: 'item', item, quantity: parsed.quantity };
   } else reject('invalid-reward', `${path}.payload.kind`);
-  return { coordinate: { x, y }, payload, claimed: value.claimed, oneTimeClaimId };
+  const state = createRewardState({ coordinate: { x, y }, payload, claimed: value.claimed, oneTimeClaimId });
+  return {
+    coordinate: { x: state.coordinate.x, y: state.coordinate.y },
+    payload: state.payload.kind === 'coins'
+      ? { kind: 'coins', amount: state.payload.amount }
+      : { kind: 'item', item: state.payload.item, quantity: state.payload.quantity },
+    claimed: state.claimed,
+    oneTimeClaimId: state.oneTimeClaimId,
+  };
 }
 
 function validate(input: unknown, migratedLegacy: boolean): ValidateSaveDocumentV3Result {
@@ -184,9 +200,9 @@ function validate(input: unknown, migratedLegacy: boolean): ValidateSaveDocument
         const key = `${entry.coordinate.x},${entry.coordinate.y}`;
         if (coordinates.has(key)) reject('invalid-reward', `${path}.coordinate`);
         coordinates.add(key);
-        const cell = getCellAt(shared.activeRun.gameState.run.board, entry.coordinate);
-        if (cell?.kind !== 'safe') reject('invalid-reward', `${path}.coordinate`);
-        if (entry.claimed !== (cell.exploration === 'explored')) reject('invalid-reward', `${path}.claimed`);
+        const boardIssue = getRewardBoardCompatibilityIssue(entry, shared.activeRun.gameState.run.board);
+        if (boardIssue === 'invalid-coordinate') reject('invalid-reward', `${path}.coordinate`);
+        if (boardIssue === 'claimed-mismatch') reject('invalid-reward', `${path}.claimed`);
         if (entry.oneTimeClaimId !== null) {
           if (claims.has(entry.oneTimeClaimId)) reject('duplicate-id', `${path}.oneTimeClaimId`);
           claims.add(entry.oneTimeClaimId);
@@ -194,11 +210,12 @@ function validate(input: unknown, migratedLegacy: boolean): ValidateSaveDocument
         }
       }
       const terminalDisposition = rawAttempt.terminalDisposition;
-      const terminal = copied.phase.kind === 'won' || copied.phase.kind === 'failed';
-      if (terminalDisposition !== 'not-applicable' && terminalDisposition !== 'settled' && terminalDisposition !== 'legacy-excluded') {
+      if (!isTerminalDisposition(terminalDisposition)) {
         reject('invalid-terminal-disposition', '$.currentAttempt.terminalDisposition');
       }
-      if (terminal === (terminalDisposition === 'not-applicable')) reject('invalid-terminal-disposition', '$.currentAttempt.terminalDisposition');
+      if (!isTerminalDispositionLegalForRunPhase(copied.phase, terminalDisposition)) {
+        reject('invalid-terminal-disposition', '$.currentAttempt.terminalDisposition');
+      }
       if (terminalDisposition === 'legacy-excluded' && !migratedLegacy) reject('legacy-migration-required', '$.currentAttempt.terminalDisposition');
       if (copied.phase.kind === 'won' && terminalDisposition === 'settled') {
         if (!completedLevelIds.includes(copied.levelId) ||
