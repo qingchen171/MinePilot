@@ -1,4 +1,4 @@
-import { createAccountState } from './account';
+import { replaceInventory } from './account';
 import { getCellAt, type Coordinate } from './board';
 import { createGameState, type GameState, type ItemTransactionResult } from './game-state';
 import { getNeighborCoordinates } from './neighborhood';
@@ -56,7 +56,7 @@ export function createDetectionCandidate(
   return {
     status: 'candidate',
     candidate: createGameState({
-      account: createAccountState({ ...account.inventory, detection: account.inventory.detection - 1 }),
+      account: replaceInventory(account, { ...account.inventory, detection: account.inventory.detection - 1 }),
       run: createRunState(revealed.board, run.characterPosition, { hasTakenStep: run.hasTakenStep, phase: run.phase }),
       runItems: createRunItemState({
         ...runItems,

@@ -1,4 +1,4 @@
-import { createAccountState } from './account';
+import { replaceInventory } from './account';
 import { createCellState, getCellAt, isCoordinateInBoard, replaceCellAt, type Coordinate } from './board';
 import { createGameState, type GameState, type ItemTransactionResult } from './game-state';
 import { getNeighborCoordinates } from './neighborhood';
@@ -42,7 +42,7 @@ export function createAirplaneCandidate(game: GameState, target: Coordinate): Ai
   return {
     status: 'candidate',
     candidate: createGameState({
-      account: createAccountState({ ...account.inventory, airplane: account.inventory.airplane - 1 }),
+      account: replaceInventory(account, { ...account.inventory, airplane: account.inventory.airplane - 1 }),
       run: victory.outcome === 'won' ? victory.state : changedRun,
       runItems: createRunItemState({ ...runItems, successfulAirplaneUses: runItems.successfulAirplaneUses + 1 }),
     }),

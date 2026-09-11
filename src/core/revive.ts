@@ -1,4 +1,4 @@
-import { createAccountState } from './account';
+import { replaceInventory } from './account';
 import { resolvePendingMineEncounterAsSurvived } from './encounter';
 import { createGameState, type GameState, type ItemTransactionResult } from './game-state';
 import { createRunItemState } from './run-item-state';
@@ -32,7 +32,7 @@ export function createReviveCandidate(game: GameState): ReviveResult {
   return {
     status: 'candidate',
     candidate: createGameState({
-      account: createAccountState({ ...account.inventory, revive: account.inventory.revive - 1 }),
+      account: replaceInventory(account, { ...account.inventory, revive: account.inventory.revive - 1 }),
       run: survival.state,
       runItems: createRunItemState({ ...runItems, successfulReviveUses: runItems.successfulReviveUses + 1 }),
     }),

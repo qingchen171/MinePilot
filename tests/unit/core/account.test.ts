@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createAccountState,
   createItemInventoryState,
+  replaceInventory,
   type ItemInventoryState,
 } from '../../../src/core/account';
 
@@ -47,5 +48,24 @@ describe('Account item inventory foundation', () => {
     (input as { lucky: number }).lucky = 99;
 
     expect(state.inventory.lucky).toBe(1);
+  });
+
+  it('replaces inventory immutably while preserving facts owned by an expanded account', () => {
+    const account = Object.freeze({
+      ...createAccountState(inventory()),
+      futureFact: Object.freeze({ value: 7 }),
+    });
+    const next = inventory({ lucky: 0 });
+    const replaced = replaceInventory(account, next);
+
+    expect(replaced).not.toBe(account);
+    expect(replaced.inventory).toEqual(next);
+    expect(replaced.futureFact).toBe(account.futureFact);
+    expect(account.inventory.lucky).toBe(1);
+    expect(Object.isFrozen(replaced)).toBe(true);
+    expect(Object.isFrozen(replaced.inventory)).toBe(true);
+
+    (next as { lucky: number }).lucky = 99;
+    expect(replaced.inventory.lucky).toBe(0);
   });
 });
