@@ -303,8 +303,8 @@ Stage 4 public mutation 仅以 intent + expectedRevision + expectedRunId/null ->
 
 ## 11. 唯一后续入口 / Recovery checklist
 
-**Stage 4 / S4-04 — Save v3 DTO, Strict Validation & Pure Migration Implementation**
+**Stage 4 / S4-05 — Aggregate Runtime, AttemptState & Runtime↔DTO Foundation Design Review**
 
-S4-02 与 S4-03 PASS/CLOSED；Save v3 CONTRACT FROZEN，implementation NOT STARTED，authoritative write DISABLED。本 S4-03 closeout 完成即停止，等待人工验收，不执行 S4-04。
+S4-02 CLOSED、S4-03 CONTRACT FROZEN、S4-04 PASS/CLOSED（implementation baseline `24724e527e030e49db3bbcca7919d281c74920ef`）。v3 DTO/strict validation/pure migration 已实现，production Runtime 尚未实现，authoritative writer DISABLED，CURRENT_SAVE_VERSION 仍为 2。当前仅 DESIGN REVIEW ONLY / IMPLEMENTATION NOT AUTHORIZED；§10.11 是依赖规划，不跳过 S4-05 的 Design → Attack → Freeze。本 closeout 停止，不执行 S4-05。
 
-新 AI 仅从 AGENTS -> Specification + 本批准合同 -> Protocol -> PROJECT_STATUS -> Git history/tag，必须恢复：Stage 0–3 FROZEN、Stage 4 产品合同、S4-02 CLOSED、S4-03 CONTRACT FROZEN、未来 GameState/account-only、§10.2 exact facts、Benben canonical model/无 RNG、Reward/独立 RNG、terminal/legacy exclusion、v2 defaults/v1 chain、writer disabled、Stage 3 compatibility、identity/revision principle、S4-04 至 S4-07 顺序及唯一 S4-04 入口。缺口只修 authority docs，不借恢复检查开始实施。
+新 AI 仅从 AGENTS -> Specification + 本批准合同 -> Protocol -> PROJECT_STATUS -> Git history/tag，必须恢复：Stage 0–3 FROZEN、Stage 4 产品合同、S4-02 CLOSED、S4-03 CONTRACT FROZEN、S4-04 DTO-only CLOSED、未来 GameState/account-only、§10.2 exact facts、Benben canonical model/无 RNG、Reward/独立 RNG、terminal/legacy exclusion、v2 defaults/v1 chain、writer disabled/version 2/旧 Runtime、Stage 3 compatibility、identity/revision principle、S4-04 至 S4-07 依赖顺序及唯一 S4-05 Design Review 入口。Stable ID nonblank 检查不改变原值；legacy-excluded 后续可信 Runtime/load/writer 接线不得放宽普通 v3 验证，具体约束与 implementation evidence 见 PROJECT_STATUS S4-04。缺口只修 authority docs，不借恢复检查开始实施。本节只同步当前进度/入口，不改变 §9–10 frozen schema/authority 合同。
