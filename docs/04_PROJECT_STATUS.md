@@ -197,9 +197,20 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-05 — Runtime Value & Validation Foundation Implementation**
+**Stage 4 / S4-06 — Reward Compatibility Design Review**
 
-**IMPLEMENTATION SCOPE FROZEN；本 closeout 不执行。** 允许小型 Account domain/value construction、`replaceInventory`、Reward runtime value construction/validation、terminal-disposition runtime value/validation、必要纯 validation primitives 与 targeted tests。禁止切换 production `GameState` root、创建第二套完整 future GameState authority、接线 Reward/terminal settlement gameplay、启用 v3 production load/write、修改 `CURRENT_SAVE_VERSION`、实现 Reward generator、Shop、Level 或 Benben gameplay。authoritative v3 writer 在 S4-08 前始终 DISABLED；UI/Phaser presentation/animation/audio 仍属于 Stage 5。
+**DESIGN REVIEW ONLY / IMPLEMENTATION NOT AUTHORIZED。** 只设计 movement / Airplane 如何在同一原子 candidate 中处理 Reward claim、Coins/Item grant、`oneTimeClaimIds`、重复领取防线、persistence failure atomicity，以及最后一个 Safe 同时触发 Reward 与 Victory 的兼容顺序。禁止实现 Reward generation/drop、经济参数、Level、Shop、Benben gameplay、UI，禁止启用 v3 production writer；S4-08 前 writer 始终 DISABLED。
+
+### Stage 4 / S4-05 — Runtime Value & Validation Foundation Implementation — PASS / CLOSED
+
+- 人工验收结论：`PASS — S4-05 FOUNDATION IMPLEMENTED, V3 WRITER STILL DISABLED`。Implementation commit `bc38b094d814b077951f5e5ffc2171ecda388287`；PR #24；merged stable main baseline `5ecb4b5d5f51b7fa50c2168c6a1ea87f27762473`。
+- 实现范围仅为小型 future Runtime value/validation foundation：扩展 Account value construction；`replaceInventory(account, inventory)` 不可变替换四种 Item 库存并保留 Coins、completed IDs、one-time claims、Benben facts；Reward 与 terminal-disposition runtime value construction/validation 已建立，但未接入 Reward claim、terminal settlement 或 production gameplay。
+- Future authority 方向不变：`GameState = account + currentAttempt | null`，但 production `GameState` root 尚未切换；没有创建第二套完整 future GameState authority。`legacy-excluded` 仍只能由可信旧版本迁移路径产生，普通 gameplay/外部 v3 不得伪造。
+- Writer 状态不变：Save v3 DTO/validator/migration 可复用这些 value contracts，但 production v3 load/write 仍 DISABLED，`CURRENT_SAVE_VERSION = 2`，Stage 2 coordinator/guarded persistence authority 未改变。S4-08 前不得启用 writer。
+- 已验收 implementation evidence：新增 targeted tests 27；Unit 630/630、Integration 82/82、Total 712/712；Architecture/TypeScript/Build PASS，Playwright 1/1 PASS。`replaceInventory` mutation sanity 在移除 Account facts 保留时使对应测试失败，恢复后 8/8 PASS，mutation 未提交。Independent Reviewer PASS；branch run `34576687054`、PR run `34576964399`、main run `34577091502` 均 Success。
+- Reverse Scan：无 production GameState root switch、v3 writer/version change、Reward/terminal gameplay、Reward generator、Shop/Level/Benben gameplay、Manager/Bus/framework、第二套 persistence path，Stage 0–3 frozen contracts 未修改。
+- 后续依赖顺序保持：`S4-06 Reward Compatibility -> S4-07 Terminal Compatibility -> S4-08 Atomic Runtime/V3 Activation -> S4-09 Compatibility Integration Gate`。Reward 与 terminal compatibility 必须先于 writer；所有既有操作必须无损保留 `benbenByLevel`。
+- Recovery：新 AI 仅从正式仓库资料与 Git history，必须恢复 Stage 0–3 FROZEN、S4-04 CLOSED、S4-05 Design/Implementation CLOSED、future Runtime 方向、上述 S4-06→S4-09 顺序、writer disabled/version 2，以及唯一 S4-06 Design Review。缺失时停止并只修 authority docs。
 
 ### Stage 4 / S4-05 — Aggregate Runtime & Lifecycle Foundation Design Review — PASS / CLOSED
 
@@ -211,7 +222,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 - First Writable Gate 依赖已重新审计：movement 与 Airplane 已能探索 Safe、产生 Victory；若在 Reward claim 与 terminal settlement compatibility 前启用 writer，将产生丢资产或 `won + not-applicable` 等非法候选。因此旧 writer-first 顺序不安全，禁止为保留旧计划放宽 Save v3 合同。
 - 冻结实施顺序：`S4-05 Foundation Implementation -> S4-06 Reward Compatibility -> S4-07 Terminal Compatibility -> S4-08 Atomic Runtime/V3 Activation -> S4-09 Compatibility Integration Gate`。S4-08 前 v3 production writer 始终 DISABLED。
 - Benben gameplay 不属于 writer 前置依赖；但所有现有操作必须无损保留 `benbenByLevel`，terminal settlement 必须处理冻结的 failure streak / entitlement 影响。Reward generator、Shop、Level 与 Benben gameplay 仍需后续独立批准。
-- Recovery：新 AI 仅从正式 repository authority、Git history 与 frozen tags，必须恢复 Stage 0–3 FROZEN、S4-04 CLOSED、S4-05 Design CLOSED、future Runtime direction、上述 S4-05→S4-09 顺序、Reward/terminal compatibility 先于 writer、v3 writer disabled，以及唯一 S4-05 Foundation Implementation。若缺失则只修 authority docs，不开始实现。
+- Design closeout 当时的 Recovery 要求：新 AI 仅从正式 repository authority、Git history 与 frozen tags，应能恢复 Stage 0–3 FROZEN、S4-04 CLOSED、S4-05 Design CLOSED、future Runtime direction、Reward/terminal compatibility 先于 writer 及 v3 writer disabled；当时入口为 S4-05 Foundation Implementation，现已完成。当前依赖顺序与唯一入口以上方当前状态为准。
 
 ### Stage 4 / S4-04 — Save v3 DTO, Strict Validation & Pure Migration — PASS / CLOSED
 
@@ -220,7 +231,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 - Writer 状态：v3 DTO/validator/migration IMPLEMENTED；v3 production Runtime NOT IMPLEMENTED；v3 authoritative writer DISABLED；CURRENT_SAVE_VERSION = 2。当前 GameState 仍为既有 `{ account, run, runItems }`，production persistence 继续正式 v2 Runtime/writer；能验证 v3 不代表游戏已使用 v3。
 - Stable ID 沿用 nonblank 语义：string 且 trim 后长度 > 0；whitespace-only 非法，trim 仅用于 validation，不修改/normalize/canonicalize ID。`" level-1 "` 原样 round-trip；duplicate 按原始 exact string equality，和 `"level-1"` 不同。所有 Stable ID 字段一致，v1/v2 解释不变。
 - Migration 只读：保留 revision、inventory、identity、Board/position/phase/encounter/Item facts；缺 provenance 与 Detection seed 保持 null，不补 seed=0；新增 approved fields 使用合同默认值，无 RNG、写盘、slot/head mutation、增 revision 或历史补发。旧 won/failed 为 legacy-excluded，不追溯补 completed/Coins/Reward/Benben failure history。
-- Legacy 后续约束：当前普通外部 v3 validator 拒绝自行声明 legacy-excluded，仅严格旧版本 migration 入口可产生。S4-05/S4-06 必须明确 migration-created legacy 如何进入 future Runtime、authoritative writer 是否及何时允许保存 legacy、如何可信恢复；不得因接线方便放宽普通 v3 terminal invariants。此为后续 integration constraint，不是 S4-04 blocker，本 closeout 不设计/实现。
+- Legacy 后续约束：当前普通外部 v3 validator 拒绝自行声明 legacy-excluded，仅严格旧版本 migration 入口可产生。后续 S4-08 Runtime/V3 activation 必须明确 migration-created legacy 如何进入 future Runtime、authoritative writer 是否及何时允许保存 legacy、如何可信恢复；不得因接线方便放宽普通 v3 terminal invariants。此为后续 integration constraint，不是 S4-04 blocker。
 - 已验收 implementation evidence（历史证据，非声称本轮重做 mutation）：新增 targeted 82/82；Unit 603/603、Integration 82/82、Total 685/685；Architecture/TypeScript/Build PASS，Playwright 1/1 PASS。六项 mutation（ID whitespace、legacy terminal、Mine Reward、revision、unknown field、null provenance）均实际使对应测试失败，恢复后 PASS，无 mutation 提交。Independent Reviewer PASS，独立重跑 82 tests。
 - Implementation CI：branch Linux Quality run `34569840682` Success；PR run `34569955475` Success；main run `34570112091` Success。可由 PR #20 / Git history 恢复。本轮 docs-only quality/Reviewer/PR/main CI 单独执行并记录在 closeout PR/最终报告，不冒用旧门禁。
 - Reverse Scan：无 GameState shape/Account runtime expansion、production AttemptState、v3 production mapper/reconstruction/writer/coordinator、Reward generation/claim、Shop/Level/Progression/Benben/terminal settlement gameplay、Manager/Bus/Repository。Stage 0–3 frozen behavior 未修改，Stage 3 gameplay 与 Stage 2 authority chain 保持。
@@ -240,7 +251,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 - Migration：strict v2 -> pure v3 -> strict validation/reconstruction；保留 revision/inventory/Run/Item/identity/provenance，coins=0，completed/claims/Benben/rewards=[]，缺 provenance=null。v1 必经既有 v1→v2；只读、无 RNG/写盘/增 revision/历史伪造。v1/v2 旧解释不变。
 - Writer gate：CONTRACT FROZEN != WRITER ENABLED。完整 DTO/validation/migration/aggregate/mapper/reconstruction/Item Account 保留/no-loss/guarded v3/identity 防线与 quality/Reviewer/Linux gate 完成才最终原子接线；不得让新事实被 v2 丢弃、不得临时 v3。现 writer DISABLED。
 - Stage 3 gameplay/occupancy/RNG/Refresh/Restart/Retry 不变。未来 public mutation = intent + expectedRevision + expectedRunId/null -> read committed authority -> validate -> candidate -> existing guarded commit -> publish；不信任 old GameState + latest revision，不创建 Repository/Bus/engine。
-- 已批准依赖顺序（历史规划，非当前编码授权）：S4-04 DTO/strict validation/pure migration；S4-05 aggregate/mapper/reconstruction/纯兼容；S4-06 atomic switch/authority defense/v3 coordinator；S4-07 lifecycle integration gate；之后 Level/Reward/Settlement/Shop/Benben 独立批准。当前唯一入口以本文顶部为准，S4-05 先 Design Review。任何 main commit 不得让 authority 无法无损保存；门禁依赖不足应停，不提前实现或开放 writer。
+- 本段所载早期实施顺序已被后续 S4-05 First Writable Gate 审计取代；当前依赖顺序与唯一入口以上方当前状态为准。任何 main commit 不得让 authority 无法无损保存；门禁依赖不足应停，不提前实现或开放 writer。
 - 本次 scope：仅本状态文件与现有 Addendum，production/tests/config/runtime/schema implementation/writer enablement = 0。Recovery 必须可从正式文档恢复 Addendum §11 全部 20 类事实；实际 local quality/independent Reviewer/branch-PR-main Linux 证据由本 closeout PR/Git history 与最终报告记录，不预称通过。
 - 已知限制保持：localStorage 非 atomic CAS、本地篡改、4096 搜索预算、catalog 兼容、farming/Phaser observation；不新增防刷或 speculative fields。回滚仅独立 revert 本 docs PR，不动 frozen tags。完成后停止，不进入 S4-04。
 
@@ -747,7 +758,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（§9–10 frozen contracts）、Protocol 和最新 PROJECT_STATUS。S4-04 PASS/CLOSED，S4-05 Design Review PASS/CLOSED；唯一下一行动为 S4-05 Runtime Value & Validation Foundation Implementation。只实施已冻结的小型 value/validation scope；不切 production GameState root、不接 Reward/terminal gameplay、不启用 v3 writer、不修改 CURRENT_SAVE_VERSION。后续顺序为 S4-06 Reward Compatibility、S4-07 Terminal Compatibility、S4-08 Atomic Runtime/V3 Activation、S4-09 Compatibility Integration Gate；完成当前 Task 后停止。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（§9–10 frozen contracts）、Protocol 和最新 PROJECT_STATUS。S4-04 与 S4-05 Design/Implementation 均 PASS/CLOSED；唯一下一行动为 S4-06 Reward Compatibility Design Review，且仅授权设计审查。设计 movement/Airplane 与 Reward claim、Coins/Item grant、oneTimeClaimIds、重复领取、失败原子性及 Victory 同步的兼容边界；不要编码，不启用 v3 writer，不修改 CURRENT_SAVE_VERSION，不实现 Reward generation、Level、Shop 或 Benben gameplay。完成设计报告后停止。
 ```
 
 ## 阶段看板
@@ -758,7 +769,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04 PASS/CLOSED；S4-05 Design PASS/CLOSED；v3 DTO/validation/migration IMPLEMENTED；production Runtime NOT IMPLEMENTED / writer DISABLED | 唯一入口 S4-05 Runtime Value & Validation Foundation Implementation；v3 writer 仅可在 S4-08 gate 满足后启用 |
+| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04 PASS/CLOSED；S4-05 Design/Implementation PASS/CLOSED；v3 DTO/validation/migration 与 Runtime value foundation IMPLEMENTED；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-06 Reward Compatibility Design Review（DESIGN ONLY）；v3 writer 仅可在 S4-08 gate 满足后启用 |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
