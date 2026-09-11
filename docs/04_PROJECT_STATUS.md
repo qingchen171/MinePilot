@@ -197,9 +197,21 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-05 — Aggregate Runtime, AttemptState & Runtime↔DTO Foundation Design Review**
+**Stage 4 / S4-05 — Runtime Value & Validation Foundation Implementation**
 
-**DESIGN REVIEW ONLY — IMPLEMENTATION NOT AUTHORIZED。** 先随 Specification 阅读 [Stage 4 Product Contract Addendum v1.0](09_Stage_4_Product_Contract_Addendum_v1.0.md) §9–10。S4-02 CLOSED、S4-03 CONTRACT FROZEN、S4-04 PASS/CLOSED；v3 DTO/validation/migration 已实现，但 production Runtime NOT IMPLEMENTED、authoritative writer DISABLED、CURRENT_SAVE_VERSION 仍为 2。S4-05 涉及 frozen Stage 3 GameState API、Account shape、nullable currentAttempt/AttemptState、Runtime↔DTO mapper/reconstruction 与 Item Account-preservation，必须 Design → Attack → Freeze → Implementation，既有实施顺序不等于编码授权。本 closeout 完成即停止，不执行 S4-05。UI/Phaser presentation/animation/audio 仍属于 Stage 5。
+**IMPLEMENTATION SCOPE FROZEN；本 closeout 不执行。** 允许小型 Account domain/value construction、`replaceInventory`、Reward runtime value construction/validation、terminal-disposition runtime value/validation、必要纯 validation primitives 与 targeted tests。禁止切换 production `GameState` root、创建第二套完整 future GameState authority、接线 Reward/terminal settlement gameplay、启用 v3 production load/write、修改 `CURRENT_SAVE_VERSION`、实现 Reward generator、Shop、Level 或 Benben gameplay。authoritative v3 writer 在 S4-08 前始终 DISABLED；UI/Phaser presentation/animation/audio 仍属于 Stage 5。
+
+### Stage 4 / S4-05 — Aggregate Runtime & Lifecycle Foundation Design Review — PASS / CLOSED
+
+- 人工验收结论：`PASS / CLOSED — RUNTIME FOUNDATION CONTRACT READY`。Design Review 为只读工作；production/tests/config/runtime/schema changes = 0，未启用 v3 writer，`CURRENT_SAVE_VERSION` 仍为 2。
+- Future Runtime authority 冻结为 `GameState { account, currentAttempt: AttemptState | null }`。Account 始终存在；`currentAttempt = null` 是真实 account-only；非 null 是唯一 current attempt。禁止 fake Run、多 resumable attempts、run/runItems 独立 nullable 或第二套完整 Runtime authority。
+- Attempt 唯一拥有 `runId / levelId / generationProvenance / run / runItems / rewards / terminalDisposition`；revision 继续属于 persistence context。Future Account facts 为 `inventory / coins / completedLevelIds / oneTimeClaimIds / benbenByLevel`。
+- Item inventory 更新必须使用类似 `replaceInventory(account, inventory)` 的最小纯更新，完整保留其他 Account facts；不得要求每个 Item 重建或理解 Account 全部字段，不建立 generic patch/Manager/framework。
+- `legacy-excluded` 只能从严格旧版本验证与可信迁移内部路径进入 Runtime；普通外部 v3 与普通 gameplay 不得声明或伪造。不得增加 persisted trust flag 或放宽普通 v3 validator。
+- First Writable Gate 依赖已重新审计：movement 与 Airplane 已能探索 Safe、产生 Victory；若在 Reward claim 与 terminal settlement compatibility 前启用 writer，将产生丢资产或 `won + not-applicable` 等非法候选。因此旧 writer-first 顺序不安全，禁止为保留旧计划放宽 Save v3 合同。
+- 冻结实施顺序：`S4-05 Foundation Implementation -> S4-06 Reward Compatibility -> S4-07 Terminal Compatibility -> S4-08 Atomic Runtime/V3 Activation -> S4-09 Compatibility Integration Gate`。S4-08 前 v3 production writer 始终 DISABLED。
+- Benben gameplay 不属于 writer 前置依赖；但所有现有操作必须无损保留 `benbenByLevel`，terminal settlement 必须处理冻结的 failure streak / entitlement 影响。Reward generator、Shop、Level 与 Benben gameplay 仍需后续独立批准。
+- Recovery：新 AI 仅从正式 repository authority、Git history 与 frozen tags，必须恢复 Stage 0–3 FROZEN、S4-04 CLOSED、S4-05 Design CLOSED、future Runtime direction、上述 S4-05→S4-09 顺序、Reward/terminal compatibility 先于 writer、v3 writer disabled，以及唯一 S4-05 Foundation Implementation。若缺失则只修 authority docs，不开始实现。
 
 ### Stage 4 / S4-04 — Save v3 DTO, Strict Validation & Pure Migration — PASS / CLOSED
 
@@ -735,7 +747,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（§9–10 frozen contracts）、Protocol 和最新 PROJECT_STATUS。S4-04 PASS/CLOSED；唯一下一行动为 S4-05 Aggregate Runtime, AttemptState & Runtime↔DTO Foundation Design Review。DESIGN REVIEW ONLY；IMPLEMENTATION NOT AUTHORIZED。v3 DTO 已实现，production Runtime 尚未实现，writer DISABLED，CURRENT_SAVE_VERSION=2。本 closeout 完成即停止，不执行 S4-05。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（§9–10 frozen contracts）、Protocol 和最新 PROJECT_STATUS。S4-04 PASS/CLOSED，S4-05 Design Review PASS/CLOSED；唯一下一行动为 S4-05 Runtime Value & Validation Foundation Implementation。只实施已冻结的小型 value/validation scope；不切 production GameState root、不接 Reward/terminal gameplay、不启用 v3 writer、不修改 CURRENT_SAVE_VERSION。后续顺序为 S4-06 Reward Compatibility、S4-07 Terminal Compatibility、S4-08 Atomic Runtime/V3 Activation、S4-09 Compatibility Integration Gate；完成当前 Task 后停止。
 ```
 
 ## 阶段看板
@@ -746,7 +758,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04 PASS/CLOSED；v3 DTO/validation/migration IMPLEMENTED；production Runtime NOT IMPLEMENTED / writer DISABLED | 唯一入口 S4-05 Design Review ONLY；IMPLEMENTATION NOT AUTHORIZED |
+| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04 PASS/CLOSED；S4-05 Design PASS/CLOSED；v3 DTO/validation/migration IMPLEMENTED；production Runtime NOT IMPLEMENTED / writer DISABLED | 唯一入口 S4-05 Runtime Value & Validation Foundation Implementation；v3 writer 仅可在 S4-08 gate 满足后启用 |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
