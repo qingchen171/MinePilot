@@ -1,0 +1,177 @@
+import { createBenbenLevelState, type BenbenLevelState } from './benben';
+import type { RunPhase } from './run';
+import { isStableId } from './stable-id';
+import type { TerminalDisposition } from './terminal-disposition';
+
+export interface TerminalSettlementInput {
+  readonly levelId: unknown;
+  readonly nextPhase: RunPhase;
+  readonly previousDisposition: unknown;
+  readonly completedLevelIds: unknown;
+  readonly benbenByLevel: unknown;
+  readonly failureThreshold?: unknown;
+}
+
+export type TerminalSettlementResult =
+  | {
+      readonly status: 'settled';
+      readonly terminalDisposition: 'settled';
+      readonly nextCompletedLevelIds: readonly string[];
+      readonly nextBenbenByLevel: readonly BenbenLevelState[];
+    }
+  | {
+      readonly status: 'not-applicable';
+      readonly reason: 'already-settled' | 'legacy-excluded';
+    }
+  | {
+      readonly status: 'rejected';
+      readonly reason:
+        | 'invalid-authority'
+        | 'invalid-terminal-transition'
+        | 'missing-config'
+        | 'invalid-threshold';
+    };
+
+function copyCompletedLevelIds(input: unknown): readonly string[] | undefined {
+  if (!Array.isArray(input)) return undefined;
+  const copied: string[] = [];
+  const seen = new Set<string>();
+  for (let index = 0; index < input.length; index += 1) {
+    if (!Object.hasOwn(input, index)) return undefined;
+    const levelId = input[index];
+    if (!isStableId(levelId) || seen.has(levelId)) return undefined;
+    seen.add(levelId);
+    copied.push(levelId);
+  }
+  return Object.freeze(copied);
+}
+
+function copyBenbenByLevel(input: unknown): readonly BenbenLevelState[] | undefined {
+  if (!Array.isArray(input)) return undefined;
+  const copied: BenbenLevelState[] = [];
+  const seen = new Set<string>();
+  for (let index = 0; index < input.length; index += 1) {
+    if (!Object.hasOwn(input, index)) return undefined;
+    const value = input[index];
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+    const record = value as Record<string, unknown>;
+    let state: BenbenLevelState;
+    try {
+      state = createBenbenLevelState({
+        levelId: record.levelId,
+        failureStreak: record.failureStreak,
+        status: record.status,
+      });
+    } catch {
+      return undefined;
+    }
+    if (seen.has(state.levelId)) return undefined;
+    seen.add(state.levelId);
+    copied.push(state);
+  }
+  return Object.freeze(copied);
+}
+
+function isTerminalPhase(phase: unknown): phase is Extract<RunPhase, { kind: 'won' | 'failed' }> {
+  return typeof phase === 'object' && phase !== null && 'kind' in phase &&
+    (phase.kind === 'won' || phase.kind === 'failed');
+}
+
+function settleWon(
+  levelId: string,
+  completedLevelIds: readonly string[],
+  benbenByLevel: readonly BenbenLevelState[],
+): Extract<TerminalSettlementResult, { status: 'settled' }> {
+  const nextCompletedLevelIds = completedLevelIds.includes(levelId)
+    ? [...completedLevelIds]
+    : [...completedLevelIds, levelId];
+  const nextBenbenByLevel = benbenByLevel.map((entry) =>
+    entry.levelId === levelId && entry.status === 'unavailable'
+      ? createBenbenLevelState({ ...entry, failureStreak: 0 })
+      : createBenbenLevelState(entry),
+  );
+  return Object.freeze({
+    status: 'settled',
+    terminalDisposition: 'settled',
+    nextCompletedLevelIds: Object.freeze(nextCompletedLevelIds),
+    nextBenbenByLevel: Object.freeze(nextBenbenByLevel),
+  });
+}
+
+function settleFailed(
+  levelId: string,
+  completedLevelIds: readonly string[],
+  benbenByLevel: readonly BenbenLevelState[],
+  failureThreshold: number,
+): Extract<TerminalSettlementResult, { status: 'settled' }> {
+  const matchingIndex = benbenByLevel.findIndex((entry) => entry.levelId === levelId);
+  const current = matchingIndex === -1
+    ? createBenbenLevelState({ levelId, status: 'unavailable', failureStreak: 0 })
+    : benbenByLevel[matchingIndex];
+  if (current === undefined) throw new Error('Benben record lookup failed.');
+
+  let nextCurrent = createBenbenLevelState(current);
+  if (current.status === 'unavailable') {
+    nextCurrent = current.failureStreak >= failureThreshold - 1
+      ? createBenbenLevelState({ levelId, status: 'available', failureStreak: 0 })
+      : createBenbenLevelState({
+          levelId,
+          status: 'unavailable',
+          failureStreak: current.failureStreak + 1,
+        });
+  }
+
+  const nextBenbenByLevel = benbenByLevel.map(createBenbenLevelState);
+  if (matchingIndex === -1) nextBenbenByLevel.push(nextCurrent);
+  else nextBenbenByLevel[matchingIndex] = nextCurrent;
+
+  return Object.freeze({
+    status: 'settled',
+    terminalDisposition: 'settled',
+    nextCompletedLevelIds: Object.freeze([...completedLevelIds]),
+    nextBenbenByLevel: Object.freeze(nextBenbenByLevel),
+  });
+}
+
+/**
+ * Pure terminal compatibility step for a short-lived post-Run-transition composition.
+ * This does not create an Account, Attempt, persistence candidate, or publishable Runtime.
+ */
+export function settleTerminalOutcome(input: TerminalSettlementInput): TerminalSettlementResult {
+  const disposition = input.previousDisposition as TerminalDisposition;
+  if (disposition === 'settled') {
+    return { status: 'not-applicable', reason: 'already-settled' };
+  }
+  if (disposition === 'legacy-excluded') {
+    return { status: 'not-applicable', reason: 'legacy-excluded' };
+  }
+  if (disposition !== 'not-applicable') {
+    return { status: 'rejected', reason: 'invalid-authority' };
+  }
+  if (!isTerminalPhase(input.nextPhase)) {
+    return { status: 'rejected', reason: 'invalid-terminal-transition' };
+  }
+  if (!isStableId(input.levelId)) {
+    return { status: 'rejected', reason: 'invalid-authority' };
+  }
+  const completedLevelIds = copyCompletedLevelIds(input.completedLevelIds);
+  const benbenByLevel = copyBenbenByLevel(input.benbenByLevel);
+  if (completedLevelIds === undefined || benbenByLevel === undefined) {
+    return { status: 'rejected', reason: 'invalid-authority' };
+  }
+
+  if (input.nextPhase.kind === 'won') {
+    return settleWon(input.levelId, completedLevelIds, benbenByLevel);
+  }
+  if (!Object.hasOwn(input, 'failureThreshold') || input.failureThreshold === undefined) {
+    return { status: 'rejected', reason: 'missing-config' };
+  }
+  if (
+    typeof input.failureThreshold !== 'number' ||
+    !Number.isSafeInteger(input.failureThreshold) ||
+    input.failureThreshold <= 0
+  ) {
+    return { status: 'rejected', reason: 'invalid-threshold' };
+  }
+  return settleFailed(input.levelId, completedLevelIds, benbenByLevel, input.failureThreshold);
+}

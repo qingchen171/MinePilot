@@ -1,4 +1,5 @@
 import type { Coordinate } from '../board';
+import { createBenbenLevelState } from '../benben';
 import {
   createRewardState,
   getRewardBoardCompatibilityIssue,
@@ -117,8 +118,11 @@ function benben(input: unknown): BenbenLevelSaveV3[] {
     const failureStreak = natural(value.failureStreak, `${path}.failureStreak`);
     const status = value.status;
     if (status !== 'unavailable' && status !== 'available' && status !== 'used') reject('invalid-benben', path);
-    if (status !== 'unavailable' && failureStreak !== 0) reject('invalid-benben', path);
-    return { levelId, failureStreak, status };
+    try {
+      return createBenbenLevelState({ levelId, failureStreak, status });
+    } catch {
+      return reject('invalid-benben', path);
+    }
   });
   if (new Set(result.map((entry) => entry.levelId)).size !== result.length) {
     reject('duplicate-id', '$.account.benbenByLevel');
