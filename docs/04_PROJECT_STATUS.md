@@ -197,9 +197,26 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-07 — Terminal Compatibility Design Review**
+**Stage 4 / S4-07 — Terminal Compatibility Implementation**
 
-**DESIGN REVIEW ONLY；IMPLEMENTATION NOT AUTHORIZED。** 仅设计 future Attempt 进入 won/failed 时，在同一纯 candidate 中完成 terminal settlement 的边界；必须覆盖 Reward-before-terminal ordering、final-Safe Reward、completion facts、Benben failure streak/entitlement、idempotency、legacy-excluded、Restart/Retry 与 persistence failure handoff。禁止实现 Benben gameplay、Reward generator、Level catalog、Shop、UI、v3 writer activation 或 S4-08；S4-08 前 writer 始终 DISABLED。
+只实现纯 terminal compatibility module、最小 Benben fact value/validation helpers、completed IDs 更新、threshold validation、idempotency、真实 movement/Airplane/S4-06/failure/Lucky/Revive composition tests 与 mutation sanity。禁止切换 production GameState、扩展 production Account、接 persistence、启用 Save v3 writer、实现 threshold authority source、Benben use、Reward generator、Level、Shop 或 UI；完成后停止等待人工验收。
+
+### Stage 4 / S4-07 — Terminal Compatibility Design Review — PASS / CLOSED
+
+- 人工验收结论：`PASS — TERMINAL COMPATIBILITY CONTRACT READY`。Terminal Compatibility 尚未实现；本收尾仅冻结设计与依赖，不修改 production/tests/config，不启用 v3 writer。
+- Won settlement：仅 `next Run.phase=won + previous terminalDisposition=not-applicable` 可正常结算为 `settled`。首次 completion 按 exact Stable-ID equality append once；Replay 不重复；保留原顺序及未知合法历史 ID，不 trim/normalize/catalog-filter/sort。没有独立 completion payout。
+- Completion/Benben：本关无 record 保持 absent；`unavailable + N -> unavailable + 0`；`available + 0`、`used + 0` 保持，不撤销 entitlement、不重新开放 used、不制造零值 history。
+- Failed settlement：只累计最终 settled Failure。无 record 以 `unavailable + 0` 参与本次计算；未达 threshold 时 append/in-place 更新为 `unavailable + N+1`，本次达到时为 `available + 0`；available/used 不再累计。pending、Lucky/Revive survival、Restart、abandon 与 technical persistence failure 不计数。
+- Consecutive semantics：settled Failure increment；completion 是唯一 streak reset；Restart/abandon 不 increment 也不 reset；pending/Lucky/Revive 不 increment。不得新增第二种 reset event。
+- Idempotency/legacy：仅 `not-applicable + won|failed` 可 settlement；already settled 不得重复 completion/streak/Benben 变化；`legacy-excluded` 不追溯结算。Legacy failed 可 Retry 但不补 streak；legacy won 不推断 completion、Benben、Reward 或 progression。
+- Composition/atomicity：`Run transition -> S4-06 Reward compatibility -> S4-07 terminal settlement -> complete candidate -> S4-08 Save v3 guarded persistence -> publish`。最后一个 Safe 的 Reward 必须先 claim；S4-07 不处理 Reward payload、Coins、Items 或 oneTimeClaimIds。validation/config/reward/revision/runId/lease/storage 任一失败均不得发布半完成状态。
+- Threshold：S4-07 只消费已验证的 positive safe integer；missing、0、negative、fractional、NaN、Infinity、unsafe 全部拒绝，不 clamp/hardcode/UI-authority/Save-persist/load-recompute。历史 `unavailable + N` 仅在下一次真实 Failure 使用当时有效 threshold；先判断 `N >= threshold - 1`，避免 safe-integer overflow。
+- Benben record：每 level 最多一条；exact ID equality；保留无关/未知历史 records 与原顺序；matching record 原位替换，新 record deterministic append；duplicate 或非 canonical status/streak 必须拒绝，不静默修复。
+- Activation-critical blocker：当前无 frozen numeric threshold、production per-level/global terminal config，generation config 也不拥有该值。因此 S4-08 前必须完成 `S4-08A — Validated Terminal-Settlement Configuration Authority`，提供 authoritative threshold source、positive-safe-integer validation、global/per-level resolution 与 missing-config safe rejection；不得把 threshold 写入 Save，也不得实现 Benben use、Level catalog、Shop 或 UI。
+- 正式依赖顺序更新为：`S4-07 Terminal Compatibility Implementation -> S4-08A Validated Terminal-Settlement Configuration Authority -> S4-08 Atomic Runtime / Save v3 Activation -> S4-09 Compatibility Integration Gate`。S4-08A 是 writer activation 硬前置，不得为保持旧编号跳过。
+- Implementation test contract：覆盖首次/Replay completion、unknown IDs/order、Benben reset/preservation、first/increment/threshold=1/crossing/available/used/threshold change/overflow、settled/legacy/Retry idempotency、movement/Airplane/failure/Reward-before-terminal/Lucky/Revive composition、invalid threshold/duplicate/noncanonical authority、immutability/no-aliasing、S4-06 与 Stage 1–3 regression。
+- Mutation sanity：至少证明移除 settled gate、completion 错误撤销 available、crossing 不清 streak、Retry 再 increment、legacy 可 normal settle、threshold=1 不解锁，分别使对应测试失败；所有临时 mutation 必须恢复且不得提交。
+- Recovery：新 AI 仅读正式 repository authority 与 Git history，必须恢复 S4-06 CLOSED、本 Design PASS/CLOSED、terminal 尚未实现、Reward-before-terminal、completion/failure/legacy/idempotency/threshold 合同、当前无 authoritative threshold source、S4-08A 为 activation-critical、上述修订顺序、`CURRENT_SAVE_VERSION=2`、v3 writer disabled，以及唯一 S4-07 Implementation。存在 GAP 时只修 docs。
 
 ### Stage 4 / S4-06 — Reward Compatibility — PASS / CLOSED
 
@@ -786,7 +803,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（§9–10 frozen contracts）、Protocol 和最新 PROJECT_STATUS。S4-05 与 S4-06 Design/Implementation 均 PASS/CLOSED；Reward compatibility 已实现但 production persistence 尚未接线，terminal settlement 尚未实现，CURRENT_SAVE_VERSION=2 且 v3 writer disabled。唯一下一行动为 Stage 4 / S4-07 Terminal Compatibility Design Review，仅设计 won/failed terminal settlement、Reward-before-terminal、completion、Benben streak/entitlement、idempotency、legacy-excluded、Restart/Retry 与 persistence failure handoff；不得实施 S4-07、Benben gameplay、Reward generator、Level/Shop/UI 或 S4-08 writer activation。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（§9–10 frozen contracts）、Protocol 和最新 PROJECT_STATUS。S4-05 与 S4-06 Design/Implementation 均 PASS/CLOSED；S4-07 Design PASS/CLOSED，但 terminal compatibility 尚未实现；Reward compatibility 已实现但 production persistence 尚未接线，CURRENT_SAVE_VERSION=2 且 v3 writer disabled。唯一下一行动为 Stage 4 / S4-07 Terminal Compatibility Implementation，只实现纯 terminal compatibility、Benben fact/threshold validation、idempotency与真实 composition tests；不得切换 Runtime/Account、接 persistence、启用 writer或实现 threshold authority source、Benben gameplay、Reward generator、Level/Shop/UI。S4-07 后必须先执行 S4-08A threshold configuration authority，才能进入 S4-08 writer activation。
 ```
 
 ## 阶段看板
@@ -797,7 +814,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04 PASS/CLOSED；S4-05 与 S4-06 Design/Implementation PASS/CLOSED；v3 DTO/validation/migration、Runtime value foundation 与 pure Reward compatibility IMPLEMENTED；Reward production persistence 与 terminal settlement NOT IMPLEMENTED；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-07 Terminal Compatibility Design Review；v3 writer 仅可在 S4-08 gate 满足后启用 |
+| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04 PASS/CLOSED；S4-05 与 S4-06 Design/Implementation PASS/CLOSED；S4-07 Design PASS/CLOSED；v3 DTO/validation/migration、Runtime value foundation 与 pure Reward compatibility IMPLEMENTED；Terminal Compatibility NOT IMPLEMENTED；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-07 Terminal Compatibility Implementation；其后 S4-08A threshold authority 是 S4-08 writer activation 硬前置 |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
