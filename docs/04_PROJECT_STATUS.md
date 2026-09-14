@@ -197,9 +197,22 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-06 — Reward Compatibility Implementation**
+**Stage 4 / S4-07 — Terminal Compatibility Design Review**
 
-**IMPLEMENTATION SCOPE FROZEN；本 closeout 不执行。** 只允许一个小型 pure Reward compatibility module、必要 asset calculations、old/new Board delta、unit/pure movement-Airplane composition tests 与 mutation sanity。禁止切换 production `GameState` root、扩展 production Account、创建 shadow Account、接线 movement/Airplane persistence、实现 terminal settlement/Reward generator/Level/Shop/Benben、启用 v3 writer或修改 `CURRENT_SAVE_VERSION`；S4-08 前 writer 始终 DISABLED。
+**DESIGN REVIEW ONLY；IMPLEMENTATION NOT AUTHORIZED。** 仅设计 future Attempt 进入 won/failed 时，在同一纯 candidate 中完成 terminal settlement 的边界；必须覆盖 Reward-before-terminal ordering、final-Safe Reward、completion facts、Benben failure streak/entitlement、idempotency、legacy-excluded、Restart/Retry 与 persistence failure handoff。禁止实现 Benben gameplay、Reward generator、Level catalog、Shop、UI、v3 writer activation 或 S4-08；S4-08 前 writer 始终 DISABLED。
+
+### Stage 4 / S4-06 — Reward Compatibility — PASS / CLOSED
+
+- 人工验收结论：`PASS — S4-06 MERGED, MAIN CI GREEN`。Implementation / merged baseline `bf46484fab175cdef0ed588ee2d915b8d8f6ecb0`；PR #27。
+- 已实现的纯能力：`old Board + next Board` 推导 newly-explored Safe；按 deterministic row-major 领取 Reward；计算 Coins/四类 Item、同步 `oneTimeClaimIds` 与 Reward claimed facts；多 Reward all-or-nothing；invalid authority/Board transition 与 safe-integer overflow 整体拒绝。
+- 组合与不可变证据：真实 `moveCharacter` 与 `createAirplaneCandidate` pure composition 覆盖单/无 Reward、revisit、Mine/pending、multiple/mixed Reward、Airplane 消耗后 Item grant、last-Safe-won handoff；输入不 mutation、输出不 alias、rejected 不携带部分或 publishable state。
+- 冻结边界：Reward eligibility 只来自 old/new Board 的 Safe exploration delta；claimed Reward 不重复发资产；claim 顺序固定 row-major；Reward 输出保持原顺序；one-time claim ID 与 claimed/asset grant 同步。`RewardClaimAssets` 只是短命 `inventory / coins / oneTimeClaimIds` value，不是 Account、没有 lifecycle/persistence/identity，未创建 shadow Account。
+- 明确未实现：production Reward gameplay/persistence wiring、terminal settlement、Reward generator、Level/Shop/Benben、Save v3 production write 与 Stage 4 economy activation。movement/Airplane production wrappers 尚未调用 Reward compatibility；S4-06 是 S4-08 writer activation 的前置能力，不是 activation。
+- Runtime/writer 保持：production `GameState` root 未切换，production Account 未扩展 Stage 4 authority，`CURRENT_SAVE_VERSION = 2`，v3 writer `DISABLED`，Stage 2 coordinator/guarded persistence authority 未改变。
+- 验证证据：Local Architecture/TypeScript PASS；Unit 654/654、Integration 90/90、Build、Playwright PASS。Independent Reviewer PASS；PR required Linux Quality run `34817282425` Success；main Linux Quality run `34817412488` Success；Reverse Scan PASS，临时 mutation、debug、docs/config/schema/version change、Manager/framework 与 production persistence leakage 均未进入 implementation。
+- 依赖顺序继续冻结：`S4-05 Foundation -> S4-06 Reward Compatibility -> S4-07 Terminal Compatibility -> S4-08 Atomic Runtime/V3 Activation -> S4-09 Compatibility Integration Gate`。S4-06 已 CLOSED；下一硬前置依赖是 S4-07 Design Review，不得提前进入 S4-08。
+- S4-07 恢复入口：won settlement 必须在 Reward 已领取后原子写入 `terminalDisposition=settled`、completion 与 Benben reset/保持规则；failed settlement 必须原子写入 terminal、failure streak 与 threshold entitlement，且 Retry 不重复累计。必须设计 idempotency、overflow/invalid config、atomic failure、legacy-excluded、Restart/Retry 与 persistence failure handoff；不在 S4-06 closeout 中实现。
+- Recovery：新 AI 仅读正式 repository authority 与 Git history，必须恢复 Stage 0–3 FROZEN、S4-05 CLOSED、S4-06 Design/Implementation CLOSED、Reward compatibility 已实现但 production persistence 未接线、terminal settlement 未实现、Reward precedes terminal、version 2/v3 writer disabled，以及唯一 S4-07 Terminal Compatibility Design Review。存在 GAP 时只修 docs。
 
 ### Stage 4 / S4-06 — Reward Compatibility Design Review — PASS / CLOSED
 
@@ -773,7 +786,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（§9–10 frozen contracts）、Protocol 和最新 PROJECT_STATUS。S4-05 CLOSED，S4-06 Design PASS/CLOSED；唯一下一行动为 S4-06 Reward Compatibility Implementation。只实现已冻结的小型 pure Reward compatibility/asset calculation、old/new Board delta及测试，不创建 shadow Account，不切 production GameState/Account，不接 movement/Airplane persistence，不实现 terminal/Reward generator/Level/Shop/Benben，不启用 v3 writer或修改 CURRENT_SAVE_VERSION。完成后停止，不执行 S4-07。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（§9–10 frozen contracts）、Protocol 和最新 PROJECT_STATUS。S4-05 与 S4-06 Design/Implementation 均 PASS/CLOSED；Reward compatibility 已实现但 production persistence 尚未接线，terminal settlement 尚未实现，CURRENT_SAVE_VERSION=2 且 v3 writer disabled。唯一下一行动为 Stage 4 / S4-07 Terminal Compatibility Design Review，仅设计 won/failed terminal settlement、Reward-before-terminal、completion、Benben streak/entitlement、idempotency、legacy-excluded、Restart/Retry 与 persistence failure handoff；不得实施 S4-07、Benben gameplay、Reward generator、Level/Shop/UI 或 S4-08 writer activation。
 ```
 
 ## 阶段看板
@@ -784,7 +797,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04 PASS/CLOSED；S4-05 Design/Implementation 与 S4-06 Design PASS/CLOSED；v3 DTO/validation/migration 与 Runtime value foundation IMPLEMENTED；Reward claim gameplay NOT IMPLEMENTED；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-06 Reward Compatibility Implementation；v3 writer 仅可在 S4-08 gate 满足后启用 |
+| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04 PASS/CLOSED；S4-05 与 S4-06 Design/Implementation PASS/CLOSED；v3 DTO/validation/migration、Runtime value foundation 与 pure Reward compatibility IMPLEMENTED；Reward production persistence 与 terminal settlement NOT IMPLEMENTED；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-07 Terminal Compatibility Design Review；v3 writer 仅可在 S4-08 gate 满足后启用 |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
