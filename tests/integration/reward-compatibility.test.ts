@@ -67,6 +67,23 @@ describe('Reward compatibility with Stage 1 exploration transitions', () => {
     expect(getCellAt(oldRun.board, createCoordinate(0, 0))).toMatchObject({ exploration: 'unexplored' });
   });
 
+  it('returns nothing-to-claim when a real movement explores a Safe without a Reward', () => {
+    const oldRun = createWaitingRunState(initialBoard(2, 1));
+    const movement = moveCharacter(oldRun, createCoordinate(0, 0));
+    if (movement.outcome !== 'moved') throw new Error('Expected Safe movement.');
+
+    expect(applyRewardClaimsForExploration({
+      oldBoard: oldRun.board,
+      nextBoard: movement.state.board,
+      rewards: [coinReward(1, 0, 3)],
+      assets: {
+        inventory: createItemInventoryState({ lucky: 0, detection: 0, airplane: 0, revive: 0 }),
+        coins: 4,
+        oneTimeClaimIds: [],
+      },
+    })).toEqual({ status: 'nothing-to-claim' });
+  });
+
   it('returns nothing for a revisit and for a Hidden Mine encounter', () => {
     const waiting = createWaitingRunState(initialBoard(4, 1, [createCoordinate(3, 0)]));
     const firstMove = moveCharacter(waiting, createCoordinate(0, 0));
