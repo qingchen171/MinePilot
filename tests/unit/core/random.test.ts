@@ -51,6 +51,12 @@ describe('seeded deterministic random source', () => {
     expect(createSeededRandomSource(0xffff_ffff).nextInt(10)).toBeGreaterThanOrEqual(0);
   });
 
+  it('locks rejection sampling instead of biased modulo mapping', () => {
+    // Seed 1 first emits 2693262067, which is outside the acceptance range for 2^31 + 1.
+    // Rejection consumes the next uint32 and therefore returns this frozen value.
+    expect(createSeededRandomSource(1).nextInt(2_147_483_649)).toBe(11_749_833);
+  });
+
   it('does not call Math.random', () => {
     const original = Math.random;
     Math.random = () => {
