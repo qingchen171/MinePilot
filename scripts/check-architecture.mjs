@@ -46,6 +46,14 @@ export function validateDependency(importerPath, specifier, typeOnly = false) {
   const targetPath = path.posix.normalize(path.posix.join(importerDirectory, specifier));
   const targetLayer = layerOf(targetPath);
 
+  if (
+    normalize(importerPath) === 'src/core/terminal-settlement.ts' &&
+    targetPath === 'src/core/benben-random' &&
+    !typeOnly
+  ) {
+    return 'terminal settlement must not execute Benben RNG';
+  }
+
   if (sourceLayer === 'bootstrap') return null;
   if (sourceLayer === 'assets') return 'assets must not contain executable source';
 
@@ -111,6 +119,17 @@ export function checkArchitecture() {
     }
 
     const sourceText = fs.readFileSync(absolutePath, 'utf8');
+    if (relativePath === 'src/core/terminal-settlement.ts') {
+      if (/\bMath\.random\s*\(/.test(sourceText)) {
+        violations.push(`${relativePath}: terminal settlement must not call Math.random`);
+      }
+      if (/\b3\b/.test(sourceText)) {
+        violations.push(`${relativePath}: terminal settlement must not hardcode failuresPerRoll`);
+      }
+      if (!sourceText.includes('BENBEN_ASSISTANCE_CONFIGURATION.failuresPerRoll')) {
+        violations.push(`${relativePath}: terminal settlement must use the Benben config authority`);
+      }
+    }
     const dependencyPattern = /(?:^|\n)\s*(import|export)\s+(type\s+)?(?:[^'"\n;]*?\s+from\s+)?['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
     for (const match of sourceText.matchAll(dependencyPattern)) {
