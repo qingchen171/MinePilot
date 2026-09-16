@@ -197,9 +197,25 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-08A — Validated Terminal-Settlement Configuration Authority Design Review**
+**Stage 4 / S4-08A — Global Benben Configuration & Deterministic RNG Foundation Implementation**
 
-仅做设计审查，回答 authoritative Benben failure threshold 的来源、global/per-level 语义、configuration ownership、runtime resolution API、missing-config rejection，以及正式产品资料是否已经冻结实际 threshold。若无权威产品答案，必须返回 `NEEDS PRODUCT DECISION` 并只提出最小问题；不得选择数值、创建 config、实现代码、启用 Save v3 writer或开始 S4-08。
+仅实现 immutable validated global configuration（3 failures、eligibility `3/10`、card weights `3/3/1/3`）、隔离的 deterministic eligibility/card-selection derivation、golden vectors 与 replay-failure determinism tests。不得修改 terminal settlement、Save v3、Item resource integration、production Runtime/writer 或 Stage 2 persistence authority；不得执行 S4-07R 或后续 Task。
+
+### Stage 4 / S4-BEN-01 — Benben Product Contract Change — PASS / CLOSED
+
+- 现行全局规则：每个 exact level 每 3 次最终 settled Failure 触发一次 deterministic eligibility roll，整数成功率 `3/10`。仅 `unavailable` 累计；roll success 为 `available + 0`，failure 为 `unavailable + 0`；`available`/`used` 不再累计或 roll，`used` 永久。
+- 只有最终 settled Failure 计数。pending、Lucky/Revive survival、Restart、abandon、technical persistence failure 不计。Completion 清除未完成 streak，但不撤销 `available`/`used`；Restart/abandon 不 increment/reset。
+- Eligibility 与 claim 分离：success 只产生 Account per-level `available`，不给失败终局 Attempt 发卡。claim 仅允许未来同 level Attempt 在 `hasTakenStep=false` 且非 pending/failed/won；错过首次实际移动则本 Attempt 不可领取，entitlement 留给未来 Attempt。
+- Claim 必须同一 candidate/guarded commit 原子完成 Account `available -> used` 与 Attempt exactly one temporary card。失败保留 `available + no card`；同一 logical claim 重试必须得到同一卡。
+- temporary card 为 Attempt-owned `null | { item: lucky|detection|airplane|revive, consumed }`，不是 Account inventory。权重 Lucky/Detection/Airplane/Revive=`3/3/1/3`。Refresh exact restore；won/failed/Restart/Retry replacement/abandon/start another level 均清除，不退款、不换 Coins、不进 inventory、不恢复 entitlement。
+- 匹配且未消费的 temporary card 优先于永久 inventory；原 Item phase/target/success/usage 合同不变。first-step Mine 为 temporary Lucky -> Account Lucky -> optional Revive；Revive 内 temporary -> Account。first-step Safe 不消费 temporary Lucky，但以后不能再满足 Lucky trigger，Attempt 结束失效。
+- Benben eligibility/card-selection 是彼此及与 Mine/Detection/Reward 隔离的 deterministic domains；禁止 `Math.random()`、共享 RNG 与 generic framework。至少绑定 exact levelId/current runId/domain-version；commit failure、stale revision、lease loss 后同一 logical event 重试结果不变；算法/domain labels 后续以 golden vectors 冻结。
+- Account 仅持久化既有 `benbenByLevel`；Attempt 需持久化 card item/consumed。threshold/probability/weights/RNG history/state/roll-result copy/ledger 不入 Save。现有 Save v3 Attempt shape 不足，必须在 writer activation 前受控修订；v1/v2 migration card=`null`，不 retro-roll/grant。v3 尚未 production-written，因此不创建 v4。
+- S4-04/S4-07 历史 PASS/CLOSED 保留；旧 `threshold reached -> deterministic available` 与固定 temporary mine reveal 已被本 change-control supersede。后续 S4-07R 只消费 trusted eligibility result，terminal helper 不生成 RNG。
+- Production boundary 不变：`CURRENT_SAVE_VERSION=2`、v3 writer `DISABLED`、production Runtime root 未切换、Stage 2 guarded persistence chain 不变；本 Task production/tests/config changes=0。
+- 唯一 global config authority 后续固定 `failuresPerRoll=3`、eligibility `3/10`、weights `3/3/1/3`；禁止 UI/Save/caller/per-level override、fallback duplicate 与 ConfigManager。
+- Revised order：`S4-BEN-01 CLOSED -> S4-08A config/RNG -> S4-07R probabilistic terminal revision -> S4-08B Attempt card/Save v3 amendment -> S4-08C claim/resource compatibility -> S4-08 atomic activation -> S4-09 integration gate`。不得合并巨型 PR或跳过 writer 前置。
+- Recovery：新 AI 必须恢复上述 supersession、eligibility/claim/card/RNG/Save 合同、writer disabled、revised order 与唯一 S4-08A Implementation；不得从旧 S4-07 历史段落重启设计审查。
 
 ### Stage 4 / S4-07 — Terminal Compatibility — PASS / CLOSED
 
@@ -214,6 +230,8 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 - Threshold blocker：S4-07 只验证和消费调用方提供的 threshold。仓库仍无 frozen numeric threshold、authoritative global threshold config 或 authoritative per-level threshold config；禁止 magic number、UI authority、Save v3 threshold field 或 load-time entitlement recomputation。
 - 依赖顺序：`S4-07 CLOSED -> S4-08A Validated Terminal-Settlement Configuration Authority -> S4-08 Atomic Runtime / Save v3 Activation -> S4-09 Compatibility Integration Gate`。S4-08 不得跳过 S4-08A。
 - Recovery：新 AI 仅读正式仓库必须恢复 S4-06 CLOSED、S4-07 Design/Implementation CLOSED、上述 terminal/reward/failure/legacy 合同、production wiring 尚未完成、version 2/v3 writer disabled、threshold authority 缺失、S4-08A 是 activation blocker，以及唯一入口为 S4-08A Design Review。
+
+> **Superseded by S4-BEN-01：** 上述 threshold blocker、deterministic unlock、旧依赖顺序与旧 Recovery 入口仅是 S4-07 closeout 的历史事实。S4-07 仍 PASS/CLOSED，但 Benben failed branch 留待 S4-07R；当前唯一入口是 S4-08A config/RNG implementation。
 
 ### Stage 4 / S4-07 — Terminal Compatibility Design Review — PASS / CLOSED
 
@@ -817,7 +835,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（§9–10 frozen contracts）、Protocol 和最新 PROJECT_STATUS。S4-05、S4-06、S4-07 Design/Implementation 均 PASS/CLOSED；pure Reward 与 Terminal compatibility 已实现，但 production Runtime/Account/persistence 尚未接线，CURRENT_SAVE_VERSION=2 且 v3 writer disabled。仓库仍无 authoritative Benben failure threshold source。唯一下一行动为 Stage 4 / S4-08A Validated Terminal-Settlement Configuration Authority Design Review；只调查权威 threshold 来源、global/per-level 语义、ownership、resolution API 与 missing-config rejection。不得自行选择数值、创建 config、实现代码、启用 writer或开始 S4-08。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-04/S4-07 历史 PASS/CLOSED；S4-BEN-01 已冻结 3 failures、eligibility 3/10、card weights 3/3/1/3、Attempt temporary card 与 revised task order。production Runtime/persistence 尚未切换，CURRENT_SAVE_VERSION=2 且 v3 writer disabled。唯一下一行动为 Stage 4 / S4-08A Global Benben Configuration & Deterministic RNG Foundation Implementation；只实现批准的 config/RNG/golden/replay scope，不修改 terminal、Save v3、Item resource 或 writer，不执行 S4-07R。
 ```
 
 ## 阶段看板
@@ -828,7 +846,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04 PASS/CLOSED；S4-05、S4-06、S4-07 Design/Implementation PASS/CLOSED；v3 DTO/validation/migration、Runtime value foundation、pure Reward 与 Terminal compatibility IMPLEMENTED；production Runtime root NOT SWITCHED / writer DISABLED；threshold authority MISSING | 唯一入口 S4-08A Validated Terminal-Settlement Configuration Authority Design Review；S4-08 writer activation 不得先于 S4-08A |
+| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07 PASS/CLOSED；S4-BEN-01 PASS/CLOSED；v3 DTO/validation/migration、Runtime value foundation、pure Reward/Terminal compatibility 已实现；旧 Benben branch 待 S4-07R；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-08A Global Benben Configuration & Deterministic RNG Foundation Implementation；之后依序 S4-07R、S4-08B、S4-08C、S4-08、S4-09 |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |

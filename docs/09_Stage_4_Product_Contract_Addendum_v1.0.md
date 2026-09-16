@@ -308,3 +308,67 @@ Stage 4 public mutation 仅以 intent + expectedRevision + expectedRunId/null ->
 S4-02 CLOSED、S4-03 CONTRACT FROZEN、S4-04 PASS/CLOSED（implementation baseline `24724e527e030e49db3bbcca7919d281c74920ef`）。v3 DTO/strict validation/pure migration 已实现，production Runtime 尚未实现，authoritative writer DISABLED，CURRENT_SAVE_VERSION 仍为 2。当前仅 DESIGN REVIEW ONLY / IMPLEMENTATION NOT AUTHORIZED；§10.11 是依赖规划，不跳过 S4-05 的 Design → Attack → Freeze。本 closeout 停止，不执行 S4-05。
 
 新 AI 仅从 AGENTS -> Specification + 本批准合同 -> Protocol -> PROJECT_STATUS -> Git history/tag，必须恢复：Stage 0–3 FROZEN、Stage 4 产品合同、S4-02 CLOSED、S4-03 CONTRACT FROZEN、S4-04 DTO-only CLOSED、未来 GameState/account-only、§10.2 exact facts、Benben canonical model/无 RNG、Reward/独立 RNG、terminal/legacy exclusion、v2 defaults/v1 chain、writer disabled/version 2/旧 Runtime、Stage 3 compatibility、identity/revision principle、S4-04 至 S4-07 依赖顺序及唯一 S4-05 Design Review 入口。Stable ID nonblank 检查不改变原值；legacy-excluded 后续可信 Runtime/load/writer 接线不得放宽普通 v3 验证，具体约束与 implementation evidence 见 PROJECT_STATUS S4-04。缺口只修 authority docs，不借恢复检查开始实施。本节只同步当前进度/入口，不改变 §9–10 frozen schema/authority 合同。
+
+## 12. Benben Assistance Product Contract Change (S4-BEN-01)
+
+**PRODUCT CHANGE FROZEN / CHANGE CONTROL APPROVED.** 本节是现行 Benben MVP authority。S4-04 与 S4-07 的历史 PASS/CLOSED 事实保留；冲突处由本节取代 §3、§4、§10.4、§10.6、§10.7、§10.11 与 §11 中旧的 deterministic-threshold、固定 temporary mine reveal、Save v3 Attempt shape 和 task order。Stage 0–3 frozen tags、Board/Run truth、Item gameplay 与 Stage 2 persistence authority 不变。
+
+### 12.1 Eligibility state machine
+
+- 所有关卡共享同一规则：每个 exact `levelId` 每累计 **3** 次最终 settled Failure 触发一次独立 eligibility roll；成功率使用整数 `3/10`，禁止散落浮点 `0.30`。
+- 仅 `unavailable` 累计：`0 -> 1 -> 2 -> roll`。roll success 为 `available + 0`；roll failure 为 `unavailable + 0`，再开始下一组。`available`/`used` 不再累计或 roll；`used` 永久。
+- 只有最终 settled Failure 计数。pending、Lucky/Revive survival、Restart、abandon、technical persistence failure 不计。Completion 清未完成 streak，但不撤销 available/used；Restart/abandon 不 increment/reset。
+- eligibility success 只产生 Account per-level available entitlement；失败终局 Attempt 不产生 card。Eligibility 与 claim/card draw 是不同事件。
+
+### 12.2 Claim, ownership and lifetime
+
+- available 跨 Refresh、Retry、Restart、Replay、Completion 保留。玩家可在未来同 level 新 Attempt claim；每 level lifetime 最多一次成功 claim。
+- claim 仅允许 `hasTakenStep=false` 且 Run 非 pending/failed/won。第一次实际移动前未领取，则本 Attempt 后续不可领取，available 留给未来 Attempt。
+- claim 是单一原子 candidate：Account `available -> used`，同时 Attempt 创建 exactly one card。persistence failure 保持 `available + no card`；同一 logical claim 重试必须得到同一卡。
+- card 只能是 `null` 或 `{ item: lucky | detection | airplane | revive, consumed: boolean }`，属于 Attempt 而非 Account inventory。全局整数权重为 Lucky `3`、Detection `3`、Airplane `1`、Revive `3`，总和 `10`，无 per-level override。
+- Refresh exact restore item/consumed。won、failed、Restart、Retry replacement、abandon、start another level 均清卡；used/unused 都不退款、不换 Coins、不进 inventory、不恢复 entitlement。
+
+### 12.3 Resource priority and Item authority
+
+- 匹配且未消费的 temporary card 先于 Account inventory 消耗；没有匹配 card 才扣永久库存。成功 Detection/Airplane/Revive 的既有 usage counter 照常增加，禁止双扣；rejection/no target 不消费。
+- card 只改变资源来源，不创建第二套 Item gameplay。Detection targeting/usage 2、Airplane clipped 3x3/usage 1、Revive pending-only/usage 1 与各自 phase/target/success 合同继续权威。
+- first actual step Mine：temporary Lucky -> Account Lucky -> optional Revive；Revive 内 temporary Revive -> Account Revive。Lucky -> Revive -> Failure 顺序不变。
+- first actual step 为 Safe 时 temporary Lucky 保持未消费，但以后不能再满足 first-step trigger，只能随 Attempt 结束失效。
+
+### 12.4 Deterministic RNG isolation
+
+- Benben 使用与 Mine、Detection、Reward 隔离的 deterministic domains；eligibility 与 card selection 彼此也 domain-separated。禁止 `Math.random()`、共享/推进既有 RNG 或 generic RNG framework。
+- 两个 domain 至少绑定 exact `levelId`、current `runId`、固定 domain/version 及必要 canonical context。同一 logical Failure/claim 在 storage failure、stale commit、lease loss 或重试后结果必须相同。
+- card mapping 改变不得影响 eligibility result。算法/domain labels 属 compatibility-sensitive contract，S4-08A 必须固定并以 golden vectors 保护。
+- commit 后 card type 是 Attempt persisted fact；Refresh 不重新 draw。禁止持久化 threshold/probability/weights、RNG history/mutable state、roll-result copy 或 roll ledger。Account 只持久化 `benbenByLevel`，Attempt 只持久化 card item/consumed。
+
+### 12.5 Save v3 amendment and terminal expiry
+
+- 当前 Save v3 Attempt contract 无法表达 temporary card，必须在 production v3 writer 首次启用前正式修订。因 `CURRENT_SAVE_VERSION=2` 且 v3 从未 production-written，本次修订 v3，不创建 v4。
+- 修订必须覆盖 strict unknown-field/cross-field validation、Runtime/DTO mapping/reconstruction、no-aliasing、migration defaults 与 recovery tests。v1/v2 migration card=`null`；禁止 retro-roll、retro-grant 或伪造 consumed history。
+- won/failed terminal candidate 必须把 card 清为 `null`，不论 consumed 与否。Terminal Attempt 不能作为卡片存储容器。
+- v3 writer 在 S4-08 前保持 **DISABLED**；本冻结不改 Save implementation、`CURRENT_SAVE_VERSION`、production Runtime root 或 Stage 2 guarded persistence chain。
+
+### 12.6 S4-07R and global configuration authority
+
+- S4-07 历史 Design/Implementation 继续 PASS/CLOSED，但 `threshold reached -> deterministic available` 已 superseded。S4-07R 在 roll boundary 仅消费 trusted deterministic eligibility result：success `available + 0`，failure `unavailable + 0`。
+- terminal helper 保持纯函数且不生成 RNG；非 roll boundary 不得接受伪造 result。Won/completion reset、legacy exclusion、idempotency 与 Reward-before-terminal 顺序不变。
+- S4-08A 建立唯一 immutable、validated、production-owned global authority：`failuresPerRoll=3`、eligibility `3/10`、weights `3/3/1/3`。禁止 UI/Save/caller/per-level override、fallback duplicate 或 ConfigManager。
+
+### 12.7 Revised dependency order
+
+1. S4-BEN-01 — Product Contract Documentation Freeze（本 Task）。
+2. S4-08A — Global Benben Configuration + Deterministic RNG Foundation Implementation。
+3. S4-07R — Probabilistic Terminal Compatibility Revision。
+4. S4-08B — Temporary Benben Card Attempt / Save v3 Contract & Persistence Foundation。
+5. S4-08C — Benben Claim + Temporary Item Resource Compatibility。
+6. S4-08 — Atomic Runtime / Save v3 Activation。
+7. S4-09 — Compatibility Integration Gate。
+
+不得合并为巨型 PR。S4-08A 只做 config、两个 deterministic domains、isolation/golden/replay tests；不改 terminal、Save v3、Item resource 或 writer。S4-07R 不做 draw/claim/Save。S4-08B 做 Attempt card Runtime/DTO amendment、migration-null、mapping/restore/expiry foundation，writer 仍禁用。S4-08C 做 claim timing、available->used、card creation 与 resource priority，不启用 writer。S4-08 才可在全部前置完成后原子激活 Runtime/Save v3；S4-09 提供全链证据。
+
+### 12.8 Current entry and recovery
+
+唯一入口：**Stage 4 / S4-08A — Global Benben Configuration & Deterministic RNG Foundation Implementation**。
+
+新 AI 仅从正式仓库必须恢复：Stage 0–3 FROZEN；S4-04/S4-07 历史 PASS/CLOSED；本节取代冲突 Benben semantics；3 settled Failures -> deterministic 3/10 eligibility；eligibility/claim 分离；Attempt-owned weighted Item card；matching temporary resource 优先；两个隔离 RNG domains；Save v3 必须在 writer activation 前受控修订；`CURRENT_SAVE_VERSION=2`、v3 writer disabled；revised order 与唯一 S4-08A entry。不得重新执行 S4-BEN-01 或跳过前置。
