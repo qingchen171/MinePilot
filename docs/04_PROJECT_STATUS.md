@@ -197,9 +197,21 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-08A — Global Benben Configuration & Deterministic RNG Foundation Implementation**
+**Stage 4 / S4-07R — Probabilistic Terminal Compatibility Revision Design Review**
 
-仅实现 immutable validated global configuration（3 failures、eligibility `3/10`、card weights `3/3/1/3`）、隔离的 deterministic eligibility/card-selection derivation、golden vectors 与 replay-failure determinism tests。不得修改 terminal settlement、Save v3、Item resource integration、production Runtime/writer 或 Stage 2 persistence authority；不得执行 S4-07R 或后续 Task。
+DESIGN REVIEW ONLY / IMPLEMENTATION NOT AUTHORIZED。只审查 S4-07 failed-terminal branch 如何消费 S4-08A 已冻结的概率资格结果；不得实现 terminal transition、temporary card、claim、Runtime activation 或 v3 writer。
+
+### Stage 4 / S4-08A — Global Benben Configuration & Deterministic RNG Foundation — PASS / CLOSED
+
+- 人工验收结论：`PASS — S4-08A BENBEN CONFIG & RNG FOUNDATION IMPLEMENTED`。Implementation / stable baseline `b715941869e6c1cbf206594f3a6eda698ebf0790`；PR #33。
+- 唯一 global configuration authority 已实现为 immutable validated facts：`failuresPerRoll=3`、eligibility `3/10`、Lucky/Detection/Airplane/Revive weights=`3/3/1/3`、total weight `10`。无 per-level override、caller override、UI/Save duplicate 或 ConfigManager。
+- Deterministic domains 与稳定输入：`benben-eligibility-v1`、`benben-card-v1`；输入为 exact `levelId` + exact current `runId`，不得 trim/normalize，按 UTF-8 与 byte-length-prefixed fields 编码，经 FNV-1a uint32 派生 seed，再使用独立 Mulberry32 与 rejection-sampling `nextInt`。不消费或修改 Mine、Detection、Reward RNG。
+- 固定映射：eligibility roll `0..2` 成功、`3..9` 失败；card roll `0..2` Lucky、`3..5` Detection、`6` Airplane、`7..9` Revive。相同 stable inputs 必须 replay 相同结果；changed run/domain 必须隔离。
+- Compatibility contract：domains、stable-ID composition/encoding、FNV-1a、Mulberry32、rejection sampling、bucket mapping 与 weights 均为兼容敏感合同。未来修改必须显式 change control、兼容影响与回归计划；golden failure 不得通过直接更新 expected 掩盖。
+- 无新增持久事实：configuration、derived seed、roll、selection 或 RNG state 均不进入 Save；S4-08A 不实现 probabilistic terminal transition、temporary card Runtime/Save、claim、temporary resource priority、Runtime activation 或 v3 writer。
+- 质量证据：Targeted `240/240`、Unit `733/733`、Integration `98/98`、Total `831/831` PASS；Architecture、TypeScript、Build、Playwright PASS。七项 mutation sanity（扩大 eligibility bucket、扩大 Airplane bucket、domain 混用、移除 runId、trim stable ID、modulo 替代 rejection、使用 `Math.random()`）均使目标测试失败，恢复后全绿且 mutation 未提交。
+- Review/CI：Independent Reviewer PASS；branch Linux Quality run `35075041080`、PR run `35075292921`、main run `35075458657` 均 Success。Reverse Scan PASS：无第二套 config truth、RNG framework、Save schema/persistence path、terminal/card gameplay 或 writer activation。
+- 修订依赖顺序：`S4-08A CLOSED -> S4-07R Design Review -> S4-08B -> S4-08C -> S4-08 -> S4-09`。在 S4-07R 中，历史 S4-07 仍保持 PASS/CLOSED，但旧 deterministic threshold branch 已被概率合同取代；只有 `streak=2 + real settled Failure` 需要消费可信 eligibility result，success 为 `available + 0`、failure 为 `unavailable + 0`，`available`/`used` 不 roll；completion、legacy exclusion、idempotency 与 Reward-before-terminal 顺序保持。S4-07R 不实现 temporary card/Save，production `CURRENT_SAVE_VERSION=2` 且 v3 writer 继续 disabled。
 
 ### Stage 4 / S4-BEN-01 — Benben Product Contract Change — PASS / CLOSED
 
@@ -214,8 +226,8 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 - S4-04/S4-07 历史 PASS/CLOSED 保留；旧 `threshold reached -> deterministic available` 与固定 temporary mine reveal 已被本 change-control supersede。后续 S4-07R 只消费 trusted eligibility result，terminal helper 不生成 RNG。
 - Production boundary 不变：`CURRENT_SAVE_VERSION=2`、v3 writer `DISABLED`、production Runtime root 未切换、Stage 2 guarded persistence chain 不变；本 Task production/tests/config changes=0。
 - 唯一 global config authority 后续固定 `failuresPerRoll=3`、eligibility `3/10`、weights `3/3/1/3`；禁止 UI/Save/caller/per-level override、fallback duplicate 与 ConfigManager。
-- Revised order：`S4-BEN-01 CLOSED -> S4-08A config/RNG -> S4-07R probabilistic terminal revision -> S4-08B Attempt card/Save v3 amendment -> S4-08C claim/resource compatibility -> S4-08 atomic activation -> S4-09 integration gate`。不得合并巨型 PR或跳过 writer 前置。
-- Recovery：新 AI 必须恢复上述 supersession、eligibility/claim/card/RNG/Save 合同、writer disabled、revised order 与唯一 S4-08A Implementation；不得从旧 S4-07 历史段落重启设计审查。
+- Revised order：`S4-BEN-01 CLOSED -> S4-08A CLOSED -> S4-07R probabilistic terminal revision -> S4-08B Attempt card/Save v3 amendment -> S4-08C claim/resource compatibility -> S4-08 atomic activation -> S4-09 integration gate`。不得合并巨型 PR或跳过 writer 前置。
+- Recovery：新 AI 必须恢复上述 supersession、eligibility/claim/card/RNG/Save 合同、S4-08A 已 CLOSED、writer disabled、revised order 与唯一 S4-07R Design Review；不得从旧 S4-07 历史段落或 S4-08A Implementation 重启工作。
 
 ### Stage 4 / S4-07 — Terminal Compatibility — PASS / CLOSED
 
@@ -231,7 +243,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 - 依赖顺序：`S4-07 CLOSED -> S4-08A Validated Terminal-Settlement Configuration Authority -> S4-08 Atomic Runtime / Save v3 Activation -> S4-09 Compatibility Integration Gate`。S4-08 不得跳过 S4-08A。
 - Recovery：新 AI 仅读正式仓库必须恢复 S4-06 CLOSED、S4-07 Design/Implementation CLOSED、上述 terminal/reward/failure/legacy 合同、production wiring 尚未完成、version 2/v3 writer disabled、threshold authority 缺失、S4-08A 是 activation blocker，以及唯一入口为 S4-08A Design Review。
 
-> **Superseded by S4-BEN-01：** 上述 threshold blocker、deterministic unlock、旧依赖顺序与旧 Recovery 入口仅是 S4-07 closeout 的历史事实。S4-07 仍 PASS/CLOSED，但 Benben failed branch 留待 S4-07R；当前唯一入口是 S4-08A config/RNG implementation。
+> **Superseded by S4-BEN-01 与 S4-08A closeout：** 上述 threshold blocker、deterministic unlock、旧依赖顺序与旧 Recovery 入口仅是 S4-07 closeout 的历史事实。S4-07 仍 PASS/CLOSED，S4-08A 已 PASS/CLOSED；Benben failed branch 留待 S4-07R，当前唯一入口是 S4-07R Design Review（implementation not authorized）。
 
 ### Stage 4 / S4-07 — Terminal Compatibility Design Review — PASS / CLOSED
 
@@ -835,7 +847,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-04/S4-07 历史 PASS/CLOSED；S4-BEN-01 已冻结 3 failures、eligibility 3/10、card weights 3/3/1/3、Attempt temporary card 与 revised task order。production Runtime/persistence 尚未切换，CURRENT_SAVE_VERSION=2 且 v3 writer disabled。唯一下一行动为 Stage 4 / S4-08A Global Benben Configuration & Deterministic RNG Foundation Implementation；只实现批准的 config/RNG/golden/replay scope，不修改 terminal、Save v3、Item resource 或 writer，不执行 S4-07R。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08A Global Benben Configuration & Deterministic RNG Foundation 已 PASS/CLOSED，固定 global config、两个 deterministic domains、稳定输入编码、FNV-1a、独立 Mulberry32、rejection sampling 与 golden compatibility contract；这些事实不进入 Save。production Runtime/persistence 尚未切换，CURRENT_SAVE_VERSION=2 且 v3 writer disabled。唯一下一行动为 Stage 4 / S4-07R — Probabilistic Terminal Compatibility Revision Design Review；仅设计审查旧 S4-07 failed branch 如何消费可信概率结果，IMPLEMENTATION NOT AUTHORIZED，不得实现 temporary card/claim/Runtime activation/writer。
 ```
 
 ## 阶段看板
@@ -846,7 +858,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07 PASS/CLOSED；S4-BEN-01 PASS/CLOSED；v3 DTO/validation/migration、Runtime value foundation、pure Reward/Terminal compatibility 已实现；旧 Benben branch 待 S4-07R；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-08A Global Benben Configuration & Deterministic RNG Foundation Implementation；之后依序 S4-07R、S4-08B、S4-08C、S4-08、S4-09 |
+| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A PASS/CLOSED；S4-BEN-01 PASS/CLOSED；v3 DTO/validation/migration、Runtime value foundation、pure Reward/Terminal compatibility、global Benben config 与 deterministic RNG foundation 已实现；旧 Benben terminal branch 待 S4-07R；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-07R Probabilistic Terminal Compatibility Revision Design Review（DESIGN REVIEW ONLY）；之后依序 S4-08B、S4-08C、S4-08、S4-09 |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
