@@ -1,4 +1,6 @@
 import { createBenbenLevelState, type BenbenLevelState } from './benben';
+import { BENBEN_ASSISTANCE_CONFIGURATION } from './benben-configuration';
+import type { BenbenEligibilityDerivationResult } from './benben-random';
 import type { RunPhase } from './run';
 import { isStableId } from './stable-id';
 import type { TerminalDisposition } from './terminal-disposition';
@@ -9,7 +11,7 @@ export interface TerminalSettlementInput {
   readonly previousDisposition: unknown;
   readonly completedLevelIds: unknown;
   readonly benbenByLevel: unknown;
-  readonly failureThreshold?: unknown;
+  readonly eligibility?: BenbenEligibilityDerivationResult;
 }
 
 export type TerminalSettlementResult =
@@ -28,8 +30,9 @@ export type TerminalSettlementResult =
       readonly reason:
         | 'invalid-authority'
         | 'invalid-terminal-transition'
-        | 'missing-config'
-        | 'invalid-threshold';
+        | 'eligibility-required'
+        | 'unexpected-eligibility'
+        | 'invalid-eligibility';
     };
 
 function copyCompletedLevelIds(input: unknown): readonly string[] | undefined {
@@ -102,8 +105,9 @@ function settleFailed(
   levelId: string,
   completedLevelIds: readonly string[],
   benbenByLevel: readonly BenbenLevelState[],
-  failureThreshold: number,
-): Extract<TerminalSettlementResult, { status: 'settled' }> {
+  eligibilitySupplied: boolean,
+  eligibility: unknown,
+): TerminalSettlementResult {
   const matchingIndex = benbenByLevel.findIndex((entry) => entry.levelId === levelId);
   const current = matchingIndex === -1
     ? createBenbenLevelState({ levelId, status: 'unavailable', failureStreak: 0 })
@@ -112,13 +116,29 @@ function settleFailed(
 
   let nextCurrent = createBenbenLevelState(current);
   if (current.status === 'unavailable') {
-    nextCurrent = current.failureStreak >= failureThreshold - 1
-      ? createBenbenLevelState({ levelId, status: 'available', failureStreak: 0 })
-      : createBenbenLevelState({
-          levelId,
-          status: 'unavailable',
-          failureStreak: current.failureStreak + 1,
-        });
+    const rollBoundary = current.failureStreak === BENBEN_ASSISTANCE_CONFIGURATION.failuresPerRoll - 1;
+    if (!rollBoundary && eligibilitySupplied) {
+      return { status: 'rejected', reason: 'unexpected-eligibility' };
+    }
+    if (rollBoundary) {
+      if (!eligibilitySupplied) return { status: 'rejected', reason: 'eligibility-required' };
+      if (!isValidEligibility(eligibility)) {
+        return { status: 'rejected', reason: 'invalid-eligibility' };
+      }
+      nextCurrent = createBenbenLevelState({
+        levelId,
+        status: eligibility.success ? 'available' : 'unavailable',
+        failureStreak: 0,
+      });
+    } else {
+      nextCurrent = createBenbenLevelState({
+        levelId,
+        status: 'unavailable',
+        failureStreak: current.failureStreak + 1,
+      });
+    }
+  } else if (eligibilitySupplied) {
+    return { status: 'rejected', reason: 'unexpected-eligibility' };
   }
 
   const nextBenbenByLevel = benbenByLevel.map(createBenbenLevelState);
@@ -131,6 +151,22 @@ function settleFailed(
     nextCompletedLevelIds: Object.freeze([...completedLevelIds]),
     nextBenbenByLevel: Object.freeze(nextBenbenByLevel),
   });
+}
+
+function isValidEligibility(
+  value: unknown,
+): value is Extract<BenbenEligibilityDerivationResult, { readonly status: 'derived' }> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const result = value as Record<string, unknown>;
+  const { eligibilitySuccessNumerator, eligibilitySuccessDenominator } =
+    BENBEN_ASSISTANCE_CONFIGURATION;
+  return result.status === 'derived' &&
+    typeof result.seed === 'number' && Number.isInteger(result.seed) &&
+    result.seed >= 0 && result.seed <= 0xffff_ffff &&
+    typeof result.roll === 'number' && Number.isInteger(result.roll) &&
+    result.roll >= 0 && result.roll < eligibilitySuccessDenominator &&
+    typeof result.success === 'boolean' &&
+    result.success === (result.roll < eligibilitySuccessNumerator);
 }
 
 /**
@@ -159,19 +195,25 @@ export function settleTerminalOutcome(input: TerminalSettlementInput): TerminalS
   if (completedLevelIds === undefined || benbenByLevel === undefined) {
     return { status: 'rejected', reason: 'invalid-authority' };
   }
-
+  if (
+    benbenByLevel.some(
+      (entry) =>
+        entry.status === 'unavailable' &&
+        entry.failureStreak >= BENBEN_ASSISTANCE_CONFIGURATION.failuresPerRoll,
+    )
+  ) {
+    return { status: 'rejected', reason: 'invalid-authority' };
+  }
+  const eligibilitySupplied = Object.hasOwn(input, 'eligibility');
   if (input.nextPhase.kind === 'won') {
+    if (eligibilitySupplied) return { status: 'rejected', reason: 'unexpected-eligibility' };
     return settleWon(input.levelId, completedLevelIds, benbenByLevel);
   }
-  if (!Object.hasOwn(input, 'failureThreshold') || input.failureThreshold === undefined) {
-    return { status: 'rejected', reason: 'missing-config' };
-  }
-  if (
-    typeof input.failureThreshold !== 'number' ||
-    !Number.isSafeInteger(input.failureThreshold) ||
-    input.failureThreshold <= 0
-  ) {
-    return { status: 'rejected', reason: 'invalid-threshold' };
-  }
-  return settleFailed(input.levelId, completedLevelIds, benbenByLevel, input.failureThreshold);
+  return settleFailed(
+    input.levelId,
+    completedLevelIds,
+    benbenByLevel,
+    eligibilitySupplied,
+    input.eligibility,
+  );
 }

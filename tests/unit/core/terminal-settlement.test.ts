@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { BenbenLevelState } from '../../../src/core/benben';
+import {
+  deriveBenbenEligibility,
+  type BenbenEligibilityDerivationResult,
+} from '../../../src/core/benben-random';
 import type { RunPhase } from '../../../src/core/run';
 import {
   settleTerminalOutcome,
@@ -16,6 +20,11 @@ const benben = (
   status: BenbenLevelState['status'] = 'unavailable',
   failureStreak = 0,
 ): BenbenLevelState => ({ levelId, status, failureStreak });
+const eligibility = (
+  success: boolean,
+): Extract<BenbenEligibilityDerivationResult, { status: 'derived' }> => ({
+  status: 'derived', seed: success ? 1 : 2, roll: success ? 0 : 3, success,
+});
 
 function settle(
   nextPhase: RunPhase,
@@ -27,7 +36,6 @@ function settle(
     previousDisposition: 'not-applicable',
     completedLevelIds: [],
     benbenByLevel: [],
-    ...(nextPhase.kind === 'failed' ? { failureThreshold: 3 } : {}),
     ...changes,
   });
 }
@@ -51,11 +59,19 @@ describe('won terminal settlement', () => {
 
   it('resets only an unavailable streak while preserving record order', () => {
     const result = settle(won, {
-      benbenByLevel: [benben('other', 'unavailable', 4), benben('level-current', 'unavailable', 7)],
+      benbenByLevel: [benben('other', 'unavailable', 2), benben('level-current', 'unavailable', 1)],
     });
     expect(result).toMatchObject({
       status: 'settled',
-      nextBenbenByLevel: [benben('other', 'unavailable', 4), benben('level-current')],
+      nextBenbenByLevel: [benben('other', 'unavailable', 2), benben('level-current')],
+    });
+  });
+
+  it.each([0, 1, 2])('resets unavailable streak %s on completion', (failureStreak) => {
+    expect(settle(won, {
+      benbenByLevel: [benben('level-current', 'unavailable', failureStreak)],
+    })).toMatchObject({
+      status: 'settled', nextBenbenByLevel: [benben('level-current')],
     });
   });
 
@@ -78,6 +94,15 @@ describe('failed terminal settlement', () => {
     });
   });
 
+  it('increments an existing zero streak without eligibility', () => {
+    expect(settle(failed, {
+      benbenByLevel: [benben('level-current', 'unavailable', 0)],
+    })).toMatchObject({
+      status: 'settled',
+      nextBenbenByLevel: [benben('level-current', 'unavailable', 1)],
+    });
+  });
+
   it('increments unavailable in place and preserves unrelated records', () => {
     expect(settle(failed, {
       completedLevelIds: ['historic'],
@@ -88,17 +113,42 @@ describe('failed terminal settlement', () => {
     });
   });
 
-  it('crosses the threshold into canonical available state', () => {
+  it('requires eligibility at the third Failure boundary', () => {
     expect(settle(failed, {
       benbenByLevel: [benben('level-current', 'unavailable', 2)],
+    })).toEqual({ status: 'rejected', reason: 'eligibility-required' });
+  });
+
+  it('uses eligibility success to make assistance available and resets the streak', () => {
+    expect(settle(failed, {
+      benbenByLevel: [benben('level-current', 'unavailable', 2)],
+      eligibility: eligibility(true),
     })).toMatchObject({
       status: 'settled', nextBenbenByLevel: [benben('level-current', 'available', 0)],
     });
   });
 
-  it('unlocks on the first failure when threshold is one', () => {
-    expect(settle(failed, { failureThreshold: 1 })).toMatchObject({
-      status: 'settled', nextBenbenByLevel: [benben('level-current', 'available', 0)],
+  it('uses eligibility failure to start a new three-Failure cycle from zero', () => {
+    const failedRoll = settle(failed, {
+      benbenByLevel: [benben('level-current', 'unavailable', 2)],
+      eligibility: eligibility(false),
+    });
+    expect(failedRoll).toMatchObject({
+      status: 'settled', nextBenbenByLevel: [benben('level-current', 'unavailable', 0)],
+    });
+    if (failedRoll.status !== 'settled') return;
+    const next = settle(failed, { benbenByLevel: failedRoll.nextBenbenByLevel });
+    expect(next).toMatchObject({
+      status: 'settled', nextBenbenByLevel: [benben('level-current', 'unavailable', 1)],
+    });
+    if (next.status !== 'settled') return;
+    const second = settle(failed, { benbenByLevel: next.nextBenbenByLevel });
+    expect(second).toMatchObject({
+      status: 'settled', nextBenbenByLevel: [benben('level-current', 'unavailable', 2)],
+    });
+    if (second.status !== 'settled') return;
+    expect(settle(failed, { benbenByLevel: second.nextBenbenByLevel })).toEqual({
+      status: 'rejected', reason: 'eligibility-required',
     });
   });
 
@@ -108,21 +158,23 @@ describe('failed terminal settlement', () => {
     });
   });
 
-  it('applies a changed threshold only on this real failure', () => {
-    const history = [benben('level-current', 'unavailable', 2)];
-    expect(history[0]?.failureStreak).toBe(2);
-    expect(settle(failed, { benbenByLevel: history, failureThreshold: 2 })).toMatchObject({
-      status: 'settled', nextBenbenByLevel: [benben('level-current', 'available', 0)],
+  it.each([0, 1])('rejects eligibility before the roll boundary at streak %s', (failureStreak) => {
+    expect(settle(failed, {
+      benbenByLevel: [benben('level-current', 'unavailable', failureStreak)],
+      eligibility: eligibility(true),
+    })).toEqual({ status: 'rejected', reason: 'unexpected-eligibility' });
+  });
+
+  it('rejects eligibility when no matching Benben record exists', () => {
+    expect(settle(failed, { eligibility: eligibility(true) })).toEqual({
+      status: 'rejected', reason: 'unexpected-eligibility',
     });
   });
 
-  it('does not overflow a maximum-safe historical streak', () => {
+  it.each(['available', 'used'] as const)('rejects eligibility after status is %s', (status) => {
     expect(settle(failed, {
-      failureThreshold: Number.MAX_SAFE_INTEGER,
-      benbenByLevel: [benben('level-current', 'unavailable', Number.MAX_SAFE_INTEGER)],
-    })).toMatchObject({
-      status: 'settled', nextBenbenByLevel: [benben('level-current', 'available', 0)],
-    });
+      benbenByLevel: [benben('level-current', status)], eligibility: eligibility(false),
+    })).toEqual({ status: 'rejected', reason: 'unexpected-eligibility' });
   });
 });
 
@@ -146,25 +198,45 @@ describe('terminal settlement gates and validation', () => {
     })).toEqual({ status: 'rejected', reason: 'invalid-terminal-transition' });
   });
 
-  it.each([
-    ['missing', undefined, true],
-    ['undefined', undefined, false],
-    ['null', null, false],
-    ['zero', 0, false],
-    ['negative', -1, false],
-    ['fractional', 1.5, false],
-    ['NaN', Number.NaN, false],
-    ['Infinity', Number.POSITIVE_INFINITY, false],
-    ['unsafe', Number.MAX_SAFE_INTEGER + 1, false],
-  ] as const)('rejects %s threshold', (_name, value, omit) => {
-    const input: Record<string, unknown> = {
-      levelId: 'level-current', nextPhase: failed, previousDisposition: 'not-applicable',
-      completedLevelIds: [], benbenByLevel: [],
-    };
-    if (!omit) input.failureThreshold = value;
-    expect(settleTerminalOutcome(input as unknown as TerminalSettlementInput)).toEqual({
-      status: 'rejected', reason: omit || value === undefined ? 'missing-config' : 'invalid-threshold',
+  it('rejects eligibility on won without reopening settled or legacy outcomes', () => {
+    expect(settle(won, { eligibility: eligibility(true) })).toEqual({
+      status: 'rejected', reason: 'unexpected-eligibility',
     });
+    expect(settle(won, {
+      eligibility: eligibility(true), previousDisposition: 'settled',
+    })).toEqual({ status: 'not-applicable', reason: 'already-settled' });
+    expect(settle(failed, {
+      eligibility: eligibility(true), previousDisposition: 'legacy-excluded',
+    })).toEqual({ status: 'not-applicable', reason: 'legacy-excluded' });
+  });
+
+  it.each([
+    undefined,
+    null,
+    { status: 'rejected', reason: 'invalid-run-id' },
+    { status: 'derived', seed: -1, roll: 0, success: true },
+    { status: 'derived', seed: 1, roll: 10, success: false },
+    { status: 'derived', seed: 1, roll: 2, success: false },
+  ])('rejects malformed or rejected eligibility %#', (value) => {
+    expect(settleTerminalOutcome({
+      levelId: 'level-current', nextPhase: failed, previousDisposition: 'not-applicable',
+      completedLevelIds: [], benbenByLevel: [benben('level-current', 'unavailable', 2)],
+      eligibility: value as BenbenEligibilityDerivationResult,
+    })).toEqual({ status: 'rejected', reason: 'invalid-eligibility' });
+  });
+
+  it('consumes a real deterministic S4-08A eligibility result without modifying it', () => {
+    const derived = deriveBenbenEligibility({ levelId: 'level-current', runId: 'run-current' });
+    expect(derived.status).toBe('derived');
+    expect(deriveBenbenEligibility({ levelId: 'level-current', runId: 'run-current' })).toEqual(derived);
+    const snapshot = structuredClone(derived);
+    expect(settle(failed, {
+      benbenByLevel: [benben('level-current', 'unavailable', 2)], eligibility: derived,
+    })).toMatchObject({
+      status: 'settled',
+      nextBenbenByLevel: [benben('level-current', derived.status === 'derived' && derived.success ? 'available' : 'unavailable', 0)],
+    });
+    expect(derived).toEqual(snapshot);
   });
 
   it.each([
@@ -177,6 +249,8 @@ describe('terminal settlement gates and validation', () => {
     ['negative streak', { benbenByLevel: [benben('x', 'unavailable', -1)] }],
     ['fractional streak', { benbenByLevel: [benben('x', 'unavailable', 1.5)] }],
     ['unsafe streak', { benbenByLevel: [benben('x', 'unavailable', Number.MAX_SAFE_INTEGER + 1)] }],
+    ['roll-overdue streak', { benbenByLevel: [benben('x', 'unavailable', 3)] }],
+    ['past-due streak', { benbenByLevel: [benben('x', 'unavailable', 4)] }],
   ])('rejects %s instead of repairing it', (_name, changes) => {
     expect(settle(won, changes)).toEqual({ status: 'rejected', reason: 'invalid-authority' });
   });
@@ -203,4 +277,3 @@ describe('terminal settlement gates and validation', () => {
     expect(Object.isFrozen(result.nextBenbenByLevel[0])).toBe(true);
   });
 });
-

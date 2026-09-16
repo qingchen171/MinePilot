@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createAccountState, createItemInventoryState } from '../../src/core/account';
 import { createAirplaneCandidate } from '../../src/core/airplane';
 import { createCoordinate } from '../../src/core/board';
+import { deriveBenbenEligibility } from '../../src/core/benben-random';
 import { settleMineEncounterAsFailure } from '../../src/core/encounter';
 import { createGameState } from '../../src/core/game-state';
 import { createInitialBoard } from '../../src/core/initial-board';
@@ -39,7 +40,6 @@ function terminal(runPhase: Parameters<typeof settleTerminalOutcome>[0]['nextPha
   return settleTerminalOutcome({
     levelId: 'level-1', nextPhase: runPhase, previousDisposition: 'not-applicable',
     completedLevelIds: [], benbenByLevel: [],
-    ...(runPhase.kind === 'failed' ? { failureThreshold: 2 } : {}),
     ...changes,
   });
 }
@@ -131,7 +131,7 @@ describe('Failure, survival, Retry, and legacy composition', () => {
     return hit.state;
   }
 
-  it('settles a real Failure and applies consecutive history only on later real Failures', () => {
+  it('settles real Failures and consumes S4-08A eligibility only on the third Failure', () => {
     const failure = settleMineEncounterAsFailure(pendingAfterStep());
     if (failure.outcome !== 'failed') throw new Error('Expected Failure.');
     const first = terminal(failure.state.phase);
@@ -139,10 +139,26 @@ describe('Failure, survival, Retry, and legacy composition', () => {
       status: 'settled', nextBenbenByLevel: [{ levelId: 'level-1', status: 'unavailable', failureStreak: 1 }],
     });
     if (first.status !== 'settled') return;
-    expect(terminal(failure.state.phase, {
+    const second = terminal(failure.state.phase, {
       benbenByLevel: first.nextBenbenByLevel,
+    });
+    expect(second).toMatchObject({
+      status: 'settled', nextBenbenByLevel: [{ levelId: 'level-1', status: 'unavailable', failureStreak: 2 }],
+    });
+    if (second.status !== 'settled') return;
+    expect(terminal(failure.state.phase, { benbenByLevel: second.nextBenbenByLevel })).toEqual({
+      status: 'rejected', reason: 'eligibility-required',
+    });
+    const eligibility = deriveBenbenEligibility({ levelId: 'level-1', runId: 'failed-run-3' });
+    if (eligibility.status !== 'derived') throw new Error('Expected eligibility derivation.');
+    expect(deriveBenbenEligibility({ levelId: 'level-1', runId: 'failed-run-3' })).toEqual(eligibility);
+    expect(terminal(failure.state.phase, {
+      benbenByLevel: second.nextBenbenByLevel, eligibility,
     })).toMatchObject({
-      status: 'settled', nextBenbenByLevel: [{ levelId: 'level-1', status: 'available', failureStreak: 0 }],
+      status: 'settled',
+      nextBenbenByLevel: [{
+        levelId: 'level-1', status: eligibility.success ? 'available' : 'unavailable', failureStreak: 0,
+      }],
     });
   });
 
@@ -226,16 +242,15 @@ describe('Failure, survival, Retry, and legacy composition', () => {
       benbenByLevel: [{ levelId: 'level-1', status: 'unavailable', failureStreak: 1 }],
     });
     if (first.status !== 'settled') throw new Error('Expected settlement.');
-    expect(first.nextBenbenByLevel[0]?.failureStreak).toBe(0);
+    expect(first.nextBenbenByLevel[0]?.failureStreak).toBe(2);
     expect(retry(fixture).status).toBe('committed');
     expect(settleTerminalOutcome({
       levelId: 'level-1', nextPhase: fixture.attempt.gameState.run.phase,
       previousDisposition: first.terminalDisposition,
       completedLevelIds: first.nextCompletedLevelIds,
       benbenByLevel: first.nextBenbenByLevel,
-      failureThreshold: 2,
     })).toEqual({ status: 'not-applicable', reason: 'already-settled' });
-    expect(first.nextBenbenByLevel).toEqual([{ levelId: 'level-1', status: 'available', failureStreak: 0 }]);
+    expect(first.nextBenbenByLevel).toEqual([{ levelId: 'level-1', status: 'unavailable', failureStreak: 2 }]);
   });
 
   it('allows legacy failed Retry without retroactive settlement', () => {
@@ -244,7 +259,6 @@ describe('Failure, survival, Retry, and legacy composition', () => {
     expect(settleTerminalOutcome({
       levelId: 'level-1', nextPhase: fixture.attempt.gameState.run.phase,
       previousDisposition: 'legacy-excluded', completedLevelIds: [], benbenByLevel: history,
-      failureThreshold: 2,
     })).toEqual({ status: 'not-applicable', reason: 'legacy-excluded' });
     expect(retry(fixture).status).toBe('committed');
     expect(history[0].failureStreak).toBe(1);

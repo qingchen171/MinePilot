@@ -8,6 +8,15 @@ describe('architecture boundaries', () => {
     expect(validateDependency('src/core/state.ts', 'phaser')).toMatch(/must not import Phaser/);
   });
 
+  it('allows the terminal eligibility type but forbids executing Benben RNG', () => {
+    expect(validateDependency(
+      'src/core/terminal-settlement.ts', './benben-random', true,
+    )).toBeNull();
+    expect(validateDependency(
+      'src/core/terminal-settlement.ts', './benben-random', false,
+    )).toMatch(/must not execute Benben RNG/);
+  });
+
   it('allows config and presentation to consume only type-level core contracts', () => {
     expect(validateDependency('src/config/items.ts', '../core/item.ts', true)).toBeNull();
     expect(validateDependency('src/config/items.ts', '../core/item.ts', false)).toMatch(/type-only core/);
