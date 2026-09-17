@@ -54,6 +54,13 @@ export function validateDependency(importerPath, specifier, typeOnly = false) {
     return 'terminal settlement must not execute Benben RNG';
   }
 
+  if (
+    normalize(importerPath) === 'src/core/persistence/save-v3.ts' &&
+    (targetPath === 'src/core/benben-random' || targetPath === 'src/core/random')
+  ) {
+    return 'Save v3 persistence must not depend on gameplay RNG';
+  }
+
   if (sourceLayer === 'bootstrap') return null;
   if (sourceLayer === 'assets') return 'assets must not contain executable source';
 

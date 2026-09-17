@@ -25,7 +25,7 @@ function v3() {
     currentAttempt: {
       runId: old.activeRun.runId, levelId: old.activeRun.levelId, generationProvenance: null,
       run: { board: old.activeRun.board, characterPosition: old.activeRun.characterPosition, hasTakenStep: false, phase: old.activeRun.phase },
-      runItems: old.activeRun.runItems, rewards: [] as ReturnType<typeof reward>[], terminalDisposition: 'not-applicable',
+      runItems: old.activeRun.runItems, rewards: [] as ReturnType<typeof reward>[], temporaryBenbenCard: null as null | { item: string; consumed: boolean }, terminalDisposition: 'not-applicable',
     },
   };
 }
@@ -108,6 +108,125 @@ describe('Save v3 isolated DTO validation and migration', () => {
     input.account.benbenByLevel[0]!.failureStreak = 1;
     expect(validateSaveDocumentV3(input).status).toBe('invalid');
   });
+  it.each([0, 1, 2])('accepts canonical unavailable Benben streak %i', (failureStreak) => {
+    const input = v3();
+    input.account.benbenByLevel = [{ levelId: input.currentAttempt.levelId, status: 'unavailable', failureStreak }];
+    expect(validateSaveDocumentV3(input).status).toBe('validated');
+  });
+  it.each([3, 4, Number.MAX_SAFE_INTEGER])('rejects unavailable Benben streak %i beyond the canonical cycle', (failureStreak) => {
+    const input = v3();
+    input.account.benbenByLevel = [{ levelId: input.currentAttempt.levelId, status: 'unavailable', failureStreak }];
+    expect(validateSaveDocumentV3(input)).toMatchObject({
+      status: 'invalid',
+      issues: [{ code: 'invalid-benben', path: '$.account.benbenByLevel[0].failureStreak' }],
+    });
+  });
+  it.each(['available', 'used'])('rejects nonzero canonical %s Benben streak', (status) => {
+    const input = v3();
+    input.account.benbenByLevel = [{ levelId: input.currentAttempt.levelId, status, failureStreak: 1 }];
+    expect(validateSaveDocumentV3(input).status).toBe('invalid');
+  });
+  it('requires the temporary card field instead of silently defaulting it', () => {
+    const input = v3();
+    Reflect.deleteProperty(input.currentAttempt, 'temporaryBenbenCard');
+    expect(validateSaveDocumentV3(input)).toMatchObject({
+      status: 'invalid',
+      issues: [{ code: 'invalid-input', path: '$.currentAttempt.temporaryBenbenCard' }],
+    });
+  });
+  it.each(['lucky', 'detection', 'airplane', 'revive'])('round-trips strict temporary %s cards', (item) => {
+    for (const consumed of [false, true]) {
+      const input = v3();
+      input.account.benbenByLevel = [{ levelId: input.currentAttempt.levelId, status: 'used', failureStreak: 0 }];
+      input.currentAttempt.temporaryBenbenCard = { item, consumed };
+      const parsed = JSON.parse(JSON.stringify(input));
+      expect(validateSaveDocumentV3(parsed)).toEqual({ status: 'validated', document: input });
+    }
+  });
+  it.each([
+    ['missing-item', { consumed: false }],
+    ['missing-consumed', { item: 'lucky' }],
+    ['unknown-item', { item: 'future', consumed: false }],
+    ['string-consumed', { item: 'lucky', consumed: 'false' }],
+    ['number-consumed', { item: 'lucky', consumed: 0 }],
+    ['null-consumed', { item: 'lucky', consumed: null }],
+    ['extra-field', { item: 'lucky', consumed: false, extra: true }],
+    ['array', []],
+    ['primitive', 'lucky'],
+  ])('rejects malformed temporary card %s', (_case, card) => {
+    const input = v3();
+    input.account.benbenByLevel = [{ levelId: input.currentAttempt.levelId, status: 'used', failureStreak: 0 }];
+    setPath(input, 'currentAttempt.temporaryBenbenCard', card);
+    expect(validateSaveDocumentV3(input).status).toBe('invalid');
+  });
+  it.each(['available', 'unavailable'])('rejects temporary card authorized by same-level %s Benben state', (status) => {
+    const input = v3();
+    input.account.benbenByLevel = [{ levelId: input.currentAttempt.levelId, status, failureStreak: 0 }];
+    input.currentAttempt.temporaryBenbenCard = { item: 'lucky', consumed: false };
+    expect(validateSaveDocumentV3(input)).toMatchObject({
+      status: 'invalid',
+      issues: [{ code: 'invalid-temporary-card', path: '$.currentAttempt.temporaryBenbenCard' }],
+    });
+  });
+  it('requires exact same-level used authority, while used plus null remains legal', () => {
+    const input = v3();
+    input.currentAttempt.temporaryBenbenCard = { item: 'detection', consumed: false };
+    expect(validateSaveDocumentV3(input).status).toBe('invalid');
+    input.account.benbenByLevel = [{ levelId: 'level-1', status: 'used', failureStreak: 0 }];
+    expect(validateSaveDocumentV3(input).status).toBe('invalid');
+    input.account.benbenByLevel = [{ levelId: input.currentAttempt.levelId, status: 'used', failureStreak: 0 }];
+    expect(validateSaveDocumentV3(input).status).toBe('validated');
+    input.currentAttempt.temporaryBenbenCard = null;
+    expect(validateSaveDocumentV3(input).status).toBe('validated');
+  });
+  it('does not alias a caller-owned temporary card object', () => {
+    const input = v3();
+    const card = { item: 'airplane', consumed: false };
+    input.account.benbenByLevel = [{ levelId: input.currentAttempt.levelId, status: 'used', failureStreak: 0 }];
+    input.currentAttempt.temporaryBenbenCard = card;
+    const result = validateSaveDocumentV3(input);
+    if (result.status !== 'validated' || result.document.currentAttempt === null || result.document.currentAttempt.temporaryBenbenCard === null) throw new Error('fixture');
+    card.item = 'revive'; card.consumed = true;
+    expect(result.document.currentAttempt.temporaryBenbenCard).toEqual({ item: 'airplane', consumed: false });
+    expect(Object.isFrozen(result.document.currentAttempt.temporaryBenbenCard)).toBe(true);
+  });
+  it('allows active after-step Lucky and pending cards without deriving usage state', () => {
+    const active = v3();
+    active.account.benbenByLevel = [{ levelId: active.currentAttempt.levelId, status: 'used', failureStreak: 0 }];
+    active.currentAttempt.run.hasTakenStep = true;
+    active.currentAttempt.run.board.cells[0]!.explored = true;
+    setPath(active, 'currentAttempt.run.characterPosition', { kind: 'on-board', coordinate: { x: 0, y: 0 } });
+    active.currentAttempt.temporaryBenbenCard = { item: 'lucky', consumed: false };
+    expect(validateSaveDocumentV3(active).status).toBe('validated');
+
+    const migrated = migrateOldSaveDocumentToV3(phaseFixture('pending-mine-encounter'));
+    if (migrated.status !== 'validated' || migrated.document.currentAttempt === null) throw new Error('fixture');
+    const pending = structuredClone(migrated.document);
+    const pendingLevelId = pending.currentAttempt?.levelId;
+    if (pendingLevelId === undefined) throw new Error('fixture');
+    setPath(pending, 'account.benbenByLevel', [{ levelId: pendingLevelId, status: 'used', failureStreak: 0 }]);
+    setPath(pending, 'currentAttempt.temporaryBenbenCard', { item: 'revive', consumed: true });
+    expect(validateSaveDocumentV3(pending).status).toBe('validated');
+  });
+  it.each(['won', 'failed'])('rejects temporary cards on %s attempts without repairing them', (kind) => {
+    const input = v3();
+    const levelId = input.currentAttempt.levelId;
+    if (kind === 'won') {
+      input.currentAttempt.run.phase.kind = 'won';
+      input.currentAttempt.run.board.cells = [cell(false, true), cell(true), cell(false, true)];
+      input.account.completedLevelIds = [levelId];
+    } else {
+      input.currentAttempt.run.hasTakenStep = true;
+      setPath(input, 'currentAttempt.run.phase', { kind: 'failed', encounter: { target: { x: 1, y: 0 }, occurredOnFirstStep: false } });
+    }
+    input.currentAttempt.terminalDisposition = 'settled';
+    setPath(input, 'account.benbenByLevel', [{ levelId, status: 'used', failureStreak: 0 }]);
+    setPath(input, 'currentAttempt.temporaryBenbenCard', { item: 'revive', consumed: false });
+    expect(validateSaveDocumentV3(input)).toMatchObject({
+      status: 'invalid',
+      issues: [{ code: 'invalid-temporary-card', path: '$.currentAttempt.temporaryBenbenCard' }],
+    });
+  });
   it('rejects duplicate claims/Benben IDs without normalizing', () => {
     const input = v3(); input.account.oneTimeClaimIds = ['x', 'x'];
     expect(validateSaveDocumentV3(input).status).toBe('invalid');
@@ -140,7 +259,7 @@ describe('Save v3 isolated DTO validation and migration', () => {
   it.each(['active', 'pending-mine-encounter', 'failed', 'won'])('migrates phase %s without retrospective settlement or history', (kind) => {
     const input = phaseFixture(kind); const before = structuredClone(input);
     const result = migrateOldSaveDocumentToV3(input);
-    expect(result).toMatchObject({ status: 'validated', document: { revision: 9, account: { coins: 0, completedLevelIds: [], oneTimeClaimIds: [], benbenByLevel: [], inventory: input.account.inventory }, currentAttempt: { rewards: [], generationProvenance: null, runItems: { detectionRandomSeed: null }, run: { phase: input.activeRun.phase }, terminalDisposition: kind === 'failed' || kind === 'won' ? 'legacy-excluded' : 'not-applicable' } } });
+    expect(result).toMatchObject({ status: 'validated', document: { revision: 9, account: { coins: 0, completedLevelIds: [], oneTimeClaimIds: [], benbenByLevel: [], inventory: input.account.inventory }, currentAttempt: { rewards: [], temporaryBenbenCard: null, generationProvenance: null, runItems: { detectionRandomSeed: null }, run: { phase: input.activeRun.phase }, terminalDisposition: kind === 'failed' || kind === 'won' ? 'legacy-excluded' : 'not-applicable' } } });
     expect(input).toEqual(before);
     if (result.status !== 'validated') throw new Error('Expected migrated DTO');
     expect(validateSaveDocumentV3(result.document).status).toBe(kind === 'failed' || kind === 'won' ? 'invalid' : 'validated');
@@ -191,7 +310,7 @@ describe('Save v3 isolated DTO validation and migration', () => {
     const current = loadSaveDocument(input);
     const target = migrateOldSaveDocumentToV3(input);
     expect(current.status).toBe('loaded');
-    expect(target).toMatchObject({ status: 'validated', document: { revision: 9, account: { inventory: { lucky: 0, detection: 0, airplane: 0, revive: 0 } }, currentAttempt: { generationProvenance: null, runItems: { detectionRandomSeed: null } } } });
+    expect(target).toMatchObject({ status: 'validated', document: { revision: 9, account: { inventory: { lucky: 0, detection: 0, airplane: 0, revive: 0 } }, currentAttempt: { generationProvenance: null, temporaryBenbenCard: null, runItems: { detectionRandomSeed: null } } } });
   });
   it('keeps production dispatcher at v2 and refuses v3 as old migration input', () => {
     expect(CURRENT_SAVE_VERSION).toBe(2);

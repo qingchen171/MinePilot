@@ -30,7 +30,7 @@ describe('S4-04 pure target-v3 path does not switch persistence authority', () =
     const loaded = loadPersistedSave(storage);
     if (!('save' in loaded)) throw new Error('Expected committed save');
     const migrated = migrateOldSaveDocumentToV3(loaded.save.document);
-    expect(migrated).toMatchObject({ status: 'validated', document: { revision: 8, currentAttempt: { generationProvenance: null, runItems: { detectionRandomSeed: null }, run: { characterPosition: { kind: 'revealed-mine-occupancy', coordinate: { x: 0, y: 0 } }, hasTakenStep: true, phase: { kind: 'active' } } } } });
+    expect(migrated).toMatchObject({ status: 'validated', document: { revision: 8, currentAttempt: { generationProvenance: null, temporaryBenbenCard: null, runItems: { detectionRandomSeed: null }, run: { characterPosition: { kind: 'revealed-mine-occupancy', coordinate: { x: 0, y: 0 } }, hasTakenStep: true, phase: { kind: 'active' } } } } });
     if (migrated.status !== 'validated') throw new Error('Expected DTO');
     expect(validateSaveDocumentV3(migrated.document)).toEqual(migrated);
     expect(migrated).not.toHaveProperty('activeRun');

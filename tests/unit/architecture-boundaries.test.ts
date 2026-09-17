@@ -17,6 +17,15 @@ describe('architecture boundaries', () => {
     )).toMatch(/must not execute Benben RNG/);
   });
 
+  it('keeps Save v3 validation and migration independent from gameplay RNG', () => {
+    expect(validateDependency(
+      'src/core/persistence/save-v3.ts', '../benben-random', true,
+    )).toMatch(/must not depend on gameplay RNG/);
+    expect(validateDependency(
+      'src/core/persistence/save-v3.ts', '../random', false,
+    )).toMatch(/must not depend on gameplay RNG/);
+  });
+
   it('allows config and presentation to consume only type-level core contracts', () => {
     expect(validateDependency('src/config/items.ts', '../core/item.ts', true)).toBeNull();
     expect(validateDependency('src/config/items.ts', '../core/item.ts', false)).toMatch(/type-only core/);
