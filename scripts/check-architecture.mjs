@@ -61,6 +61,21 @@ export function validateDependency(importerPath, specifier, typeOnly = false) {
     return 'Save v3 persistence must not depend on gameplay RNG';
   }
 
+  const claimAndItemCompatibilityFiles = new Set([
+    'src/core/benben-claim.ts',
+    'src/core/item-resource.ts',
+    'src/core/lucky.ts',
+    'src/core/detection.ts',
+    'src/core/airplane.ts',
+    'src/core/revive.ts',
+  ]);
+  if (
+    claimAndItemCompatibilityFiles.has(normalize(importerPath)) &&
+    targetPath.startsWith('src/core/persistence/')
+  ) {
+    return 'Claim and Item compatibility must not depend on persistence';
+  }
+
   if (sourceLayer === 'bootstrap') return null;
   if (sourceLayer === 'assets') return 'assets must not contain executable source';
 
@@ -136,6 +151,9 @@ export function checkArchitecture() {
       if (!sourceText.includes('BENBEN_ASSISTANCE_CONFIGURATION.failuresPerRoll')) {
         violations.push(`${relativePath}: terminal settlement must use the Benben config authority`);
       }
+    }
+    if (relativePath === 'src/core/benben-claim.ts' && /\bMath\.random\s*\(/.test(sourceText)) {
+      violations.push(`${relativePath}: Benben Claim must use the deterministic Benben card authority`);
     }
     const dependencyPattern = /(?:^|\n)\s*(import|export)\s+(type\s+)?(?:[^'"\n;]*?\s+from\s+)?['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
