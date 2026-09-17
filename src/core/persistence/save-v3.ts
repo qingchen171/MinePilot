@@ -8,6 +8,10 @@ import {
 } from '../reward';
 import { isStableId } from '../stable-id';
 import { isTerminalDisposition, isTerminalDispositionLegalForRunPhase } from '../terminal-disposition';
+import {
+  createTemporaryBenbenCard,
+  type TemporaryBenbenCard,
+} from '../temporary-benben-card';
 import type { BoardSaveV1, GenerationProvenanceSaveV1, RunPhaseSaveV1 } from './save-v1';
 import { loadSaveDocument } from './save-dispatcher';
 import {
@@ -50,6 +54,7 @@ export interface AttemptSaveV3 {
   };
   readonly runItems: RunItemStateSaveV2;
   readonly rewards: readonly RewardSaveV3[];
+  readonly temporaryBenbenCard: TemporaryBenbenCard | null;
   readonly terminalDisposition: 'not-applicable' | 'settled' | 'legacy-excluded';
 }
 /** DTO only. This is not the current Runtime aggregate or a writable save version. */
@@ -62,6 +67,7 @@ export interface SaveDocumentV3 {
 export interface SaveV3ValidationIssue {
   readonly code: SaveV2ValidationIssue['code'] | 'invalid-id' | 'invalid-number'
     | 'invalid-array' | 'duplicate-id' | 'invalid-benben' | 'invalid-reward'
+    | 'invalid-temporary-card'
     | 'invalid-terminal-disposition' | 'legacy-migration-required' | 'inconsistent-settlement';
   readonly path: string;
   readonly detail?: SaveV2ValidationIssue['detail'];
@@ -118,6 +124,7 @@ function benben(input: unknown): BenbenLevelSaveV3[] {
     const failureStreak = natural(value.failureStreak, `${path}.failureStreak`);
     const status = value.status;
     if (status !== 'unavailable' && status !== 'available' && status !== 'used') reject('invalid-benben', path);
+    if (status === 'unavailable' && failureStreak > 2) reject('invalid-benben', `${path}.failureStreak`);
     try {
       return createBenbenLevelState({ levelId, failureStreak, status });
     } catch {
@@ -128,6 +135,17 @@ function benben(input: unknown): BenbenLevelSaveV3[] {
     reject('duplicate-id', '$.account.benbenByLevel');
   }
   return result;
+}
+
+function temporaryBenbenCard(input: unknown): TemporaryBenbenCard | null {
+  if (input === null) return null;
+  const path = '$.currentAttempt.temporaryBenbenCard';
+  const value = record(input, ['item', 'consumed'], path);
+  try {
+    return createTemporaryBenbenCard({ item: value.item, consumed: value.consumed });
+  } catch {
+    return reject('invalid-temporary-card', path);
+  }
 }
 function reward(input: unknown, i: number): RewardSaveV3 {
   const path = `$.currentAttempt.rewards[${i}]`;
@@ -175,7 +193,7 @@ function validate(input: unknown, migratedLegacy: boolean): ValidateSaveDocument
     let rawAttempt: Record<string, unknown> | null = null;
     let rawRun: Record<string, unknown> | null = null;
     if (root.currentAttempt !== null) {
-      rawAttempt = record(root.currentAttempt, ['runId', 'levelId', 'generationProvenance', 'run', 'runItems', 'rewards', 'terminalDisposition'], '$.currentAttempt');
+      rawAttempt = record(root.currentAttempt, ['runId', 'levelId', 'generationProvenance', 'run', 'runItems', 'rewards', 'temporaryBenbenCard', 'terminalDisposition'], '$.currentAttempt');
       rawRun = record(rawAttempt.run, ['board', 'characterPosition', 'hasTakenStep', 'phase'], '$.currentAttempt.run');
     }
     // Delegate unchanged Board/Run/Item/inventory/provenance legality and reconstruction.
@@ -197,6 +215,7 @@ function validate(input: unknown, migratedLegacy: boolean): ValidateSaveDocument
     const copied = shared.document.activeRun;
     if (rawAttempt !== null && copied !== null && shared.activeRun !== null) {
       const rewards = array(rawAttempt.rewards, '$.currentAttempt.rewards').map(reward);
+      const card = temporaryBenbenCard(rawAttempt.temporaryBenbenCard);
       const coordinates = new Set<string>();
       const claims = new Set<string>();
       for (const [i, entry] of rewards.entries()) {
@@ -220,6 +239,15 @@ function validate(input: unknown, migratedLegacy: boolean): ValidateSaveDocument
       if (!isTerminalDispositionLegalForRunPhase(copied.phase, terminalDisposition)) {
         reject('invalid-terminal-disposition', '$.currentAttempt.terminalDisposition');
       }
+      if (card !== null) {
+        const matchingBenben = benbenByLevel.find((entry) => entry.levelId === copied.levelId);
+        if (matchingBenben?.status !== 'used') {
+          reject('invalid-temporary-card', '$.currentAttempt.temporaryBenbenCard');
+        }
+        if (copied.phase.kind === 'won' || copied.phase.kind === 'failed' || terminalDisposition === 'legacy-excluded') {
+          reject('invalid-temporary-card', '$.currentAttempt.temporaryBenbenCard');
+        }
+      }
       if (terminalDisposition === 'legacy-excluded' && !migratedLegacy) reject('legacy-migration-required', '$.currentAttempt.terminalDisposition');
       if (copied.phase.kind === 'won' && terminalDisposition === 'settled') {
         if (!completedLevelIds.includes(copied.levelId) ||
@@ -230,7 +258,7 @@ function validate(input: unknown, migratedLegacy: boolean): ValidateSaveDocument
         runId: copied.runId, levelId: copied.levelId,
         generationProvenance: copied.generationProvenance ?? null,
         run: { board: copied.board, characterPosition: copied.characterPosition, hasTakenStep: copied.hasTakenStep, phase: copied.phase },
-        runItems: copied.runItems, rewards, terminalDisposition,
+        runItems: copied.runItems, rewards, temporaryBenbenCard: card, terminalDisposition,
       };
     }
     return { status: 'validated', document: { saveVersion: 3, revision, account, currentAttempt } };
@@ -264,7 +292,7 @@ export function migrateOldSaveDocumentToV3(input: unknown): ValidateSaveDocument
       runId: attempt.runId, levelId: attempt.levelId,
       generationProvenance: attempt.generationProvenance ?? null,
       run: { board: attempt.board, characterPosition: attempt.characterPosition, hasTakenStep: attempt.hasTakenStep, phase: attempt.phase },
-      runItems: attempt.runItems, rewards: [],
+      runItems: attempt.runItems, rewards: [], temporaryBenbenCard: null,
       terminalDisposition: attempt.phase.kind === 'won' || attempt.phase.kind === 'failed' ? 'legacy-excluded' : 'not-applicable',
     },
   }, true);
