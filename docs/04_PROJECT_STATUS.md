@@ -197,9 +197,28 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-08B — Temporary Benben Card Attempt / Save v3 Contract & Persistence Foundation Design Review**
+**Stage 4 / S4-08B — Temporary Benben Card Attempt / Save v3 Contract & Persistence Foundation Implementation**
 
-仅进行 Design Review：设计 Attempt-owned temporary card Runtime fact、Save v3 DTO amendment、strict validation、Benben unavailable streak canonical `0..2`、v1/v2 migration card=`null`、Runtime/DTO mapping/reconstruction、no-aliasing、refresh exact restore 与 Attempt expiry representation。Implementation 未授权；禁止 writer enablement、`CURRENT_SAVE_VERSION=3`、production orchestration、Benben claim、Item temporary-first resource integration或 Runtime activation。
+只实现已冻结的 Attempt-owned temporary-card 小型 value、`AttemptSaveV3` required-nullable amendment、strict parsing/aggregate validation、Save v3 Benben canonical streak `0..2`、v1/v2 migration explicit `null`、no-aliasing/round-trip 与 architecture guards。不得创建完整 shadow `GameState`、切换 production Runtime root、启用 v3 writer、修改 `CURRENT_SAVE_VERSION`、接线 Claim/temporary-first Item resource、修改 terminal settlement 或进入 S4-08C/S4-08。
+
+### Stage 4 / S4-08B — Temporary Benben Card Attempt / Save v3 Contract & Persistence Foundation Design Review — PASS / CLOSED
+
+- 人工验收结论：`PASS — S4-08B SAVE/ATTEMPT CONTRACT READY`。这是 production v3 writer 首次启用前的受控 Save v3 contract amendment design freeze；S4-04 继续保持历史 `PASS / CLOSED`，本次不是 S4-04 rollback、Save v4 或 production v3 migration。Design closeout production/tests/config changes = 0；起始 baseline `23746375cee428a7a39e9a2d83da5ffdb03d35f9`。
+- Existing Runtime reality：production `GameState` 仍是 Stage 3 authority，production new-attempt path 仍为 v2；v3 DTO/strict validator/pure migration 已存在，但完整 future `GameState { account, currentAttempt }` aggregate、Runtime↔v3 mapper/reconstructor 与 production writer 尚未 activation。S4-08B Implementation 不得创建第二套完整 shadow Runtime。
+- Ownership/value：future `GameState.currentAttempt.temporaryBenbenCard` 唯一拥有 Attempt 临时卡，值为 required nullable `null | { item, consumed }`；`item` 复用 Lucky/Detection/Airplane/Revive canonical four-item authority，`consumed` 为 boolean。它不属于 Account、inventory、RunItemState、Board/Cell、Benben per-level progression 或 persistence coordinator；不得建立 temporary inventory、Manager 或 Save-backed runtime authority。
+- Strict data contract：非空卡只允许 `item`、`consumed`；不得重复 Attempt 已拥有的 levelId/runId，也不保存 source/claim/reward ID、seed/roll/RNG state、timestamp、expiry 或 UI/animation facts。字段缺失、未知字段、invalid item、nonboolean consumed 均拒绝，不能把 missing 静默解释为 `null`；validated value 必须复制/immutable，不能保留 caller mutable alias。
+- Save v3 amendment：`AttemptSaveV3` 必须新增 required nullable temporary-card 字段。因 `CURRENT_SAVE_VERSION=2` 且 production v3 writer 从未启用，直接修订 pre-production v3 contract，不创建 Save v4，也不为旧 v3 fixtures 建 optional/fallback compatibility；旧形状缺字段必须 invalid。production writer 在 S4-08 前继续 `DISABLED`。
+- Canonical Benben persistence：`unavailable.failureStreak` 仅允许 `0|1|2`；`available`/`used` 仅允许 `0`。negative、fractional、unsafe integer、unavailable `>=3`、available/used `>0` 均 invalid；不得 clamp、repair、reset、unlock、roll 或 load-time eligibility。S4-07R Runtime terminal boundary 已拒绝 unavailable `>=3`；S4-08B 优先在 Save-v3-specific validation 收紧，不为此扩大通用 Benben value constructor。
+- Aggregate invariant：非空 card 要求 `currentAttempt` 存在，并且 Account `benbenByLevel` 中 exact-equal current levelId 的 record 为 `used`；available、unavailable、missing record 或仅 other-level used 均不能授权。Stable ID 不 trim/normalize/case-fold。反向不成立：`used + card null` 合法，不得由 used 自动生成卡。
+- Lifecycle legality：active/waiting 与 pending-mine-encounter 可持 null 或合法 card；Claim legality 不得错误编码为 persistence legality。`hasTakenStep=true + temporary Lucky + consumed=false` 合法。won、failed 与 legacy-excluded terminal Attempt 必须 card=`null`；terminal card 一律 invalid。card expiry 未来由 Attempt/GameState candidate composition 在 aggregate validation/guarded commit 前清除，不修改 S4-07R terminal Account-economics primitive。
+- Consumed semantics：`null` 表示本 Attempt 没有卡；`consumed=false` 表示已领取未成功消费；`consumed=true` 是本 Attempt 已成功消费且不可再用的 durable fact。消费后不得立即用 null 抹去“曾持有且已消费”；仅在 Attempt 结束/被替换/abandon 时清除。consumed 不从 runItems 推断；未来成功临时卡使用对 consumed 与相应 usage counter 的原子更新属于 S4-08C。
+- New-attempt/abandon：未来 normal Start、Restart、Retry、new-level Attempt 都必须 explicit card=`null`，不得复制旧卡或因 Account status=used 重新生成。abandon 以 `currentAttempt -> null` 自然清除卡，同时 Account used 保持且不 refund/restore/convert。当前 production v2 Start/Restart/Retry 不在 S4-08B 修改；真实 production evidence 延后 S4-08/S4-09。
+- Migration/restore：v1→v2→amended-v3 与 v2→amended-v3 必须 explicit card=`null`；不得 derive eligibility/card、调用 RNG、推断历史 claim/consumed、retro-grant 或 retro-roll。legacy-excluded semantics 与 trusted migration-only permission 保持，且 card=null；普通 external v3 不得伪造 trusted legacy authority。Load/parse/validation/migration/reconstruction 不调用 Benben/Mine/Detection/Reward RNG；Refresh 只恢复 committed item+consumed，不 redraw/reroll/rederive。
+- Atomic-claim readiness：amended v3 必须接受同一未来 candidate 中 `same-level Benben available + card null -> used + { item, consumed:false }` 的最终状态，并拒绝 `available + card exists` partial candidate。Claim、available→used gameplay mutation与 temporary-first Item priority 均不在 S4-08B Implementation。
+- Mapper boundary：S4-08B 只允许小型 immutable card value、DTO structural parsing/copying、migration default null、aggregate Save validation，以及在真实 mapper foundation 已存在时做最小兼容更新。完整 Runtime→DTO→Runtime bridge 与 production aggregate activation 属 S4-08；禁止为卡提前实现完整 future GameState/Account/currentAttempt authority。
+- Test/reverse-scan contract：Implementation 必须覆盖 required-nullable/四 item/consumed/strict fields、canonical streak、same-level used、terminal与active/pending、Lucky after-step、migration null/no retro RNG、round-trip/no-alias、S4-08A goldens/S4-07R/Reward/Stage 3 regressions，并以 mutation sanity 证明 missing fallback、unknown item、streak 3、wrong-level authorization、terminal card、migration grant、load RNG、aliasing、consumed reset 与错误拒绝 after-step Lucky 均会失败。`CURRENT_SAVE_VERSION` 必须保持 2，writer保持 disabled。
+- Recovery：新 AI 仅从正式仓库必须恢复 S4-08A/S4-07R/S4-08B Design 均 CLOSED；v3仍 pre-production；temporary card 属 Attempt、只含 item+consumed、字段 required nullable；same-level used 才授权但 used+null 合法；active/pending可持卡，won/failed/legacy不可；unavailable streak 仅0..2；migration null且load不重抽；无 Save v4、无 shadow Runtime；唯一入口是上方 S4-08B Implementation。
+- Revised order：`S4-08A CLOSED -> S4-07R CLOSED -> S4-08B Design CLOSED -> S4-08B Implementation -> S4-08C -> S4-08 -> S4-09`。不得跳过或合并为巨型 PR。
 
 ### Stage 4 / S4-07R — Probabilistic Terminal Compatibility Revision — PASS / CLOSED
 
@@ -875,7 +894,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08A 与 S4-07R 已 PASS/CLOSED。旧 arbitrary threshold/deterministic unlock 已 superseded；当前 authoritative cycle 为 unavailable 0->1->2，第三次 settled Failure 必须消费 S4-08A eligibility，success->available/0、failure->unavailable/0；terminal 不生成 RNG。CURRENT_SAVE_VERSION=2、v3 writer disabled、temporary card 尚未实现。唯一下一行动为 Stage 4 / S4-08B Temporary Benben Card Attempt / Save v3 Contract & Persistence Foundation Design Review；只设计 Attempt card 与 pre-production Save v3 amendment，不实现 writer、claim、Item resource priority 或 Runtime activation。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08A、S4-07R 与 S4-08B Design 已 PASS/CLOSED。CURRENT_SAVE_VERSION=2、v3 writer disabled、production Runtime仍是Stage 3 authority；temporary card 尚未实现。唯一下一行动为 Stage 4 / S4-08B Temporary Benben Card Attempt / Save v3 Contract & Persistence Foundation Implementation：只实现 Attempt-owned required-nullable card value、pre-production Save v3 strict amendment、canonical Benben persistence、migration null/no-alias/round-trip与测试；不得建立 shadow Runtime、启用writer、实现claim/temporary-first priority或进入S4-08C/S4-08。
 ```
 
 ## 阶段看板
@@ -886,7 +905,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R PASS/CLOSED；v3 DTO/validation/migration、Runtime value foundation、pure Reward/Terminal compatibility、global Benben config、deterministic RNG 与 probabilistic terminal revision 已实现；production Runtime root NOT SWITCHED / writer DISABLED；temporary card NOT IMPLEMENTED | 唯一入口 S4-08B Temporary Benben Card Attempt / Save v3 Contract & Persistence Foundation Design Review；之后依序 S4-08B Implementation、S4-08C、S4-08、S4-09 |
+| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R PASS/CLOSED；S4-08B Design PASS/CLOSED；v3 DTO/validation/migration、Runtime value foundation、pure Reward/Terminal compatibility、global Benben config、deterministic RNG 与 probabilistic terminal revision 已实现；production Runtime root NOT SWITCHED / writer DISABLED；temporary card NOT IMPLEMENTED | 唯一入口 S4-08B Temporary Benben Card Attempt / Save v3 Contract & Persistence Foundation Implementation；之后依序 S4-08C、S4-08、S4-09 |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
