@@ -197,9 +197,25 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-08C — Benben Claim + Temporary Item Resource Compatibility Design Review**
+**Stage 4 / S4-08C — Benben Claim + Temporary Item Resource Compatibility Implementation**
 
-仅设计 Benben Claim eligibility/atomic transition、S4-08A deterministic card derivation 的消费边界，以及 Lucky/Detection/Airplane/Revive 的 matching temporary-card-first 资源兼容。Implementation 未授权；不得启用 v3 writer、修改 `CURRENT_SAVE_VERSION`、切换 production Runtime root、接线完整 S4-08 activation 或进入 S4-09。
+只实现已冻结的 pure Claim foundation、deterministic S4-08A card derivation、atomic available→used + card creation、最小 temporary/account resource helper，以及 Detection/Airplane/Revive/Lucky compatibility 与 Lucky/Revive applicability correction。不得启用 v3 writer、修改 `CURRENT_SAVE_VERSION`、切换 production Runtime root、接线完整 S4-08 activation 或进入 S4-09。
+
+### Stage 4 / S4-08C — Benben Claim + Temporary Item Resource Compatibility Design Review — PASS / CLOSED
+
+- 人工验收结论：`PASS — S4-08C CLAIM/ITEM COMPATIBILITY CONTRACT READY`。第一次 Design Review 中把 Lucky resource existence 与 gameplay applicability 混同的表述，已在同一 Design 阶段内完成技术纠正；最终 authority 以本节修正合同为准。这不是 Product Contract change，而是恢复已冻结的“Lucky only applies to first actual step Mine”。Design closeout production/tests/config changes = 0。
+- Claim eligibility：仅 current same-level Attempt、exact matching Account Benben `available`、card=null、hasTakenStep=false、真实 Run phase=active 时允许。missing/unavailable/used、wrong level、existing card、已 step、pending/failed/won 或 invalid authority 均明确拒绝；拒绝不消费 entitlement、不 derive/create card、不改 inventory/runItems/Board/Run，也不返回 publishable candidate。entitlement 保持 available，可留给未来 same-level Attempt。
+- Atomic Claim：成功结果必须同时表达 matching Benben `available -> used` 与 Attempt card `null -> { item: deterministic S4-08A result, consumed:false }`；不得把 `used+null` 或 `available+card` 暴露为本次成功中间态。`used+null` 仍是合法 durable state，但不能补领。
+- Card derivation/trust：Claim eligibility 先验证，真正成功时才基于 exact authoritative levelId/runId 调用现有 `deriveBenbenCard`；caller不得选择 item，不得使用 `Math.random`、第二 RNG、复制权重或 arbitrary config。同一 Attempt 重试必须得到同一卡。S4-08 最终负责证明 IDs 来自 committed currentAttempt。
+- Resource model：matching unconsumed temporary card -> Account permanent inventory -> unavailable。允许一个极小 pure helper只负责 availability/source 与 successful-use consumption；temporary success 设 consumed=true且不扣 inventory，permanent success只扣对应 inventory且card不变，禁止双扣。helper不得决定 phase、target、encounter、first-step、usage cap、applicability或gameplay success；必须先确认 action属于 successful use，再原子消费资源。
+- Item compatibility：Detection no-target不消费、不增usage、不推进seed，成功仍受总cap 2；Airplane合法no-effect仍成功消费且总cap 1；Revive仍pending-only/optional/cap 1，decline与拒绝不消费；Lucky仍automatic且无新usage counter。temporary资源只替代来源，不改变任何Stage 3 gameplay、Board/Run、target、Victory或usage规则；mismatch/consumed card不供资源，inventory可fallback，temporary不得提供额外quota。
+- Correct Lucky applicability：pending创建后hasTakenStep已经为true；first-step canonical fact只能是 `encounter.occurredOnFirstStep`。Lucky applicable当且仅当当前为pending且该fact=true；此后才按 temporary Lucky -> Account Lucky 查资源。first Safe step 后 unconsumed temporary/permanent Lucky在later-step Mine不触发、不消费、也不阻止Revive。
+- Correct Revive priority：仅 `occurredOnFirstStep=true` 且存在真正可用Lucky resource时，Lucky priority阻止Revive。later-step pending无论temporary/permanent Lucky是否存在，Revive都只按自身pending legality、usage cap与temporary Revive -> Account Revive资源判断。正常movement seam在first-step Lucky适用时应在pending发布前自动结算；Revive command仍防御非法/低层first-step pending调用。一个Attempt最多一张temporary card，测试不得构造temporary Lucky与temporary Revive并存。
+- Atomic composition seam：successful Item future candidate必须一起表达gameplay effect、Board/Run、usage和选中资源消费。Airplane导致win时，未来S4-08必须按 effect/resource -> Reward -> terminal settlement -> card expiry -> aggregate validation -> Save/commit 组合，不能持久化terminal+card中间态。Lucky/Revive survival保持active并保留consumed=true card，直到Attempt结束。
+- Save/Runtime boundary：S4-08C不修改Save v3 schema、migration、Reward、S4-07R terminal、`CURRENT_SAVE_VERSION`、writer或persistence path；不创建shadow GameState/Account/Attempt、temporary inventory、Manager/Provider/Bus/framework。S4-08B contract已足够表达最终Claim/use facts；若Implementation发现必须再改schema则BLOCKED。完整aggregate、terminal/new-attempt wiring、mapper与guarded persistence activation仍属S4-08。
+- Test/mutation contract：除Claim/resource/四Item/usage/immutability/regression测试外，必须证明pending hasTakenStep=true但occurredOnFirstStep=true仍适用Lucky；first Safe后later Mine允许Revive且Lucky不耗；first-step temporary/permanent Lucky均优先Revive；无Lucky进入Revive；later-step Lucky不能救。必须杀死resource-existence-only Revive guard、pending hasTakenStep误判、later-step Lucky触发/扣减、first-step绕过Lucky以及auto flow先发布pending等mutations，恢复后不得提交。
+- Preserved boundaries：S4-08A goldens、S4-07R、S4-08B Save contract、无temporary card时Stage 3行为、Reward、Stage 2 persistence与RNG isolation必须全部回归；version仍2、writer仍disabled。
+- Revised order：`S4-08A CLOSED -> S4-07R CLOSED -> S4-08B CLOSED -> S4-08C Design CLOSED -> S4-08C Implementation -> S4-08 -> S4-09`。不得跳过Implementation gate或直接进入S4-08/S4-09。
 
 ### Stage 4 / S4-08B — Temporary Benben Card Attempt / Save v3 Contract & Persistence Foundation — PASS / CLOSED
 
@@ -909,7 +925,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08A、S4-07R、S4-08B Design/Implementation 均 PASS/CLOSED。amended Save v3 已有 required-nullable Attempt temporary card、canonical Benben streak 与 migration-null contract；CURRENT_SAVE_VERSION=2、v3 writer disabled、production Runtime仍是Stage 3 authority。Claim、temporary-first Item resource、new-attempt/terminal production wiring与 Runtime/v3 activation尚未实现。唯一下一行动为 Stage 4 / S4-08C Benben Claim + Temporary Item Resource Compatibility Design Review；仅设计，不执行 Implementation 或 S4-08。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08A、S4-07R、S4-08B、S4-08C Design 均 PASS/CLOSED。Claim必须atomic available→used+deterministic card；matching unconsumed temporary资源优先且只替代来源。Lucky仅first actual step Mine适用，canonical fact是pending encounter.occurredOnFirstStep，不是pending下已为true的hasTakenStep；later-step Lucky资源不得阻止Revive。CURRENT_SAVE_VERSION=2、v3 writer disabled、production Runtime仍是Stage 3 authority。唯一下一行动为 Stage 4 / S4-08C Benben Claim + Temporary Item Resource Compatibility Implementation；不得启用writer/root或进入S4-08。
 ```
 
 ## 阶段看板
@@ -920,7 +936,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R、S4-08B PASS/CLOSED；v3 DTO/validation/migration、Runtime value foundation、pure Reward/Terminal compatibility、global Benben config、deterministic RNG、probabilistic terminal revision 与 Attempt temporary-card Save foundation 已实现；production Runtime root NOT SWITCHED / writer DISABLED；Claim 与 temporary-first Item resource NOT IMPLEMENTED | 唯一入口 S4-08C Benben Claim + Temporary Item Resource Compatibility Design Review；之后依序 S4-08C Implementation、S4-08、S4-09 |
+| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R、S4-08B PASS/CLOSED；S4-08C Design PASS/CLOSED；v3 DTO/validation/migration、Runtime value foundation、pure Reward/Terminal compatibility、global Benben config、deterministic RNG、probabilistic terminal revision 与 Attempt temporary-card Save foundation 已实现；production Runtime root NOT SWITCHED / writer DISABLED；Claim 与 temporary-first Item resource NOT IMPLEMENTED | 唯一入口 S4-08C Benben Claim + Temporary Item Resource Compatibility Implementation；之后依序 S4-08、S4-09 |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
