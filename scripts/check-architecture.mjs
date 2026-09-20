@@ -61,6 +61,20 @@ export function validateDependency(importerPath, specifier, typeOnly = false) {
     return 'Save v3 persistence must not depend on gameplay RNG';
   }
 
+  if (
+    normalize(importerPath) === 'src/core/reward-generation.ts' &&
+    (targetPath === 'src/core/benben-random' || targetPath.startsWith('src/core/persistence/'))
+  ) {
+    return 'Reward generation must remain independent from Benben RNG and persistence';
+  }
+
+  if (
+    normalize(importerPath) === 'src/core/level-catalog.ts' &&
+    (targetPath === 'src/core/game-state' || targetPath.startsWith('src/core/persistence/'))
+  ) {
+    return 'Level catalog must remain independent from Runtime and persistence';
+  }
+
   const claimAndItemCompatibilityFiles = new Set([
     'src/core/benben-claim.ts',
     'src/core/item-resource.ts',
@@ -154,6 +168,21 @@ export function checkArchitecture() {
     }
     if (relativePath === 'src/core/benben-claim.ts' && /\bMath\.random\s*\(/.test(sourceText)) {
       violations.push(`${relativePath}: Benben Claim must use the deterministic Benben card authority`);
+    }
+    if (relativePath === 'src/core/reward-generation.ts' && /\bMath\.random\s*\(/.test(sourceText)) {
+      violations.push(`${relativePath}: Reward generation must use its deterministic Reward source`);
+    }
+    if (
+      relativePath === 'src/core/level-catalog.ts' &&
+      /\b(?:highestUnlocked|currentUnlockedIndex|nextUnlocked)\b/.test(sourceText)
+    ) {
+      violations.push(`${relativePath}: level access must derive progression without an unlock cache`);
+    }
+    if (
+      (relativePath === 'src/core/level-catalog.ts' || relativePath === 'src/core/reward-generation.ts') &&
+      /\b(?:AttemptState|FutureAttempt|Stage4GameState|FutureGameState|RewardManager|LevelManager)\b/.test(sourceText)
+    ) {
+      violations.push(`${relativePath}: S4-08.1 must not introduce Runtime, Attempt, or manager authority`);
     }
     const dependencyPattern = /(?:^|\n)\s*(import|export)\s+(type\s+)?(?:[^'"\n;]*?\s+from\s+)?['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 

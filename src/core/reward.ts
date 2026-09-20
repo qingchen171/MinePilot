@@ -24,6 +24,8 @@ export interface RewardStateInput {
   readonly oneTimeClaimId: unknown;
 }
 
+export type RewardPayloadInput = RewardStateInput['payload'];
+
 export type RewardBoardCompatibilityIssue = 'invalid-coordinate' | 'claimed-mismatch';
 
 export function isPositiveSafeInteger(value: unknown): value is number {
@@ -34,26 +36,25 @@ export function isRewardItem(value: unknown): value is RewardItem {
   return value === 'lucky' || value === 'detection' || value === 'airplane' || value === 'revive';
 }
 
+export function createRewardPayload(input: RewardPayloadInput): RewardPayload {
+  if (input.kind === 'coins') {
+    if (!isPositiveSafeInteger(input.amount)) {
+      throw new RangeError('Coin reward amount must be a positive safe integer.');
+    }
+    return Object.freeze({ kind: 'coins', amount: input.amount });
+  }
+
+  if (!isRewardItem(input.item)) throw new Error('Item reward item is invalid.');
+  if (!isPositiveSafeInteger(input.quantity)) {
+    throw new RangeError('Item reward quantity must be a positive safe integer.');
+  }
+  return Object.freeze({ kind: 'item', item: input.item, quantity: input.quantity });
+}
+
 export function createRewardState(input: RewardStateInput): RewardState {
   const coordinate = createCoordinate(input.coordinate.x, input.coordinate.y);
   if (typeof input.claimed !== 'boolean') throw new Error('Reward claimed must be a boolean.');
-  let payload: RewardPayload;
-  if (input.payload.kind === 'coins') {
-    if (!isPositiveSafeInteger(input.payload.amount)) {
-      throw new RangeError('Coin reward amount must be a positive safe integer.');
-    }
-    payload = Object.freeze({ kind: 'coins', amount: input.payload.amount });
-  } else {
-    if (!isRewardItem(input.payload.item)) throw new Error('Item reward item is invalid.');
-    if (!isPositiveSafeInteger(input.payload.quantity)) {
-      throw new RangeError('Item reward quantity must be a positive safe integer.');
-    }
-    payload = Object.freeze({
-      kind: 'item',
-      item: input.payload.item,
-      quantity: input.payload.quantity,
-    });
-  }
+  const payload = createRewardPayload(input.payload);
 
   return Object.freeze({
     coordinate,
