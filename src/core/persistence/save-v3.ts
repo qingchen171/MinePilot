@@ -76,6 +76,34 @@ export type ValidateSaveDocumentV3Result =
   | { readonly status: 'validated'; readonly document: SaveDocumentV3 }
   | { readonly status: 'invalid'; readonly issues: readonly SaveV3ValidationIssue[] };
 
+class TrustedMigratedV3 {
+  declare private readonly trustedOldSaveMigration: true;
+  readonly status = 'validated' as const;
+  constructor(readonly document: SaveDocumentV3) {}
+}
+const trustedMigrationResults = new WeakSet<object>();
+const trustedMigrationDocuments = new WeakMap<object, SaveDocumentV3>();
+function freezeTrustedValue<T>(value: T): T {
+  if (typeof value !== 'object' || value === null || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value)) freezeTrustedValue(child);
+  return Object.freeze(value);
+}
+export type TrustedMigratedSaveDocumentV3Result =
+  | TrustedMigratedV3
+  | { readonly status: 'invalid'; readonly issues: readonly SaveV3ValidationIssue[] };
+
+export function isAuthenticTrustedMigrationResult(
+  value: unknown,
+): value is Extract<TrustedMigratedSaveDocumentV3Result, { readonly status: 'validated' }> {
+  return typeof value === 'object' && value !== null && trustedMigrationResults.has(value);
+}
+
+export function getAuthenticTrustedMigrationDocument(
+  value: Extract<TrustedMigratedSaveDocumentV3Result, { readonly status: 'validated' }>,
+): SaveDocumentV3 | undefined {
+  return trustedMigrationDocuments.get(value);
+}
+
 // Local parsing control flow only; no shared validation framework or runtime authority.
 class InvalidV3 extends Error {
   constructor(readonly issues: readonly SaveV3ValidationIssue[]) { super('Invalid Save v3 DTO'); }
@@ -278,14 +306,14 @@ export function validateSaveDocumentV3(input: unknown): ValidateSaveDocumentV3Re
  * Future authoritative v3 restore of persisted legacy terminals needs an explicit trusted
  * integration boundary; accepting a caller-supplied boolean here would defeat that boundary.
  */
-export function migrateOldSaveDocumentToV3(input: unknown): ValidateSaveDocumentV3Result {
+export function migrateOldSaveDocumentToV3(input: unknown): TrustedMigratedSaveDocumentV3Result {
   const old = loadSaveDocument(input);
   if (old.status !== 'loaded') {
     return { status: 'invalid', issues: 'issues' in old ? old.issues : [{ code: 'invalid-save-version', path: '$.saveVersion' }] };
   }
   const document = old.document;
   const attempt = document.activeRun;
-  return validate({
+  const migrated = validate({
     saveVersion: 3, revision: document.revision,
     account: { inventory: document.account.inventory, coins: 0, completedLevelIds: [], oneTimeClaimIds: [], benbenByLevel: [] },
     currentAttempt: attempt === null ? null : {
@@ -296,4 +324,10 @@ export function migrateOldSaveDocumentToV3(input: unknown): ValidateSaveDocument
       terminalDisposition: attempt.phase.kind === 'won' || attempt.phase.kind === 'failed' ? 'legacy-excluded' : 'not-applicable',
     },
   }, true);
+  if (migrated.status === 'invalid') return migrated;
+  const trusted = new TrustedMigratedV3(migrated.document);
+  trustedMigrationResults.add(trusted);
+  trustedMigrationDocuments.set(trusted, freezeTrustedValue(structuredClone(migrated.document)));
+  Object.freeze(trusted);
+  return trusted;
 }

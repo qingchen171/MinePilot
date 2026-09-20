@@ -59,4 +59,9 @@ describe('architecture boundaries', () => {
     expect(layerOf('src/main.ts')).toBe('bootstrap');
     expect(layerOf('src/scenes/game/GameScene.ts')).toBe('scenes');
   });
+
+  it('keeps the Stage 4 Runtime foundation dormant and reconstruction generation-free', async () => {
+    const { checkArchitecture } = await import('../../scripts/check-architecture.mjs');
+    expect(checkArchitecture()).toEqual([]);
+  });
 });
