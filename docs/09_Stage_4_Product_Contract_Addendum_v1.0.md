@@ -372,3 +372,36 @@ S4-02 CLOSED、S4-03 CONTRACT FROZEN、S4-04 PASS/CLOSED（implementation baseli
 唯一入口：**Stage 4 / S4-08A — Global Benben Configuration & Deterministic RNG Foundation Implementation**。
 
 新 AI 仅从正式仓库必须恢复：Stage 0–3 FROZEN；S4-04/S4-07 历史 PASS/CLOSED；本节取代冲突 Benben semantics；3 settled Failures -> deterministic 3/10 eligibility；eligibility/claim 分离；Attempt-owned weighted Item card；matching temporary resource 优先；两个隔离 RNG domains；Save v3 必须在 writer activation 前受控修订；`CURRENT_SAVE_VERSION=2`、v3 writer disabled；revised order 与唯一 S4-08A entry。不得重新执行 S4-BEN-01 或跳过前置。
+
+## 13. S4-08 Atomic Runtime / Save v3 Activation Design — PASS / CLOSED (2026-09-20)
+
+**FINAL DESIGN CONTRACT APPROVED.** 本节取代 §10.11、§11 和 §12.8 中已过时的 task order/current-entry 文字，不改变其他已冻结的 Save v3、Benben、Stage 2/3 合同。Design Correction 已消除 Attempt Factory 早于 Runtime authority 的顺序矛盾，并补齐 fresh/no-save bootstrap。Production 仍使用 Stage 3 Runtime / Save v2；`CURRENT_SAVE_VERSION=2`，v3 writer disabled。
+
+### 13.1 Fresh account / no-save authority
+
+- `INITIAL_ACCOUNT` 唯一 production 值：inventory Lucky/Detection/Airplane/Revive = `1/2/1/1`，Coins `0`，`completedLevelIds=[]`，`oneTimeClaimIds=[]`，`benbenByLevel=[]`。
+- No committed save 在 Runtime 中表达为 initial Account + `currentAttempt=null`；不创建 fake Run/Save，不写盘、不调 RNG。Refresh 稳定返回同一 authority。
+- No-save 的 expected revision/runId 均为 `null`；第一笔成功 mutation 写 revision `0`。No-save 与 committed revision 0 严格不同。失败保持 no-save account-only；并发 first writes 最多一个由现有 Stage 2 authority 成功。
+
+### 13.2 Minimum production catalog / Reward authority
+
+- 当前 catalog 只有 stable ID `level-001`：`9×9`、`10` Mines、`0` Obstacles。它是默认开放的首关、当前 final level，允许 Replay、当前无 Next。未来追加 catalog level 不改名它；unlocked 由 catalog + completed IDs 派生，不保存 highestUnlocked。
+- `level-001` 每个 new Attempt 生成恰好 `2` 个 ordinary Reward；Safe-only、row-major candidates、partial Fisher–Yates without replacement、每 coordinate 最多一个，`oneTimeClaimId=null`。不足时拒绝 configuration/Attempt creation，不 clamp/复制/减少。
+- Payload 权重 Coins/Detection/Revive/Lucky/Airplane = `50/20/15/10/5`，amount/quantity 均为 `1`。坐标选择完成后才按同一 dedicated Reward RNG stream 顺序抽 payload。Reward identity 是 `runId + coordinate`，无 rewardId；未来 one-time claim ID 只能来自 validated config。
+- Compatibility 固定为 domain `reward-generation-v1`，adopted generation uint32 seed，FNV-1a uint32，domain UTF-8 byte-length-prefixed + seed 4-byte big-endian encoding，复用现有 Mulberry32/rejection sampling。不使用 `Math.random()`，不推进 Mine/Detection/Benben RNG。Domain/编码/PRNG/sampling/candidate order/draw order/goldens 一经合并即为 compatibility-sensitive。
+- Reward generation 仅在 Start/Restart/Retry 的 new Attempt creation 发生；load/reopen/refresh/migration/exploration/claim/terminal/Benben Claim 不得重新生成。
+
+### 13.3 Corrected controlled activation order
+
+1. **S4-08.1 — Level Access & Deterministic Reward Generation Foundation**：只做 pure catalog/access、production `level-001` config、Reward config/generator/RNG/goldens。不建 Attempt/Runtime/factory/mapper/reader/Start/writer；production 仍 Stage 3/v2。
+2. **S4-08.2 — Stage 4 Runtime Aggregate, Fresh Bootstrap, Complete Attempt Factory & Save v3 Mapping/Reconstruction Foundation**：建立正式 Account/Attempt/GameState、account-only/bootstrap、返回真实 AttemptState 的 complete factory、explicit mapper/reconstruction 与 dormant v1/v2/v3 Stage 4 reader；production 仍 Stage 3/v2。
+3. **S4-08.3 — Dormant Full Mutation & Lifecycle Orchestration**：建立 committed-read/identity/lifecycle/gameplay/Reward/terminal/Benben/Claim orchestration 及 failure injection；production entrypoints 仍 Stage 3/v2。
+4. **S4-08.4 — Atomic Production Runtime / Save v3 Activation**：同时切 production Runtime root、reader、全部可达 mutation entrypoints、writer 与 `CURRENT_SAVE_VERSION 2 -> 3`，使全部 v2 mutation writers 不可达。只有本步可 activation writer。
+
+Complete Attempt Factory 必须与正式 AttemptState 同阶段或更晚实现，并一次返回 identity/provenance/Run/RunItems/Rewards/`not-applicable` terminal/null card 完整 AttemptState；不得返回 Save DTO 或创建临时 shadow authority。S4-08.2 reader 只是 dormant foundation；“reader before writer”不授权提前替换 production dispatcher。
+
+### 13.4 First writable v3 gate / recovery
+
+Writer activation 前必须同时证明：full Runtime/account-only/INITIAL_ACCOUNT；no-save zero-write/zero-RNG/revision-0/concurrency；production catalog/Reward config/goldens/RNG isolation；real Attempt factory；explicit no-alias mapper/reconstruction；v1/v2/v3 read-only migration 与 mixed-version A/B；Start/abandon/terminal dismiss/Restart/Retry；Flag/movement/Lucky/Detection/Airplane/Revive/pending Failure；Reward/completion/Benben settlement/Claim/card expiry；revision/runId/lease/stale-write/persist-before-publish；无可达 v2 writer；完整 quality/Independent Reviewer/Linux gate。任一未绿，`CURRENT_SAVE_VERSION` 不得改为 3。
+
+新 AI 必须恢复：Stage 0–3 FROZEN；S4-08A/S4-07R/S4-08B/S4-08C/S4-08 Design CLOSED；production 仍 Stage 3/v2、version 2、writer disabled；上述 initial Account、`level-001`、Reward production/compatibility 合同、no-save revision 合同、four-step decomposition；writer only in S4-08.4。唯一后续入口为 **Stage 4 / S4-08.1 — Level Access & Deterministic Reward Generation Foundation Implementation**；不得重新执行已关闭 Design 或跳过阶段。

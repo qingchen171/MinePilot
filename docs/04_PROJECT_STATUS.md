@@ -1,7 +1,7 @@
 # PROJECT_STATUS
 
 **项目：MinePilot / Minesweeper Product**  
-**状态更新时间：2026-09-17**
+**状态更新时间：2026-09-20**
 **控制文档版本：v1.0 FROZEN**  
 **正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item foundation/Save v2/统一揭雷、Lucky/Detection/Revive/Airplane 及跨 Item 生命周期集成均已完成。Stage 3 FROZEN CANDIDATE；最终冻结状态按下方标签与门禁规则确认。**
 
@@ -197,9 +197,21 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-08 — Atomic Runtime / Save v3 Activation Design Review**
+**Stage 4 / S4-08.1 — Level Access & Deterministic Reward Generation Foundation Implementation**
 
-DESIGN REVIEW ONLY。审计并冻结唯一 production `GameState { account, currentAttempt }`、account-only/single-attempt lifecycle、Runtime↔Save v3 显式映射与重建、v1/v2→v3 production load、trusted legacy exclusion、Start/Restart/Retry/abandon、Reward/terminal/temporary-card expiry、Claim/Item guarded commit、revision/runId/lease authority、persist-before-publish，以及最后的 writer/version switch gate。Implementation 未授权；不得直接启用 v3 writer、修改 `CURRENT_SAVE_VERSION` 或进入 S4-09。
+只实现已冻结的 pure Level catalog/access、`level-001` production config、Reward config validation、`reward-generation-v1` deterministic generation、golden vectors 与 RNG isolation tests。Production 必须继续使用 Stage 3 Runtime / Save v2；不得建立 AttemptState/future GameState/shadow Runtime/Complete Attempt Factory/Runtime mapper/Stage 4 reader/Start command，不得修改 Save、dispatcher、coordinator、`CURRENT_SAVE_VERSION`、writer 或开始 S4-08.2。
+
+### Stage 4 / S4-08 — Atomic Runtime / Save v3 Activation Design Review — PASS / CLOSED
+
+- 人工验收结论：`PASS — S4-08 ATOMIC ACTIVATION CONTRACT READY`。初次 Design Review 后发现 Attempt Factory/Runtime ordering 矛盾与 fresh/no-save bootstrap authority 缺口，已在 Design Correction 中修正；本节及 Addendum §13 是最终 authoritative Design。Closeout 仅修改 authority docs，production/tests/config changes = 0。
+- Fresh authority：`INITIAL_ACCOUNT = { inventory: { lucky: 1, detection: 2, airplane: 1, revive: 1 }, coins: 0, completedLevelIds: [], oneTimeClaimIds: [], benbenByLevel: [] }`。No committed save 在内存中映射为该 Account + `currentAttempt=null`，不创建 fake Run、不写盘、不调 RNG。No-save 的 expected revision/runId 均为 `null`；首次成功写入 revision `0`，与“已 committed revision 0”严格区分。
+- Production catalog：当前唯一真实 production level 为 stable ID `level-001`，Board `9×9`、`mineCount=10`、无 Obstacle；它是默认开放的首关且当前为 final level，允许 Replay、无 Next。Unlocked 仅由 catalog + `completedLevelIds` 派生，不持久化 `highestUnlocked`；后续追加 `level-002...` 不得改名 `level-001`。
+- Reward production config：`level-001` 每个 new Attempt 固定生成 `2` 个 ordinary Reward，Safe-only、row-major candidates、without replacement、每坐标最多一个；无 one-time Reward，`oneTimeClaimId=null`。Payload 权重为 Coins/Detection/Revive/Lucky/Airplane = `50/20/15/10/5`，对应 amount/quantity 均为 `1`。配置超出 eligible Safe 数量必须拒绝，不 clamp/重复/自动减少。
+- Reward compatibility：domain `reward-generation-v1`；adopted generation uint32 seed 通过 FNV-1a uint32 派生，domain 按 UTF-8 byte-length-prefixed encoding、seed 按 4-byte big-endian encoding；复用现有 Mulberry32/rejection-sampling `createSeededRandomSource`。单一 dedicated stream 的调用顺序固定为 partial Fisher–Yates coordinate selection -> payload selection，不推进 Mine/Detection/Benben RNG；所有算法、编码、顺序与 goldens 均为 compatibility-sensitive。Reward identity 仍为 `runId + coordinate`，无 rewardId。
+- Runtime/reader/writer boundary：目标唯一 Runtime 为 `GameState { account, currentAttempt: AttemptState | null }`；Complete Attempt Factory 必须与正式 AttemptState 同阶段或更晚实现并返回真实 AttemptState，不得返回 DTO/临时 shadow aggregate。S4-08.2 的 v1/v2/v3 Stage 4 reader 保持 dormant；production reader/root/writer 只在 S4-08.4 一次切换。
+- 修正后的唯一实施顺序：`S4-08.1 Level/Reward pure foundation -> S4-08.2 Stage 4 Runtime + fresh bootstrap + Complete Attempt Factory + v3 mapping/reconstruction -> S4-08.3 dormant full mutation/lifecycle orchestration -> S4-08.4 atomic production Runtime/reader/all entrypoints/writer/version activation -> S4-09`。S4-08.1/2/3 合并后 production 都仍必须是 Stage 3/v2；只有 S4-08.4 可以修改 `CURRENT_SAVE_VERSION` 并启用 v3 writer。
+- First writable gate：full Runtime/account-only/initial Account、no-save bootstrap/revision/concurrency、production catalog/Reward config/goldens/isolation、real Attempt factory、explicit mapper/reconstruction/no-alias、v1/v2/v3 read-only reader/mixed-version A/B、全部 lifecycle/gameplay/economy/terminal/Claim mutation、revision/runId/lease/stale-write/persist-before-publish、无可达 v2 writer 及全部 quality/Reviewer/Linux gates 未全绿前，writer 不得 activation。
+- Recovery：新 AI 必须能仅从正式仓库恢复 Stage 0–3 FROZEN，S4-08A/S4-07R/S4-08B/S4-08C/S4-08 Design CLOSED，production 仍 Stage 3/v2、version 2/writer disabled，INITIAL_ACCOUNT、`level-001`、Reward production config/compatibility，four-step decomposition，writer-only-in-S4-08.4，以及唯一 Next Action S4-08.1。
 
 ### Stage 4 / S4-08C — Benben Claim + Temporary Item Resource Compatibility — PASS / CLOSED
 
@@ -938,7 +950,7 @@ DESIGN REVIEW ONLY。审计并冻结唯一 production `GameState { account, curr
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08A、S4-07R、S4-08B、S4-08C 均 PASS/CLOSED。S4-08C 已实现 pure atomic Claim、temporary-first Item resource compatibility 和 corrected Lucky/Revive applicability，但尚未激活 production aggregate/persistence。CURRENT_SAVE_VERSION=2、v3 writer disabled、production Runtime仍是Stage 3 authority。唯一下一行动为 Stage 4 / S4-08 Atomic Runtime / Save v3 Activation Design Review；DESIGN REVIEW ONLY，不得直接启用writer/root、执行Implementation或进入S4-09。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12–13）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08A、S4-07R、S4-08B、S4-08C 与 S4-08 Design 均 PASS/CLOSED。CURRENT_SAVE_VERSION=2、v3 writer disabled、production Runtime仍是 Stage 3 authority。唯一下一行动为 Stage 4 / S4-08.1 — Level Access & Deterministic Reward Generation Foundation Implementation；仅允许 pure catalog/access、level-001 production config、Reward config/generation/RNG/goldens，不得建立 Attempt/Runtime/factory/mapper/reader/Start、修改 Save/persistence/version/writer，或进入 S4-08.2/3/4/S4-09。
 ```
 
 ## 阶段看板
@@ -949,7 +961,7 @@ DESIGN REVIEW ONLY。审计并冻结唯一 production `GameState { account, curr
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R、S4-08B、S4-08C PASS/CLOSED；v3 DTO/validation/migration、Runtime value foundation、pure Reward/Terminal compatibility、global Benben config、deterministic RNG、probabilistic terminal revision、Attempt temporary-card Save foundation、pure Claim 与 temporary-first Item compatibility 已实现；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-08 Atomic Runtime / Save v3 Activation Design Review；Implementation 未授权，之后才可受控进入 activation 与 S4-09 |
+| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R、S4-08B、S4-08C 与 S4-08 Design PASS/CLOSED；v3 DTO/validation/migration、Runtime value foundation、pure Reward/Terminal compatibility、global Benben config/RNG、Attempt temporary-card Save foundation、pure Claim/temporary-first Item compatibility、fresh Account、level-001 与 Reward generation contract 已冻结；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-08.1 Level Access & Deterministic Reward Generation Foundation Implementation；仅 pure foundation，不得进入 Runtime/reader/writer activation |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
@@ -962,7 +974,7 @@ DESIGN REVIEW ONLY。审计并冻结唯一 production `GameState { account, curr
 - localStorage 不提供 atomic CAS；S2-06 的 best-effort lease 与两次 ownership verification 不能消除所有精确并发 race。若未来实测不足，必须单独评估更强协调机制，不得把当前实现描述为强事务或绝对互斥。
 - Reward farming/反自动化继续保留于 Future Requirements Registry；在出现真实经济破坏证据前不提前实现复杂防刷系统。
 - 游戏正式名称与域名未定。
-- 平衡参数（掉率、价格、援助阈值、障碍比例最终值）等待可玩原型数据。
+- 未冻结的后续关卡/商店平衡（例如价格、level-002+ 的 Reward/难度参数、障碍比例最终值）等待可玩原型数据；不得把已冻结的 `level-001` Reward 配置或 Benben global 阈值重新标为待定。
 - 美术、音乐与音效素材来源等待核心玩法验证后决定。
 - 目标浏览器最低版本等待 Stage 0/6 兼容性审查。
 - 流程改进候选：现行“同一 Bug 两次修复未通过即 STOP”可能需要区分“未知根因下的连续试错”与“根因已明确的直接连锁修复”；在正式审查并修改 Protocol 前继续严格遵守现行规则，本次不修改 Protocol。
