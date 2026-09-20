@@ -155,6 +155,51 @@ export function checkArchitecture() {
     }
 
     const sourceText = fs.readFileSync(absolutePath, 'utf8');
+    const dormantStage4Modules = [
+      'stage4-account', 'attempt-state', 'stage4-game-state', 'stage4-attempt-factory',
+      'stage4-runtime-mapping', 'dormant-stage4-reader',
+    ];
+    const productionStage4Importers = relativePath === 'src/main.ts' ||
+      relativePath === 'src/core/persistence/save-dispatcher.ts' ||
+      relativePath === 'src/systems/persistence/persistence-coordinator.ts' ||
+      relativePath === 'src/systems/persistence/new-attempt.ts' ||
+      /src\/systems\/persistence\/(?:lucky|detection|revive|airplane)\.ts$/.test(relativePath);
+    if (
+      productionStage4Importers &&
+      dormantStage4Modules.some((moduleName) => sourceText.includes(moduleName))
+    ) {
+      violations.push(`${relativePath}: production must not import dormant Stage 4 Runtime foundation`);
+    }
+    if (
+      relativePath === 'src/core/stage4-attempt-factory.ts' &&
+      /(?:systems\/persistence|core\/persistence)/.test(sourceText)
+    ) {
+      violations.push(`${relativePath}: Complete Attempt factory must not depend on persistence`);
+    }
+    if (
+      relativePath === 'src/core/persistence/stage4-runtime-mapping.ts' &&
+      /(?:level-catalog|reward-generation|initial-board|\.\/random)/.test(sourceText)
+    ) {
+      violations.push(`${relativePath}: reconstruction must not depend on catalog, generation, or RNG`);
+    }
+    if (
+      relativePath === 'src/core/persistence/save-v3.ts' &&
+      /\b(?:allowLegacy|migrationSource|legacyTrusted)\b|\btrusted\??\s*:/.test(sourceText)
+    ) {
+      violations.push(`${relativePath}: migration trust must not use a public boolean or persisted marker`);
+    }
+    if (
+      relativePath === 'src/core/stage4-attempt-factory.ts' &&
+      /\b(?:RunIdSource|nextRunId|hiddenSeedSelection|SaveDocumentV3)\b/.test(sourceText)
+    ) {
+      violations.push(`${relativePath}: Complete Attempt factory must receive exact identity/provenance and return domain truth`);
+    }
+    if (
+      relativePath === 'src/systems/persistence/dormant-stage4-reader.ts' &&
+      /(?:persistence-coordinator|guarded-persistence|writer-lease|key-value-storage)/.test(sourceText)
+    ) {
+      violations.push(`${relativePath}: dormant Stage 4 reader must consume selected authority and remain read-only`);
+    }
     if (relativePath === 'src/core/terminal-settlement.ts') {
       if (/\bMath\.random\s*\(/.test(sourceText)) {
         violations.push(`${relativePath}: terminal settlement must not call Math.random`);
