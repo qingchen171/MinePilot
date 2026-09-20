@@ -404,4 +404,18 @@ Complete Attempt Factory 必须与正式 AttemptState 同阶段或更晚实现�
 
 Writer activation 前必须同时证明：full Runtime/account-only/INITIAL_ACCOUNT；no-save zero-write/zero-RNG/revision-0/concurrency；production catalog/Reward config/goldens/RNG isolation；real Attempt factory；explicit no-alias mapper/reconstruction；v1/v2/v3 read-only migration 与 mixed-version A/B；Start/abandon/terminal dismiss/Restart/Retry；Flag/movement/Lucky/Detection/Airplane/Revive/pending Failure；Reward/completion/Benben settlement/Claim/card expiry；revision/runId/lease/stale-write/persist-before-publish；无可达 v2 writer；完整 quality/Independent Reviewer/Linux gate。任一未绿，`CURRENT_SAVE_VERSION` 不得改为 3。
 
-新 AI 必须恢复：Stage 0–3 FROZEN；S4-08A/S4-07R/S4-08B/S4-08C/S4-08 Design CLOSED；production 仍 Stage 3/v2、version 2、writer disabled；上述 initial Account、`level-001`、Reward production/compatibility 合同、no-save revision 合同、four-step decomposition；writer only in S4-08.4。唯一后续入口为 **Stage 4 / S4-08.1 — Level Access & Deterministic Reward Generation Foundation Implementation**；不得重新执行已关闭 Design 或跳过阶段。
+Historical recovery note：本节 closeout 当时的 S4-08.1 entry 已由下方 §14 的 PASS/CLOSED 状态取代；当前唯一入口以 §14 和 PROJECT_STATUS 为准。
+
+## 14. S4-08.1 Level Access & Deterministic Reward Generation Foundation — PASS / CLOSED (2026-09-20)
+
+**IMPLEMENTATION ACCEPTED / DORMANT FOUNDATION ONLY.** Implementation `73b3673a9d6ac8cc1a386362d179647ca002b558`、PR #45、merged baseline `55b79b3b3fc8593bb3e15da07a12286501a1979a`。本节取代 §13.4 中已过时的 S4-08.1 current-entry 文字；§13 四阶段分解继续有效。
+
+- Production catalog 现有唯一 level `level-001`（9×9、10 Mines、0 Obstacles），默认 unlocked、当前 final、允许 Replay。Access 仅由 exact stable IDs、catalog order 与 `completedLevelIds` 派生；不保存 unlock cache，不 trim/normalize/case-fold stored IDs。
+- `level-001` 生成 2 个 ordinary Rewards，weights Coins/Detection/Revive/Lucky/Airplane=`50/20/15/10/5`、所有 amount/quantity=1、无 one-time claim。`nextInt(100)` buckets 为 `0–49/50–69/70–84/85–94/95–99`。
+- Reward generation 仅使用 row-major Safe candidates、partial Fisher–Yates without replacement，先抽全部 coordinates 再依 selection order 抽 payload；不足明确拒绝。输出复用 canonical Reward values，identity、claim/one-time、claimed/explored 与 Safe-only 解释不变。
+- RNG compatibility 固定为 `reward-generation-v1`、UTF-8 uint32 byte-length-prefixed domain、generation seed 4-byte big-endian、FNV-1a uint32、现有 Mulberry32/rejection sampling。Reward source 与 Mine/Detection/Benben 隔离，无 shared/global RNG 或 `Math.random()`。seed 0、123456789、uint32 max 与真实 Stage1 board goldens 已冻结；intentional change 必须 compatibility change-control，不得直接更新 expected。
+- Catalog/config/coordinates/payloads/results 均 immutable/no-alias。Generation 只用于 future new Attempt creation，不在 load/migration/refresh/reopen/exploration/claim/terminal/Benben Claim 执行。
+- Evidence：Architecture/TypeScript/Build PASS；Unit 844、Integration 102、Playwright 1；Reviewer focused 86；A–S 19 mutation classes 全部被检测；branch/PR/main Linux `35505061641`/`35505171090`/`35505233532` Success；Independent Reviewer PASS。
+- Production boundary 未改变：Runtime 仍 Stage3，Save/writer 仍 v2，`CURRENT_SAVE_VERSION=2`，v3 writer disabled。未实现 Account/Attempt/Stage4 GameState、fresh bootstrap、Complete Attempt Factory、mapper/reconstruction、Stage4 reader、Start 或 persistence activation。
+
+唯一入口现在是 **Stage 4 / S4-08.2 — Stage 4 Runtime Aggregate, Fresh Bootstrap, Complete Attempt Factory & Save v3 Mapping/Reconstruction Foundation Design Review**。仅 Design Review，Implementation 未授权。新 AI 必须恢复 S4-08 Design/S4-08.1 CLOSED、catalog/Reward/RNG/goldens、Stage3/v2 production boundary、no-save≠revision0，以及 writer only in S4-08.4；不得直接开始 S4-08.2 Implementation 或跳至 S4-08.3/4/S4-09。

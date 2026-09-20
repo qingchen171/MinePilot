@@ -197,9 +197,9 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-08.1 — Level Access & Deterministic Reward Generation Foundation Implementation**
+**Stage 4 / S4-08.2 — Stage 4 Runtime Aggregate, Fresh Bootstrap, Complete Attempt Factory & Save v3 Mapping/Reconstruction Foundation Design Review**
 
-只实现已冻结的 pure Level catalog/access、`level-001` production config、Reward config validation、`reward-generation-v1` deterministic generation、golden vectors 与 RNG isolation tests。Production 必须继续使用 Stage 3 Runtime / Save v2；不得建立 AttemptState/future GameState/shadow Runtime/Complete Attempt Factory/Runtime mapper/Stage 4 reader/Start command，不得修改 Save、dispatcher、coordinator、`CURRENT_SAVE_VERSION`、writer 或开始 S4-08.2。
+仅执行 Design Review。必须审计 Stage 3 Account/GameState 到唯一未来 `GameState { account, currentAttempt }` 的受控演进、`INITIAL_ACCOUNT`、fresh/no-save 与 committed revision 0 的区分、完整 AttemptState/Attempt Factory、显式 Runtime↔Save v3 mapping/reconstruction、dormant v1/v2/v3 reader、trusted `legacy-excluded`、mixed-version read、immutability/no-alias 及 production 隔离。Implementation 未授权；production 必须继续使用 Stage 3 Runtime / Save v2，`CURRENT_SAVE_VERSION=2`、v3 writer disabled，不得进入 S4-08.3/4 或 S4-09。
 
 ### Stage 4 / S4-08 — Atomic Runtime / Save v3 Activation Design Review — PASS / CLOSED
 
@@ -211,7 +211,18 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 - Runtime/reader/writer boundary：目标唯一 Runtime 为 `GameState { account, currentAttempt: AttemptState | null }`；Complete Attempt Factory 必须与正式 AttemptState 同阶段或更晚实现并返回真实 AttemptState，不得返回 DTO/临时 shadow aggregate。S4-08.2 的 v1/v2/v3 Stage 4 reader 保持 dormant；production reader/root/writer 只在 S4-08.4 一次切换。
 - 修正后的唯一实施顺序：`S4-08.1 Level/Reward pure foundation -> S4-08.2 Stage 4 Runtime + fresh bootstrap + Complete Attempt Factory + v3 mapping/reconstruction -> S4-08.3 dormant full mutation/lifecycle orchestration -> S4-08.4 atomic production Runtime/reader/all entrypoints/writer/version activation -> S4-09`。S4-08.1/2/3 合并后 production 都仍必须是 Stage 3/v2；只有 S4-08.4 可以修改 `CURRENT_SAVE_VERSION` 并启用 v3 writer。
 - First writable gate：full Runtime/account-only/initial Account、no-save bootstrap/revision/concurrency、production catalog/Reward config/goldens/isolation、real Attempt factory、explicit mapper/reconstruction/no-alias、v1/v2/v3 read-only reader/mixed-version A/B、全部 lifecycle/gameplay/economy/terminal/Claim mutation、revision/runId/lease/stale-write/persist-before-publish、无可达 v2 writer 及全部 quality/Reviewer/Linux gates 未全绿前，writer 不得 activation。
-- Recovery：新 AI 必须能仅从正式仓库恢复 Stage 0–3 FROZEN，S4-08A/S4-07R/S4-08B/S4-08C/S4-08 Design CLOSED，production 仍 Stage 3/v2、version 2/writer disabled，INITIAL_ACCOUNT、`level-001`、Reward production config/compatibility，four-step decomposition，writer-only-in-S4-08.4，以及唯一 Next Action S4-08.1。
+- Historical Recovery superseded：S4-08 Design closeout 当时的 S4-08.1 entry 已由下方 S4-08.1 PASS/CLOSED 取代；当前恢复与唯一入口以下方最新 closeout 为准。
+
+### Stage 4 / S4-08.1 — Level Access & Deterministic Reward Generation Foundation — PASS / CLOSED
+
+- 人工验收结论：`PASS — S4-08.1 LEVEL/REWARD FOUNDATION IMPLEMENTED`。Implementation commit `73b3673a9d6ac8cc1a386362d179647ca002b558`；PR #45；merged main baseline `55b79b3b3fc8593bb3e15da07a12286501a1979a`。这是 dormant/pure foundation，不是 production Stage 4 activation。
+- Catalog/access authority：唯一 production level 是永久 stable ID `level-001`，Board `9×9`、10 Mines、0 Obstacles；当前为默认开放首关与 final level。其它关卡访问只由 catalog order + exact `completedLevelIds` 派生，completed 可永久 Replay，未知/padded IDs 不解锁；不持久化 `highestUnlocked`，Stable ID 只以 trim-nonempty 验证且存储/比较不 trim、normalize 或 case-fold。
+- Reward authority：`level-001` 的 `rewardCount=2`，仅 ordinary Reward、`oneTimeClaimId=null`；Coins/Detection/Revive/Lucky/Airplane 权重 `50/20/15/10/5`、amount/quantity 全为 1。`nextInt(100)` buckets 固定为 `0–49/50–69/70–84/85–94/95–99`。eligible coordinates 仅 Safe、row-major、partial Fisher–Yates without replacement；先完成全部 coordinates，再按 selection order 抽 payload；不足时拒绝，不 clamp/重复/降 count。
+- RNG compatibility：domain `reward-generation-v1`，adopted generation uint32 seed，domain 使用 UTF-8 uint32 byte-length prefix，seed 使用 4-byte big-endian，FNV-1a uint32 后复用既有 Mulberry32/rejection-sampling `nextInt`。Reward source 与 Mine/Detection/Benben eligibility/card 完全隔离，无 global RNG/`Math.random()`；domain、编码、hash、PRNG、bounded mapping、candidate/sampling/draw order 及 goldens 均为 compatibility-sensitive，禁止只更新 expected 静默改变。
+- Reward lifecycle/compatibility：生成只属于未来 Start/Restart/Retry 的 new Attempt creation；load/migration/refresh/reopen/exploration/claim/terminal/Benben Claim 不生成。复用 canonical `RewardPayload`/`RewardState`，identity 仍为 `runId + coordinate`、无 rewardId；未改变 claim、one-time synchronization、claimed/explored、Safe-only 合同，现有 one-time 能力仍保留。
+- Immutability/evidence：production catalog/config、coordinates、payloads 与 generated Rewards 均复制并 immutable，caller mutation 不污染 authority。Goldens覆盖 generation seed `0`、`123456789`、uint32 max 及真实 Stage 1 `level-001` Board composition，并锁住 derived seed、coordinate selection、payload draws/results 与 final Rewards。Architecture/TypeScript/Build PASS；Unit `844/844`、Integration `102/102`、Playwright `1/1`；Reviewer focused `86/86`；A–S 共 19 项 mutation sanity 全部被杀死且未进入 main。Branch/PR/main Linux runs `35505061641`/`35505171090`/`35505233532` 均 Success，Independent Reviewer PASS。
+- Production/reverse scan：production 仍为 Stage 3 Runtime + Save v2，`CURRENT_SAVE_VERSION=2`、v3 writer disabled。没有 Account/Attempt/Stage4 GameState activation、fresh bootstrap、Complete Attempt Factory、Start、mapper/reconstruction、Stage4 reader、Save/migration/version/dispatcher/writer/persistence path 变化、Reward RNG state persistence、load-time generation或 Manager/Repository/Bus/Provider framework。
+- Recovery：必须恢复 S4-08 Design 与 S4-08.1 CLOSED、上述 catalog/access/Reward/RNG/goldens、production 仍 Stage3/v2，以及 Attempt Factory/Stage4 Runtime/fresh bootstrap/Stage4 reader 尚未实现、writer only in S4-08.4。唯一 Next Action 是 S4-08.2 Design Review only；不得直接开始 Implementation。
 
 ### Stage 4 / S4-08C — Benben Claim + Temporary Item Resource Compatibility — PASS / CLOSED
 
@@ -950,7 +961,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12–13）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08A、S4-07R、S4-08B、S4-08C 与 S4-08 Design 均 PASS/CLOSED。CURRENT_SAVE_VERSION=2、v3 writer disabled、production Runtime仍是 Stage 3 authority。唯一下一行动为 Stage 4 / S4-08.1 — Level Access & Deterministic Reward Generation Foundation Implementation；仅允许 pure catalog/access、level-001 production config、Reward config/generation/RNG/goldens，不得建立 Attempt/Runtime/factory/mapper/reader/Start、修改 Save/persistence/version/writer，或进入 S4-08.2/3/4/S4-09。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12–14）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08A、S4-07R、S4-08B、S4-08C、S4-08 Design 与 S4-08.1 均 PASS/CLOSED。CURRENT_SAVE_VERSION=2、v3 writer disabled、production Runtime仍是 Stage 3 authority。唯一下一行动为 Stage 4 / S4-08.2 — Stage 4 Runtime Aggregate, Fresh Bootstrap, Complete Attempt Factory & Save v3 Mapping/Reconstruction Foundation Design Review；DESIGN REVIEW ONLY，Implementation 未授权，不得进入 S4-08.3/4 或 S4-09。
 ```
 
 ## 阶段看板
@@ -961,7 +972,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R、S4-08B、S4-08C 与 S4-08 Design PASS/CLOSED；v3 DTO/validation/migration、Runtime value foundation、pure Reward/Terminal compatibility、global Benben config/RNG、Attempt temporary-card Save foundation、pure Claim/temporary-first Item compatibility、fresh Account、level-001 与 Reward generation contract 已冻结；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-08.1 Level Access & Deterministic Reward Generation Foundation Implementation；仅 pure foundation，不得进入 Runtime/reader/writer activation |
+| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R、S4-08B、S4-08C、S4-08 Design 与 S4-08.1 PASS/CLOSED；production catalog/access 与 deterministic Reward generation foundation 已实现并冻结；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-08.2 Runtime/Aggregate/Bootstrap/Attempt Factory/Mapper/Reader Design Review only；Implementation 未授权 |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
