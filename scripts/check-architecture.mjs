@@ -155,20 +155,27 @@ export function checkArchitecture() {
     }
 
     const sourceText = fs.readFileSync(absolutePath, 'utf8');
-    const dormantStage4Modules = [
-      'stage4-account', 'attempt-state', 'stage4-game-state', 'stage4-attempt-factory',
-      'stage4-runtime-mapping', 'dormant-stage4-reader',
-    ];
-    const productionStage4Importers = relativePath === 'src/main.ts' ||
-      relativePath === 'src/core/persistence/save-dispatcher.ts' ||
-      relativePath === 'src/systems/persistence/persistence-coordinator.ts' ||
-      relativePath === 'src/systems/persistence/new-attempt.ts' ||
-      /src\/systems\/persistence\/(?:lucky|detection|revive|airplane)\.ts$/.test(relativePath);
-    if (
-      productionStage4Importers &&
-      dormantStage4Modules.some((moduleName) => sourceText.includes(moduleName))
-    ) {
-      violations.push(`${relativePath}: production must not import dormant Stage 4 Runtime foundation`);
+    if (relativePath === 'src/main.ts') {
+      if (!sourceText.includes('createProductionStage4Session(') ||
+          !sourceText.includes('productionSession =')) {
+        violations.push(`${relativePath}: production must own one live Stage 4 session`);
+      }
+      if (/persistence\/(?:lucky|detection|revive|airplane|new-attempt|guarded-persistence)/.test(sourceText)) {
+        violations.push(`${relativePath}: obsolete v2 mutation paths must not be reachable`);
+      }
+    }
+    if (relativePath === 'src/systems/persistence/production-stage4-runtime.ts') {
+      if (!sourceText.includes('commitCandidateWithWriterLeaseV3') ||
+          !sourceText.includes('executeProductionStage4Mutation(storage, identity, clock, intent)') ||
+          !sourceText.includes("if (result.status === 'committed')") ||
+          !sourceText.includes('authority = {') ||
+          /commitCandidateWithWriterLease\(|commitCandidateSaveV2|\.\/(?:lucky|detection|revive|airplane|new-attempt)/.test(sourceText)) {
+        violations.push(`${relativePath}: production must use only the guarded v3 commit path`);
+      }
+    }
+    if (relativePath === 'src/systems/persistence/dormant-stage4-mutation.ts' &&
+        /commitCandidateWithWriterLease\(|commitCandidateSaveV2|loadPersistedSave\(/.test(sourceText)) {
+      violations.push(`${relativePath}: activated composition must not reach the obsolete v2 writer/reader`);
     }
     if (
       relativePath === 'src/core/stage4-attempt-factory.ts' &&

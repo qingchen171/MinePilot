@@ -1,6 +1,16 @@
 import Phaser from 'phaser';
 import { BASELINE_MESSAGE } from './baseline';
+import { createLocalStorageAdapter } from './systems/persistence/key-value-storage';
+import { createProductionStage4Session } from './systems/persistence/production-stage4-runtime';
+import { createSystemClock, createWriterIdentity } from './systems/persistence/writer-lease';
 import './style.css';
+
+let browserStorage: Storage | null = null;
+try { browserStorage = window.localStorage; } catch { /* The adapter reports unavailable storage. */ }
+/** One browser authority: read-only on boot, guarded v3 commit before any mutation is published. */
+export const productionSession = createProductionStage4Session(
+  createLocalStorageAdapter(browserStorage), createWriterIdentity(), createSystemClock(),
+);
 
 class BaselineScene extends Phaser.Scene {
   constructor() {

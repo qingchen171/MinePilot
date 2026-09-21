@@ -1,7 +1,7 @@
 import {
-  loadSaveDocument,
-  type LoadSaveDocumentResult,
-} from '../../core/persistence/save-dispatcher';
+  loadLegacySaveDocument,
+  type LoadLegacySaveDocumentResult,
+} from '../../core/persistence/save-legacy-dispatcher';
 import {
   serializeSaveDocumentV1,
   type SaveDocumentPersistenceInputV1,
@@ -12,6 +12,7 @@ import {
   type SaveDocumentPersistenceInputV2,
   type SaveV2ValidationIssue,
 } from '../../core/persistence/save-v2';
+import { validateSaveDocumentV3, type SaveDocumentV3, type SaveV3ValidationIssue } from '../../core/persistence/save-v3';
 import {
   commitSnapshot,
   loadCommittedSnapshot,
@@ -20,9 +21,18 @@ import {
   type SnapshotSlot,
 } from './crash-safe-snapshot-store';
 import { type StringKeyValueStorage } from './key-value-storage';
+import { readDormantStage4Runtime } from './dormant-stage4-reader';
 
 export type CandidateSaveV1 = SaveDocumentPersistenceInputV1;
 export type CandidateSaveV2 = SaveDocumentPersistenceInputV2;
+
+/** The activated writer accepts only a complete, strictly valid v3 DTO. */
+export type CommitCandidateSaveV3Result =
+  | { readonly status: 'committed'; readonly slot: SnapshotSlot; readonly revision: number;
+      readonly backupUpdate: 'updated' | 'failed'; readonly backupFailure?: Extract<CommitSnapshotResult, { readonly status: 'committed' }>['backupFailure'] }
+  | { readonly status: 'serialization-failure'; readonly stage: 'save-document'; readonly issues: readonly SaveV3ValidationIssue[] }
+  | { readonly status: 'serialization-failure'; readonly stage: 'json'; readonly cause: unknown }
+  | { readonly status: 'persistence-failure'; readonly failure: CommitFailure };
 
 type CommitFailure = Exclude<CommitSnapshotResult, { readonly status: 'committed' }>;
 
@@ -82,7 +92,7 @@ type SnapshotSource = {
   readonly revision: number;
 };
 
-type VersionLoadFailure = Exclude<LoadSaveDocumentResult, { readonly status: 'loaded' }>;
+type VersionLoadFailure = Exclude<LoadLegacySaveDocumentResult, { readonly status: 'loaded' }>;
 
 export type LoadPersistedSaveResult =
   | { readonly status: 'no-save' }
@@ -95,7 +105,7 @@ export type LoadPersistedSaveResult =
     })
   | (SnapshotSource & {
       readonly status: 'loaded' | 'recovered-from-backup';
-      readonly save: Extract<LoadSaveDocumentResult, { readonly status: 'loaded' }>;
+      readonly save: Extract<LoadLegacySaveDocumentResult, { readonly status: 'loaded' }>;
     });
 
 export function commitCandidateSaveV1(
@@ -180,6 +190,28 @@ export function commitCandidateSaveV2(
   };
 }
 
+export function commitCandidateSaveV3(
+  storage: StringKeyValueStorage,
+  candidate: SaveDocumentV3,
+): CommitCandidateSaveV3Result {
+  const validated = validateSaveDocumentV3(candidate);
+  if (validated.status === 'invalid') {
+    return { status: 'serialization-failure', stage: 'save-document', issues: validated.issues };
+  }
+  let serializedPayload: string;
+  try {
+    serializedPayload = JSON.stringify(validated.document);
+  } catch (cause) {
+    return { status: 'serialization-failure', stage: 'json', cause };
+  }
+  const committed = commitSnapshot(storage, serializedPayload, validated.document.revision);
+  return committed.status === 'committed'
+    ? { status: 'committed', slot: committed.slot, revision: committed.revision,
+        backupUpdate: committed.backupUpdate,
+        ...(committed.backupFailure === undefined ? {} : { backupFailure: committed.backupFailure }) }
+    : { status: 'persistence-failure', failure: committed };
+}
+
 export function loadPersistedSave(storage: StringKeyValueStorage): LoadPersistedSaveResult {
   const snapshot = loadCommittedSnapshot(storage);
   if (
@@ -202,7 +234,7 @@ export function loadPersistedSave(storage: StringKeyValueStorage): LoadPersisted
     return { status: 'malformed-json', ...source, cause };
   }
 
-  const loaded = loadSaveDocument(parsed);
+  const loaded = loadLegacySaveDocument(parsed);
   if (loaded.status !== 'loaded') return { ...source, ...loaded };
   if (loaded.document.revision !== snapshot.revision) {
     return {
@@ -216,4 +248,9 @@ export function loadPersistedSave(storage: StringKeyValueStorage): LoadPersisted
     ...source,
     save: loaded,
   };
+}
+
+/** Activated reader; Stage 2 still selects the committed A/B authority. */
+export function loadProductionPersistedSave(storage: StringKeyValueStorage) {
+  return readDormantStage4Runtime(loadCommittedSnapshot(storage));
 }

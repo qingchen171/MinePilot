@@ -13,7 +13,7 @@ import {
   type TemporaryBenbenCard,
 } from '../temporary-benben-card';
 import type { BoardSaveV1, GenerationProvenanceSaveV1, RunPhaseSaveV1 } from './save-v1';
-import { loadSaveDocument } from './save-dispatcher';
+import { loadLegacySaveDocument } from './save-legacy-dispatcher';
 import {
   validateAndLoadSaveDocumentV2,
   type CharacterPositionSaveV2,
@@ -301,13 +301,11 @@ export function validateSaveDocumentV3(input: unknown): ValidateSaveDocumentV3Re
   return validate(input, false);
 }
 
-/** Read-only target-v3 seam. Existing dispatcher supplies strict v1 -> v2 -> reconstruction.
- * No current version/writer switch. Legacy permission is private and accepts only old input.
- * Future authoritative v3 restore of persisted legacy terminals needs an explicit trusted
- * integration boundary; accepting a caller-supplied boolean here would defeat that boundary.
+/** Read-only old-version migration. The legacy dispatcher supplies strict v1 -> v2 interpretation.
+ * Legacy permission is private and accepts only old input; direct v3 cannot opt in.
  */
 export function migrateOldSaveDocumentToV3(input: unknown): TrustedMigratedSaveDocumentV3Result {
-  const old = loadSaveDocument(input);
+  const old = loadLegacySaveDocument(input);
   if (old.status !== 'loaded') {
     return { status: 'invalid', issues: 'issues' in old ? old.issues : [{ code: 'invalid-save-version', path: '$.saveVersion' }] };
   }
