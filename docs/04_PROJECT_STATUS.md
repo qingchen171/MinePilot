@@ -1,7 +1,7 @@
 # PROJECT_STATUS
 
 **项目：MinePilot / Minesweeper Product**  
-**状态更新时间：2026-09-20**
+**状态更新时间：2026-09-22**
 **控制文档版本：v1.0 FROZEN**  
 **正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item foundation/Save v2/统一揭雷、Lucky/Detection/Revive/Airplane 及跨 Item 生命周期集成均已完成。Stage 3 FROZEN CANDIDATE；最终冻结状态按下方标签与门禁规则确认。**
 
@@ -197,9 +197,16 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-08.3 — Dormant Full Mutation & Lifecycle Orchestration Implementation**
+**Stage 4 / S4-08.4 — Atomic Production Runtime / Save v3 Activation Design Review**
 
-S4-08.3 Design Review 已人工验收并关闭；下一项只可实施 dormant orchestration。Production 继续使用 Stage 3 Runtime / Save v2，`CURRENT_SAVE_VERSION=2`、v3 writer disabled；不得接入 production entrypoints 或开始 S4-08.4/S4-09。
+S4-08.3 Implementation 已通过独立 Reviewer、PR 与 main Linux Quality，现为 PASS / CLOSED。下一项仅为 S4-08.4 Design Review，不授权实施。Production 继续使用 Stage 3 Runtime / Save v2，`CURRENT_SAVE_VERSION=2`、v3 writer disabled；不得提前接入 production entrypoints 或开始 S4-09。
+
+### Stage 4 / S4-08.3 — Dormant Full Mutation & Lifecycle Orchestration Implementation — PASS / CLOSED
+
+- 稳定 main baseline：`7576aad0a947bf201ec5d9b481aaf73cc6142909`；PR #51 已合并。Dormant orchestration 已实现，但 production Runtime/Account/reader/entrypoints 未切换，v3 writer 未启用，`CURRENT_SAVE_VERSION=2`。
+- Mutation evidence：`docs/10_S4-08-3_Mutation_Evidence_Matrix.md` 将此前无法恢复的“A–AQ”标签解析为 26 项可追溯错误类别，并如实区分实际 mutation 击杀与仅有测试覆盖；不虚构 43 项清单。新增 S4-08.3 integration 54/54 PASS；Independent Reviewer 复核实际 diff、冻结合同与矩阵后 PASS。
+- Quality：本地 Architecture/TypeScript/build/Playwright PASS，Unit 883/883、Integration 164/164；任务分支 Linux `Quality` run `35628793045` Success，PR Linux `Quality` run `35629132825` Success，main Linux `Quality` run `35629465095` Success。生产行为不变，S4-08.4 才允许原子 activation。
+- 回滚：如需撤销本 Task，走受控 PR revert S4-08.3 实现/收尾提交；不得 `reset --hard`，且不得把历史 v3 dormant fixture 当作 production authority。
 
 ### Stage 4 / S4-08.3 — Dormant Full Mutation & Lifecycle Orchestration Design Review — PASS / CLOSED
 
@@ -221,8 +228,8 @@ S4-08.3 Design Review 已人工验收并关闭；下一项只可实施 dormant o
 - Dormant commit seam：S4-08.3 可建立极窄、production-unreachable 的 testable commit seam，优先复用 Stage2 A/B snapshot、lease、revision/ownership semantics；若需 test adapter 仅为 non-production Stage2-compatible harness，不建第二 coordinator/generic framework。merge 后仍 `CURRENT_SAVE_VERSION=2`、production Runtime/Account/reader/writer/Item wrappers/entrypoints/main.ts 不切、不 import dormant executor、v3 production save 不可达；S4-08.4 才作真实 production v3 guarded wiring。
 - S4-08.4 cutover inventory：必须原子核对 single production Runtime root/full Account、v1/v2/v3 reader、v3 writer、CURRENT_SAVE_VERSION=3、全部 mutation entrypoints、Refresh、publish-after-commit、real Stage2 lease/second ownership verification/revision/A-B crash safety、旧 v2 writers 全不可达、architecture guards、Reviewer 与 main Linux Quality。当前 v2 paths 已知含 Lucky/movement、Detection、Airplane、Revive、Restart/Retry、guarded commit/coordinator；尚未 production 接线的 Start/Flag/Failure/Claim/Abandon/dismiss/Replay/Next 亦不可漏。
 - S4-08.3 Implementation 测试/反向扫描门禁：一个受控 dormant PR、production behavior 0 change。覆盖 W 首步 Safe/Mine/Flag/Abandon/Restart/Airplane/win/Reward-before-terminal/非实际步/可 Claim、Detection waiting reject；null provenance load/Restart/legacy failed Retry、实际 Mine set、稳定 seed 与缺 catalog 只挡 replacement；account-only via Start、settled/legacy Replay entitlement、Next committed Account/catalog、当前末关/未来 catalog、旧 terminal 在 commit failure 保留；所有 gameplay、multi Reward/one-time/overflow/completion、Benben streak/roll/Claim/race、temp priority。每个实际 writing command（Start、Abandon、dismiss、Restart、Retry、Replay、Next、Flag changed、Safe movement、Mine pending、Lucky survival、Failure、Detection、Airplane、Revive、Claim）注入 commit failure；rejection/no-op zero write；stale revision/runId/both/old run after replacement；同 intent retry Start/Restart/Retry/Replay/Next 的 runId/seed/Board/Rewards、Failure eligibility、Claim card 均稳定。Mutation sanity 必须杀死既定 A–AQ 与新增 waiting lock、Airplane waiting reject、Flag/Claim 过严、null provenance禁 Retry、比较 seed 非 mines、重抽 base seed、account-only Replay 分叉、legacy auto-complete/无 entitlement Replay/Next、末关永远硬编码等错误；临时 mutation 全恢复。
-- Mutation gate clarification（实施期，未宣告 PASS）：上条所引“A–AQ”在正式仓库和 Git history 中没有逐项定义，不得凭标签虚构 43 个 mutation。其可恢复、可审计的具体错误类别、原合同来源、对应测试及已执行/未执行状态，统一见 `docs/10_S4-08-3_Mutation_Evidence_Matrix.md`；该矩阵展开既有冻结合同，不新增玩法。Independent Reviewer 必须按矩阵的真实证据复核；未击杀项不得伪报已击杀，Reviewer 未 PASS 前不得 PR/merge。
-- Recovery/唯一入口：只凭正式仓库可恢复 S4-08.1/2 CLOSED、S4-08.3 Design CLOSED、production Stage3/v2/version2/writer disabled、waiting W/O/M/P、null provenance 不单独禁 Restart/Retry、Replay/Next atomic replacement、Reward-before-terminal、Lucky 不发布中间 pending、persist-before-publish，以及 S4-08.4 才真正 production cutover。唯一 Next Action 为 **Stage 4 / S4-08.3 — Dormant Full Mutation & Lifecycle Orchestration Implementation**；不得先行 S4-08.4/S4-09。
+- Mutation gate clarification（已由 PR #51 复核）：上条所引“A–AQ”在正式仓库和 Git history 中没有逐项定义，不得凭标签虚构 43 个 mutation。其可恢复、可审计的具体错误类别、原合同来源、对应测试及已执行/未执行状态，统一见 `docs/10_S4-08-3_Mutation_Evidence_Matrix.md`；该矩阵展开既有冻结合同，不新增玩法。Independent Reviewer 已按真实证据 PASS；未击杀项不得伪报已击杀。
+- Recovery/唯一入口：只凭正式仓库可恢复 S4-08.1/2/3 CLOSED、production Stage3/v2/version2/writer disabled、waiting W/O/M/P、null provenance 不单独禁 Restart/Retry、Replay/Next atomic replacement、Reward-before-terminal、Lucky 不发布中间 pending、persist-before-publish，以及 S4-08.4 才真正 production cutover。唯一 Next Action 为 **Stage 4 / S4-08.4 — Atomic Production Runtime / Save v3 Activation Design Review**；不得先行 S4-08.4 Implementation/S4-09。
 
 ### Stage 4 / S4-08 — Atomic Runtime / Save v3 Activation Design Review — PASS / CLOSED
 
@@ -1007,7 +1014,7 @@ S4-08.3 Design Review 已人工验收并关闭；下一项只可实施 dormant o
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12–15）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08.2 Implementation 已 PASS/CLOSED（PR #48，main `021baa82cd9233a1cc21048c5fcd8da7d44441b1`）。CURRENT_SAVE_VERSION=2、v3 writer disabled、production Runtime 仍是 Stage 3 authority。唯一下一行动为 Stage 4 / S4-08.3 — Dormant Full Mutation & Lifecycle Orchestration Design Review；仅设计审查，不实施，不接 production writer/entrypoints，不进入 S4-08.4/S4-09。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12–15）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08.3 Implementation 已 PASS/CLOSED（PR #51，main `7576aad0a947bf201ec5d9b481aaf73cc6142909`）。CURRENT_SAVE_VERSION=2、v3 writer disabled、production Runtime 仍是 Stage 3 authority。唯一下一行动为 Stage 4 / S4-08.4 — Atomic Production Runtime / Save v3 Activation Design Review；仅设计审查，不实施，不接 production writer/entrypoints，不进入 S4-09。
 ```
 
 ## 阶段看板
@@ -1018,7 +1025,7 @@ S4-08.3 Design Review 已人工验收并关闭；下一项只可实施 dormant o
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R、S4-08B、S4-08C、S4-08 Design、S4-08.1、S4-08.2 Design 与 Implementation PASS/CLOSED；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-08.3 Dormant Full Mutation & Lifecycle Orchestration Design Review；Implementation 未批准，不得进入 S4-08.4/S4-09 |
+| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R、S4-08B、S4-08C、S4-08 Design、S4-08.1/2/3 PASS/CLOSED；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-08.4 Atomic Production Runtime / Save v3 Activation Design Review；Implementation 未批准，不得进入 S4-09 |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
