@@ -1,4 +1,4 @@
-/** Dormant S4-08.3 composition. This module is deliberately not imported by production entrypoints. */
+/** Stage 4 pure candidate composition, shared by dormant tests and the activated production facade. */
 import type { Coordinate } from '../../core/board';
 import { createAccountState } from '../../core/account';
 import type { AttemptState, GenerationProvenance } from '../../core/attempt-state';
@@ -23,8 +23,7 @@ import { createStage4GameState, type Stage4GameState } from '../../core/stage4-g
 import { createStableId } from '../../core/stable-id';
 import { settleTerminalOutcome } from '../../core/terminal-settlement';
 import type { RunState } from '../../core/run';
-import { loadCommittedSnapshot } from './crash-safe-snapshot-store';
-import { readDormantStage4Runtime } from './dormant-stage4-reader';
+import { loadProductionPersistedSave } from './persistence-coordinator';
 import type { StringKeyValueStorage } from './key-value-storage';
 
 const UINT32_RANGE = 0x1_0000_0000;
@@ -48,7 +47,7 @@ export type DormantMutationIntent = Authority & (
   | { readonly kind: 'detection'; readonly initializeSeed?: number }
 );
 
-/** A test-only, narrow seam. S4-08.4 must bind this to the real Stage 2 lease/revision gate. */
+/** Narrow commit port. Production binds it to the Stage 2 lease/revision gate. */
 export interface DormantCommitBoundary {
   commit(document: SaveDocumentV3, expectedRevision: number | null):
     | { readonly status: 'committed' }
@@ -296,15 +295,14 @@ function compose(old: Stage4GameState, intent: DormantMutationIntent, catalog: L
   }) };
 }
 
-/** Re-reads Stage 2 committed authority for every intent. This does not bind any production writer. */
+/** Re-reads Stage 2 committed authority for every intent; only a committed port result publishes. */
 export function executeDormantStage4Mutation(
   storage: StringKeyValueStorage,
   intent: DormantMutationIntent,
   commit: DormantCommitBoundary,
   catalog: LevelCatalog = PRODUCTION_LEVEL_CATALOG,
 ): DormantMutationResult {
-  const selected = loadCommittedSnapshot(storage);
-  const loaded = readDormantStage4Runtime(selected);
+  const loaded = loadProductionPersistedSave(storage);
   if (loaded.status !== 'fresh' && loaded.status !== 'loaded') return { status: 'rejected', reason: loaded.status };
   const actualRevision = loaded.status === 'fresh' ? null : loaded.persistence.revision;
   if (intent.expectedRevision !== actualRevision) return { status: 'rejected', reason: 'revision-conflict' };

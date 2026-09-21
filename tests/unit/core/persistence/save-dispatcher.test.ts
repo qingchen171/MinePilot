@@ -7,9 +7,9 @@ import {
   type BoardState,
 } from '../../../../src/core/board';
 import {
-  CURRENT_SAVE_VERSION,
-  loadSaveDocument,
-} from '../../../../src/core/persistence/save-dispatcher';
+  LEGACY_SAVE_VERSION as CURRENT_SAVE_VERSION,
+  loadLegacySaveDocument as loadSaveDocument,
+} from '../../../../src/core/persistence/save-legacy-dispatcher';
 import {
   serializeSaveDocumentV1,
   type SaveDocumentV1,

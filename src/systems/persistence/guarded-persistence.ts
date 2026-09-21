@@ -6,11 +6,8 @@ import {
   type CommitCandidateSaveV2Result,
   type LoadPersistedSaveResult,
 } from './persistence-coordinator';
-import {
-  inspectWriterLease,
-  type Clock,
-  type WriterIdentity,
-} from './writer-lease';
+import { checkWriterOwnership } from './writer-ownership';
+import type { Clock, WriterIdentity } from './writer-lease';
 
 type SuccessfulLoad = Extract<
   LoadPersistedSaveResult,
@@ -59,31 +56,6 @@ export type GuardedCommitResult =
     }
   | { readonly status: 'persistence-commit-failure'; readonly failure: CommitFailure };
 
-function checkOwnership(
-  storage: StringKeyValueStorage,
-  identity: WriterIdentity,
-  clock: Clock,
-): Exclude<GuardedCommitResult, { readonly status: 'committed' }> | undefined {
-  const lease = inspectWriterLease(storage, clock);
-  if (lease.status === 'storage-failure') {
-    return { status: 'lease-storage-failure', failure: lease.failure };
-  }
-  if (lease.status === 'no-lease') {
-    return { status: 'writer-not-owner', reason: 'no-lease' };
-  }
-  if (lease.status === 'invalid-lease') {
-    return { status: 'writer-not-owner', reason: 'invalid-lease' };
-  }
-  if (lease.status === 'expired') return { status: 'lease-expired' };
-  if (
-    lease.lease.sessionId !== identity.sessionId ||
-    lease.lease.leaseToken !== identity.leaseToken
-  ) {
-    return { status: 'writer-not-owner', reason: 'different-owner' };
-  }
-  return undefined;
-}
-
 function isExpectedRevision(value: number | null): boolean {
   return value === null || (Number.isSafeInteger(value) && value >= 0);
 }
@@ -95,7 +67,7 @@ export function commitCandidateWithWriterLease(
   expectedRevision: number | null,
   candidate: SaveDocumentPersistenceInputV2,
 ): GuardedCommitResult {
-  const firstOwnership = checkOwnership(storage, identity, clock);
+  const firstOwnership = checkWriterOwnership(storage, identity, clock);
   if (firstOwnership !== undefined) return firstOwnership;
 
   const current = loadPersistedSave(storage);
@@ -122,7 +94,7 @@ export function commitCandidateWithWriterLease(
     };
   }
 
-  const secondOwnership = checkOwnership(storage, identity, clock);
+  const secondOwnership = checkWriterOwnership(storage, identity, clock);
   if (secondOwnership !== undefined) return secondOwnership;
 
   const committed = commitCandidateSaveV2(storage, candidate);
