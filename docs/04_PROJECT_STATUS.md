@@ -197,9 +197,9 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-08.2 — Stage 4 Runtime Aggregate, Fresh Bootstrap, Complete Attempt Factory & Save v3 Mapping/Reconstruction Foundation Implementation**
+**Stage 4 / S4-08.3 — Dormant Full Mutation & Lifecycle Orchestration Design Review**
 
-只实现已冻结的 dormant full Account、AttemptState、Stage4GameState、fresh/no-save bootstrap、aggregate validation、Complete Attempt Factory、显式 Runtime↔Save v3 mapping/reconstruction、migration-only trust seam、只读 dormant v1/v2/v3 reader 及 production-isolation guards。Production 必须继续使用 Stage 3 Runtime / Save v2，`CURRENT_SAVE_VERSION=2`、v3 writer disabled；不得接入 production entrypoints、mutation orchestration、writer，或进入 S4-08.3/4/S4-09。
+仅进行 S4-08.3 的只读 Design Review；Implementation 尚未批准。Production 继续使用 Stage 3 Runtime / Save v2，`CURRENT_SAVE_VERSION=2`、v3 writer disabled；不得接入 production entrypoints、mutation orchestration、writer，或进入 S4-08.4/S4-09。
 
 ### Stage 4 / S4-08 — Atomic Runtime / Save v3 Activation Design Review — PASS / CLOSED
 
@@ -236,7 +236,16 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 - Dormant reader：Stage2 继续只负责选择 committed payload；reader只解释/验证该 payload。no-save→fresh；v1/v2→strict validation→pure migration→trusted reconstruction；v3→ordinary strict validation→reconstruction。Reader不选择A/B、不写盘/回写migration、不增revision、不操作lease/head/slot、不调RNG/generation。
 - Production isolation/first-writable gate：S4-08.2/3 merge后 production仍 Stage3/v2，production dispatcher/coordinator/mutations/main不得import dormant Runtime/reader，`CURRENT_SAVE_VERSION=2`、无v3 guarded commit/writer。S4-08.3/4 中 legacy terminal 只能先通过 dismiss清Attempt或Retry/合法replacement产生非legacy candidate再写v3；不得 legacy→settled、retro-settle或保留legacy写v3。S4-08.4 activation还必须证明direct/committed/backup v3 legacy拒绝、migration legacy可恢复、mapper拒绝legacy、无public trust boolean/持久化trust flag及无其他可达legacy写入。
 - Test/mutation contract：覆盖 fresh与migration defaults隔离、factory完整性/同seed Board+Reward、全部 durable mapping/no-alias/exact IDs、catalog-independent reconstruction、direct v3 strictness、legacy migration-only trust、mapper non-writable、reader read-only、Stage3/v2 production isolation。Mutation必须杀死字段遗漏/alias/ID trim、fresh/migration混用、补Reward/catalog lookup/reconstruction RNG、factory隐藏ID/seed或分裂seed、reader写盘/提前切production/version3，以及 committed legacy escalation、allowLegacy boolean、legacy mapper写入、persisted trust flag、retro settlement或head绕过validation。
-- Implementation decomposition：一个受控 PR，因 dormant Account/Attempt/GameState/factory/mapper/reconstruction/reader 强耦合；整个 PR 必须保持 dormant，production behavior 0 change。唯一 Next Action 为下方 S4-08.2 Implementation；不得开始 S4-08.3/4/S4-09。
+- Implementation decomposition：一个受控 PR，因 dormant Account/Attempt/GameState/factory/mapper/reconstruction/reader 强耦合；整个 PR 必须保持 dormant，production behavior 0 change。历史入口 S4-08.2 Implementation 已由下方 implementation PASS/CLOSED 取代；当前唯一入口以上方“唯一下一行动”为准。
+
+### Stage 4 / S4-08.2 — Runtime Aggregate, Fresh Bootstrap, Complete Attempt Factory & Save v3 Mapping/Reconstruction Foundation Implementation — PASS / CLOSED
+
+- 人工验收与实现稳定点：`91e2ed0778cccd8c2244d24ebb0d20b3a51b5d5b`；PR #48 已合并，main baseline `021baa82cd9233a1cc21048c5fcd8da7d44441b1`。S4-08.2 仅建立 dormant foundation，不切换 production authority。
+- Dormant Runtime：完整 Account 包含 inventory、coins、completedLevelIds、oneTimeClaimIds、benbenByLevel；`Stage4GameState = { account, currentAttempt: AttemptState | null }`，account-only 合法。Attempt 唯一拥有 runId、levelId、provenance、run、runItems、rewards、temporary card、terminalDisposition；aggregate validation 约束所有权与组合一致性。S4-08.4 必须将 dormant Account 收敛为唯一 production Account authority，不得保留双真值。
+- Fresh/migration/factory：fresh no-save Account inventory 为 `1/2/1/1`、coins 0、其余事实空，Attempt 为 null；旧 v1/v2 migration 保留旧 inventory，不注入 fresh bonus。Complete Attempt Factory 使用已采纳的 seed 构造同一 Board/Reward Attempt，不在 restore 时重新生成。
+- Runtime/Save：显式 Runtime↔Save v3 映射与验证重建，不共享可变引用；`legacy-excluded` 仅由可信旧版本迁移获得，ordinary direct v3 不可信，legacy Attempt 不可写。Dormant reader 保持只读；production 仍使用 Stage 3 Runtime / Save v2，`CURRENT_SAVE_VERSION=2`，v3 writer disabled，Stage 2 persistence authority chain 未改变。
+- 门禁证据：Unit `883/883`、Integration `110/110`、Playwright `1/1`，Architecture/TypeScript/Build/完整 quality PASS；A–AC 共 29 项 mutation sanity 均杀死，临时 mutation 未提交。Independent Reviewer PASS；branch Linux `35512885462`、PR required `35512989615`、main Linux `35513096076` 均 Success。
+- 剩余边界：S4-08.3 尚须设计并验证完整 dormant gameplay/economy/lifecycle mutation orchestration；S4-08.4 才允许原子切换 production Runtime/reader/entrypoints/writer/version，S4-09 为 compatibility gate。S4-08.3 当前仅获 Design Review 入口，未批准 implementation。
 
 ### Stage 4 / S4-08C — Benben Claim + Temporary Item Resource Compatibility — PASS / CLOSED
 
@@ -975,7 +984,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12–15）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08A、S4-07R、S4-08B、S4-08C、S4-08 Design、S4-08.1 与 S4-08.2 Design 均 PASS/CLOSED。CURRENT_SAVE_VERSION=2、v3 writer disabled、production Runtime仍是 Stage 3 authority。唯一下一行动为 Stage 4 / S4-08.2 — Stage 4 Runtime Aggregate, Fresh Bootstrap, Complete Attempt Factory & Save v3 Mapping/Reconstruction Foundation Implementation；只实现 dormant foundation，必须遵守 migration-only legacy trust、mapper拒绝legacy与temporary Account isolation，不得接production mutation/writer或进入 S4-08.3/4/S4-09。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12–15）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08.2 Implementation 已 PASS/CLOSED（PR #48，main `021baa82cd9233a1cc21048c5fcd8da7d44441b1`）。CURRENT_SAVE_VERSION=2、v3 writer disabled、production Runtime 仍是 Stage 3 authority。唯一下一行动为 Stage 4 / S4-08.3 — Dormant Full Mutation & Lifecycle Orchestration Design Review；仅设计审查，不实施，不接 production writer/entrypoints，不进入 S4-08.4/S4-09。
 ```
 
 ## 阶段看板
@@ -986,7 +995,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R、S4-08B、S4-08C、S4-08 Design、S4-08.1 与 S4-08.2 Design PASS/CLOSED；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-08.2 dormant Runtime/Aggregate/Bootstrap/Attempt Factory/Mapper/Reconstruction/Reader Implementation；不得进入 S4-08.3/4/S4-09 |
+| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R、S4-08B、S4-08C、S4-08 Design、S4-08.1、S4-08.2 Design 与 Implementation PASS/CLOSED；production Runtime root NOT SWITCHED / writer DISABLED | 唯一入口 S4-08.3 Dormant Full Mutation & Lifecycle Orchestration Design Review；Implementation 未批准，不得进入 S4-08.4/S4-09 |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
