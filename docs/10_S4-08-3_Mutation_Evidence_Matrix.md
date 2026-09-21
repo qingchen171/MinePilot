@@ -41,6 +41,8 @@
 
 `PROJECT_STATUS` 同节还明确列出 waiting Airplane/Flag/Claim 过严、seed 与 Mine set 混淆、account-only Replay、legacy 无权限 Replay/Next、当前末关硬编码等错误。对应捕获测试分别为：`waiting Airplane preserves step and can win; terminal Next and Replay follow committed Account`、`distinguishes no-save from revision zero; waiting Flag, Abandon and stale run gate`、`Benben Claim is waiting-only, deterministic and turns available into a temporary card`、`Restart skips a changed seed that collides with the previous actual Mine set`、MUT-13、MUT-25、`Next is catalog-derived and unavailable after the actual final level`。这些九类临时 mutation 已逐项使定向测试 FAIL，随后恢复，源码哈希相同。
 
+完整流程还由 `waiting Airplane can remain active and Claim Benben without taking a step` 证明非终局 Airplane 后仍可 Claim；`historical level absent from current catalog restores and dismisses, but cannot be replaced` 证明缺 catalog 的旧 Attempt 可恢复、终局可 dismiss，而 Restart/Retry/Replay/Next 不会以缺失关卡配置创建替代 Attempt。后者的 Replay 在可信 v2 legacy 状态下先受独立 completion entitlement 拦截；不伪造 entitlement 来强行到达 catalog 分支。这两项为正向/拒绝测试证据，不宣称额外做过 mutation 注入。
+
 ## 不可伪造的证据边界
 
 - 当前 dormant commit seam 的 ownership-loss 测试只证明候选构造后、测试提交前失去 ownership 会被拒绝；真实 Stage2 第二次 ownership verification 的 production 绑定属于 S4-08.4。

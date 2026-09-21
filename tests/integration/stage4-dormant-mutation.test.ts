@@ -461,6 +461,26 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
     expect(f.run({ kind: 'replay', expectedRevision: 2, expectedRunId: 'run-2', creation: creation('run-3', 8) }).status).toBe('rejected');
   });
 
+  it('waiting Airplane can remain active and Claim Benben without taking a step', () => {
+    const f = fixture();
+    const started = f.start().runtime;
+    f.persist(createStage4GameState({
+      account: createStage4AccountState({ ...started.account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] }),
+      currentAttempt: started.currentAttempt,
+    }), 1);
+    expect(f.run({ kind: 'airplane', expectedRevision: 1, expectedRunId: 'run-1', coordinate: { x: 0, y: 0 } }).status).toBe('committed');
+    const afterAirplane = f.current().runtime;
+    expect(afterAirplane.currentAttempt?.run.phase.kind).toBe('active');
+    expect(afterAirplane.currentAttempt?.run.characterPosition.kind).toBe('waiting');
+    expect(afterAirplane.currentAttempt?.run.hasTakenStep).toBe(false);
+    expect(f.run({ kind: 'claim-benben', expectedRevision: 2, expectedRunId: 'run-1' }).status).toBe('committed');
+    const afterClaim = f.current().runtime;
+    expect(afterClaim.currentAttempt?.run.characterPosition.kind).toBe('waiting');
+    expect(afterClaim.currentAttempt?.run.hasTakenStep).toBe(false);
+    expect(afterClaim.account.benbenByLevel[0]?.status).toBe('used');
+    expect(afterClaim.currentAttempt?.temporaryBenbenCard).toMatchObject({ consumed: false });
+  });
+
   it('commit failure returns no candidate, keeps old snapshot and deterministic retry result', () => {
     const f = fixture();
     f.setFailure(true);
@@ -737,6 +757,53 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
     expect(f.attempts.at(-1)).toBe(firstCandidate);
     expect(coordinates(f.current().runtime, 'mine')).not.toEqual(oldMines);
     expect(f.current().runtime.currentAttempt?.generationProvenance?.seed).toBeGreaterThanOrEqual(23);
+  });
+
+  it('historical level absent from current catalog restores and dismisses, but cannot be replaced', () => {
+    for (const phase of ['active', 'failed', 'won'] as const) {
+      const f = fixture(phase === 'won' ? smallCatalog() : PRODUCTION_LEVEL_CATALOG);
+      f.start();
+      if (phase === 'failed') {
+        enterPending(f);
+        expect(f.run({ kind: 'failure', expectedRevision: 2, expectedRunId: 'run-1' }).status).toBe('committed');
+      }
+      if (phase === 'won') {
+        expect(f.run({ kind: 'airplane', expectedRevision: 0, expectedRunId: 'run-1', coordinate: firstSafe(f) }).status).toBe('committed');
+      }
+      const beforeMigration = f.current();
+      const legacy = serializeSaveDocumentV2({
+        revision: beforeMigration.revision! + 1,
+        activeRun: {
+          runId: 'historical-run', levelId: 'unknown-historical-level',
+          gameState: createGameState({
+            account: createAccountState(beforeMigration.runtime.account.inventory),
+            run: beforeMigration.runtime.currentAttempt!.run,
+            runItems: beforeMigration.runtime.currentAttempt!.runItems,
+          }),
+        },
+      });
+      if (legacy.status !== 'serialized') throw new Error('historical fixture');
+      expect(commitSnapshot(f.storage, JSON.stringify(legacy.document), legacy.document.revision).status).toBe('committed');
+      const restored = f.current();
+      expect(restored.runtime.currentAttempt?.levelId).toBe('unknown-historical-level');
+      expect(restored.runtime.currentAttempt?.run.phase.kind).toBe(phase);
+      const count = f.commits;
+      const common = { expectedRevision: restored.revision!, expectedRunId: 'historical-run' };
+      if (phase === 'active') {
+        expect(f.run({ kind: 'restart', ...common, creation: creation('replacement') })).toEqual({ status: 'rejected', reason: 'level-not-found' });
+      } else if (phase === 'failed') {
+        expect(f.run({ kind: 'retry', ...common, creation: creation('replacement') })).toEqual({ status: 'rejected', reason: 'level-not-found' });
+      } else {
+        expect(f.run({ kind: 'replay', ...common, creation: creation('replacement') }).status).toBe('rejected');
+        expect(f.run({ kind: 'next', ...common, creation: creation('replacement') })).toEqual({ status: 'rejected', reason: 'level-not-found' });
+      }
+      expect(f.commits).toBe(count);
+      expect(f.current()).toEqual(restored);
+      if (phase !== 'active') {
+        expect(f.run({ kind: 'dismiss', ...common }).status).toBe('committed');
+        expect(f.current().runtime.currentAttempt).toBeNull();
+      }
+    }
   });
 
   it('trusted legacy won never gains Replay or Next entitlement from the terminal phase alone', () => {
