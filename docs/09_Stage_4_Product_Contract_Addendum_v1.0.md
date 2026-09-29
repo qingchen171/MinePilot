@@ -444,4 +444,46 @@ Historical recovery note：本节当时的 S4-08.2 Design Review entry 已由下
 - 本地 quality 为 Unit 877、Integration 181、Playwright 1，Architecture/TypeScript/Build PASS；Independent Reviewer PASS；branch/PR/main Linux Quality runs `35642518513`/`35642658980`/`35642854991` Success。
 - localStorage 无 atomic CAS、lease 仅 best-effort coordination、second ownership verification 仅缩小 race window的限制继续有效。首次真实 v3 write 后不得以 v2-only code rollback、save downgrade 或自动覆盖作为恢复方案。
 
-当前唯一入口是 **Stage 4 / S4-09 — Compatibility Integration Gate Design Review**。本 closeout 不授权直接实施 S4-09。
+Historical recovery note：本节 closeout 当时的 S4-09 Design Review entry 已由下方 §17 PASS/CLOSED 状态取代；当前唯一入口以 §17 与 PROJECT_STATUS 为准。
+
+## 17. S4-09 Compatibility Integration Gate Design — PASS / CLOSED (2026-09-29)
+
+**COMPATIBILITY GATE CONTRACT APPROVED.** S4-09 只为已激活 production Stage 4 Runtime/Save v3 authority 提供全链 compatibility evidence，不改变 §16 production behavior，不新增玩法、Level、Item、Reward、economy、UI、Runtime 或 persistence authority。默认 production behavior/source changes = 0；测试若暴露真实 defect，Implementation 必须停止为 `BLOCKED`、报告 exact defect 与 affected frozen boundary，不得在 gate 内静默修复或扩 scope。
+
+### 17.1 Evidence reuse rule
+
+- 必须先引用现有充分证据：Save v1/v2/v3 strict validation/migration、Stage 4 mapper/reconstruction/no-alias、dormant full mutation matrix、Reward/terminal/Benben/temporary-resource composition、Stage 2 A/B/lease/revision/crash tests、S4-08.4 production activation 与 architecture guards。
+- Implementation 报告必须逐项区分：`existing evidence referenced`、`new integration evidence added`、`mutation actually injected`、`behavior-only coverage`。不得把普通正向 test 描述为 mutation evidence，也不得为数量重复已有充分测试。
+
+### 17.2 Frozen C1–C14 integration matrix
+
+| ID | Start / path | Required evidence |
+|---|---|---|
+| C1 | no-save -> production boot -> Start -> reopen | INITIAL_ACCOUNT、zero boot write/RNG、first v3 revision 0、same committed Attempt |
+| C2 | rich v1 Attempt -> read-only migration -> legal mutation | gameplay facts preserved；load不写；first v3 write=N+1 |
+| C3 | rich v2 Attempt -> Item/gameplay mutation -> reopen | Board、position、phase、inventory、RunItemState、provenance exact continuity |
+| C4 | trusted legacy terminal Attempt | forbidden write rejected；only legal dismiss/Retry/replacement clears legacy before v3 write |
+| C5 | rich direct v3 -> reopen -> mutation -> reopen | strict exact restore；no generation；Reward `oneTimeClaimId` 与 Account `oneTimeClaimIds` 同步且不重复 claim |
+| C6 | repeated real settled Failure -> eligibility -> reopen -> Claim | Benben entitlement/claim/revision atomic persistence |
+| C7 | claimed temporary card -> matching Item -> reopen -> terminal | temporary-first consumption、no double permanent consumption、terminal expiry |
+| C8 | exploration -> Reward -> terminal -> Replay | Reward-before-terminal、completion、coins/inventory/claim facts continuity |
+| C9 | two production sessions | lease takeover、old-session stale rejection、reload/fresh authority reread |
+| C10 | composed candidate -> storage/ownership/revision/runId rejection | no publish、no revision/resource/Reward/card advance |
+| C11 | new-head outcome uncertain | cached authority unchanged；no blind retry；explicit reload decides committed authority |
+| C12 | malformed JSON/invalid v3/future version/revision mismatch/unprovable slot | distinct from no-save；no reset、overwrite、fresh bootstrap或write |
+| C13 | corrupt head + provable committed legacy backup -> mutation | only committed backup restored；source/revision retained；first v3 write=N+1；bare slot never promoted |
+| C14 | production-root dependency closure | obsolete v2 **write** paths/symbols unreachable；single Stage4/v3 mutation authority |
+
+Historical catalog case 是 matrix 的强制兼容补充：保存的 Attempt `levelId` 不存在于 current catalog 时仍可恢复；适用 phase 可合法 dismiss；依赖 current catalog/config 的 Restart/Retry/Replay/Next replacement 必须明确拒绝且不污染 Runtime/persisted authority。当前 production catalog 只有 final `level-001`；S4-09 不为测试增加 Level，successful multi-level Next 继续引用既有 injected-catalog dormant evidence，production 仅要求 `next-unavailable`。
+
+C14 只禁止 obsolete v2 mutation/write wrappers、`commitCandidateSaveV2` 与 parallel/fallback v2 writer 从 `src/main.ts`/approved production facade 的 dependency closure 可达。不得 blanket-ban production v3 path 合法复用的 Stage 2 committed authority selection、strict old-version read/migration、lease/revision、A/B snapshot/head 或 crash-recovery infrastructure；旧 v2 modules 可保留为 frozen historical regression/test surface。
+
+### 17.3 Failure/recovery and acceptance gate
+
+- 新 full-chain tests 应优先使用真实 `createProductionStage4Session()`、production catalog（除既有明确 injected-catalog evidence）、Save v3 mapper、Stage 2 guarded commit 与 reopen/reload；不得只测 helper/dormant seam。session authority 仅 commit success 后更新；uncertain outcome 必须显式 reload。
+- Failure/recovery 必须证明 boot/read failure不创建fresh authority、candidate/validation/lease/revision/runId/storage failure不publish、backup保留source/revision、retry重新读取authority且不reroll Board/Reward/Benben/card、corrupt/unsupported不删除覆盖。
+- Mutation sanity 至少能够杀死 publish-before-commit、legacy direct-write、temporary-priority bypass、terminal card preservation、retry reroll、corrupt-as-no-save、stale-session overwrite 与 indirect obsolete-v2-writer reachability；可直接引用已存在且仍充分的 mutation，不要求重复注入。
+- 工程可按 compatibility boot（C1–C5/C12–C13）、lifecycle/economy（C6–C8）与 authority/recovery（C9–C11/C14）组织，但全部只是同一个 S4-09 Task 的 engineering slices，不是独立 product milestones。
+- Acceptance 必须同时满足：C1–C14/历史 catalog/one-time claim evidence closed；Stage 1–4 regressions、architecture/typecheck/build/Playwright/full quality PASS；production write-reachability reverse scan PASS；Independent Reviewer PASS；branch/PR/main Linux Quality Success；Final Recovery Test 可仅从正式 repository 恢复 production authority、compatibility boundary、evidence reuse分类、known limitations 与下一 Stage entry。
+
+当前唯一入口是 **Stage 4 / S4-09 — Compatibility Integration Gate Implementation**。不得开始下一 Stage。

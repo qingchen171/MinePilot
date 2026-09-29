@@ -197,9 +197,20 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-09 — Compatibility Integration Gate Design Review**
+**Stage 4 / S4-09 — Compatibility Integration Gate Implementation**
 
-S4-08.4 Design 与 Implementation 均已 PASS / CLOSED；production 已原子切换到 Stage 4 Runtime / full Account 与唯一 Save v3 writer。S4-09 仅获 Design Review 入口，尚未开始；不得把本 closeout 视为 S4-09 Implementation 授权，也不得跳过 Design -> Attack -> Freeze -> Implementation -> Test -> Reverse Scan。
+S4-09 Design Review 已 PASS / CLOSED；本入口只授权按冻结 C1–C14 matrix 建立 compatibility/integration evidence。默认 production behavior/source changes = 0；若测试暴露真实 production defect，必须停止并报告 affected frozen boundary，不得静默扩大范围或进入下一 Stage。
+
+### Stage 4 / S4-09 — Compatibility Integration Gate Design Review — PASS / CLOSED
+
+- 定位：S4-09 是已激活 Stage 4 production authority 的 compatibility/integration gate，不新增玩法、Level、Item、Reward、economy、UI、Runtime 或 persistence authority。现有充分 unit/dormant/integration/mutation evidence 必须引用复用，并明确区分“existing evidence referenced / new integration evidence added / mutation actually injected / behavior-only coverage”。
+- 冻结 matrix：C1 fresh/no-save -> Start -> v3 revision 0 -> reopen；C2 rich v1 Attempt read-only migration -> legal mutation -> v3 N+1；C3 rich v2 Attempt（Board/position/items/inventory/phase/provenance）-> mutation -> reopen；C4 legacy terminal 只允许合法 dismiss/Retry/replacement 后写 v3；C5 rich v3 exact restore/continue 且 one-time Reward `oneTimeClaimId` 与 Account `oneTimeClaimIds` 始终同步、不重复 claim；C6 third settled Failure -> Benben eligibility -> reopen -> Claim；C7 temporary card -> temporary-first Item use -> reopen -> terminal expiry；C8 exploration -> Reward-before-terminal -> completion -> Replay；C9 two-session lease takeover/stale writer/reload；C10 storage/ownership/revision/runId failure 不 publish；C11 uncertain-head 不猜测、显式 reload；C12 malformed/invalid/future/revision-mismatch 不当 no-save、不 reset/write；C13 mixed A/B committed legacy backup -> first v3 N+1 且不提升裸 slot；C14 从 production roots 做 obsolete v2 **write** reachability gate。
+- Historical catalog compatibility：必须额外覆盖一个已保存 Attempt 的 `levelId` 已不在当前 catalog：restore 仍合法；适用 phase 可合法 dismiss；Restart/Retry/Replay/Next 等需要 current catalog/config 的 replacement 明确拒绝且 authority 不受污染。不得为了测试新增 production Level。
+- Reachability clarification：C14 只禁止 obsolete v2 mutation/write wrappers、`commitCandidateSaveV2` 与 fallback/parallel v2 writer 从 production roots 可达；不得误禁 current v3 production path 正当复用的 Stage 2 committed-read、lease/revision、A/B snapshot/head 与 migration infrastructure。旧 v2 modules 可继续作为 frozen historical regression/test surface。
+- Engineering slices：若需要，可按 compatibility boot（C1–C5/C12–C13）、lifecycle/economy composition（C6–C8）与 authority/recovery（C9–C11/C14）组织同一个 S4-09 Task；不得拆成独立产品 milestone。production source 默认零修改；发现真实缺陷即 `BLOCKED` 并单独报告，不在 gate 内顺手修复。
+- Acceptance：新增证据必须以真实 `createProductionStage4Session`、Save v3 mapper、Stage 2 guarded persistence 与 reopen/reload 为主；现有充分证据不重复。完整 Stage 1–4 regressions、architecture/typecheck/build/Playwright/quality、目标 mutation sanity、production write reachability scan、Independent Reviewer、branch/PR/main Linux Quality 与 Recovery Test 全绿后，才可判定 S4-09 Implementation PASS。
+- Design Review evidence：repository reality sync 为 main `50228d2e38db58a45b9899016c578142e10b9d5a`、clean；相关 production/dormant/migration/architecture 定向验证 5 files、84/84 PASS。未发现产品语义冲突或需 Elio 决策的问题。
+- 唯一入口：**Stage 4 / S4-09 — Compatibility Integration Gate Implementation**。不得开始下一 Stage。
 
 ### Stage 4 / S4-08.4 — Atomic Production Runtime / Save v3 Activation Implementation — PASS / CLOSED
 
@@ -210,7 +221,7 @@ S4-08.4 Design 与 Implementation 均已 PASS / CLOSED；production 已原子切
 - 验证证据：本地 Architecture/TypeScript/Build PASS；Unit 877/877、Integration 181/181、Playwright 1/1 PASS。独立只读 Reviewer 在发现并复验 production composition-root 与旧 v2 reachability 问题修正后给出 PASS；branch Linux `Quality` run `35642518513`、PR required run `35642658980`、main run `35642854991` 均 Success。architecture guards 已从“writer 未启用”改为“单一 Stage 4 session + v3 guarded writer 已正确接线”的正向/反向护栏。
 - 边界与限制：Stage 2 localStorage best-effort lease、无 atomic CAS/数据库级互斥的限制不变；second ownership verification 只缩小 race window。历史 v2 模块仍 source/test-callable 以保留冻结回归，但不是 production entrypoint。Phaser UI 仍为现有表现层基线；S4-08.4 未实现新玩法、UI 或 S4-09。
 - 回滚：首次 production v3 write 后不得部署 v2-only writer、降级 Save 或自动覆盖数据；发现问题时保留 persisted authority，通过兼容性修复/前滚 PR 处理。代码回滚若不能读取已产生的 v3 存档，不构成安全回滚方案。
-- 唯一入口：**Stage 4 / S4-09 — Compatibility Integration Gate Design Review**。本条只授权设计审查，不执行 S4-09 Implementation。
+- Historical Recovery superseded：本 S4-08.4 Implementation closeout 当时的 S4-09 Design Review entry 已由上方 S4-09 Design PASS/CLOSED 取代；当前唯一入口以上方“唯一下一行动”为准。
 
 ### Stage 4 / S4-08.4 — Atomic Production Runtime / Save v3 Activation Design Review — PASS / CLOSED
 
@@ -220,7 +231,7 @@ S4-08.4 Design 与 Implementation 均已 PASS / CLOSED；production 已原子切
 - Writer/失败边界：`intent + expectedRevision + expectedRunId|null -> reread committed authority -> validate/compose full candidate -> explicit v3 mapper -> real guarded commit -> publish`。fresh 仅 null→0、已有 N 仅 N→N+1；lease 两次 ownership verification、runId/revision gates 与 Stage 2 head commit point 保持。commit 前失败不得 publish；head 已提交而 publish/crash 发生时以重开读取的新 persisted authority 为准；head write 结果不确定时不得盲目重试或发布，先重读并明确结果。storage-valid payload 仍需 semantic validation；corrupt/unsupported 不得当 no-save。
 - Implementation acceptance：证明 fresh/v1/v2/v3/account-only/legacy/mixed-version A/B 读取与首次 v3 write；完整 Start/Abandon/dismiss/Restart/Retry/Replay/Next/Flag/movement/Lucky/Detection/Airplane/Revive/Claim/Failure production entrypoint 切换；Reward-before-terminal、Item/Benben facts 无损、refresh/reopen、stale revision/runId/lease、ownership loss、storage failure、commit 前/中/后 crash、publish failure、旧页 v2 写入拒绝。更新 architecture guards 和现有 Stage 4 production-isolation tests 为“完整激活且无双写”护栏，不可只删除旧护栏。完整 quality、独立 Reviewer、PR required checks 与 main Linux Quality 全绿后才可认定 Implementation 完成；不得单独合并任何半激活切片。
 - 已知风险/回滚：当前 dormant executor 的 commit seam 尚未绑定真实 Stage 2 guarded coordinator；现有 v3 migration 对 v2 dispatcher 的依赖使直接 bump version 可能形成循环，须保持无环严格分发。localStorage 仍只有 best-effort single-writer、无 atomic CAS。首次真实 v3 提交前可回滚代码；提交后不可盲目部署 v2-only writer、回退 Save 或自动覆盖数据，应保留存档并采用兼容性修复/前滚方案。实施属于 frozen-boundary change，按 Protocol 记录原因、影响、兼容性、migration/version 与回归证据。
-- 唯一入口：**Stage 4 / S4-08.4 — Atomic Production Runtime / Save v3 Activation Implementation**。本条仅授权进入实施流程，不代表 writer 已启用；不得执行 S4-09。
+- Historical Recovery superseded：本 S4-08.4 Design closeout 当时的 Implementation entry 与 writer-not-yet-active 状态已由后续 S4-08.4 Implementation 及上方 S4-09 Design PASS/CLOSED 取代；当前唯一入口以上方“唯一下一行动”为准。
 
 ### Stage 4 / S4-08.3 — Dormant Full Mutation & Lifecycle Orchestration Implementation — PASS / CLOSED
 
@@ -250,7 +261,7 @@ S4-08.4 Design 与 Implementation 均已 PASS / CLOSED；production 已原子切
 - S4-08.4 cutover inventory：必须原子核对 single production Runtime root/full Account、v1/v2/v3 reader、v3 writer、CURRENT_SAVE_VERSION=3、全部 mutation entrypoints、Refresh、publish-after-commit、real Stage2 lease/second ownership verification/revision/A-B crash safety、旧 v2 writers 全不可达、architecture guards、Reviewer 与 main Linux Quality。当前 v2 paths 已知含 Lucky/movement、Detection、Airplane、Revive、Restart/Retry、guarded commit/coordinator；尚未 production 接线的 Start/Flag/Failure/Claim/Abandon/dismiss/Replay/Next 亦不可漏。
 - S4-08.3 Implementation 测试/反向扫描门禁：一个受控 dormant PR、production behavior 0 change。覆盖 W 首步 Safe/Mine/Flag/Abandon/Restart/Airplane/win/Reward-before-terminal/非实际步/可 Claim、Detection waiting reject；null provenance load/Restart/legacy failed Retry、实际 Mine set、稳定 seed 与缺 catalog 只挡 replacement；account-only via Start、settled/legacy Replay entitlement、Next committed Account/catalog、当前末关/未来 catalog、旧 terminal 在 commit failure 保留；所有 gameplay、multi Reward/one-time/overflow/completion、Benben streak/roll/Claim/race、temp priority。每个实际 writing command（Start、Abandon、dismiss、Restart、Retry、Replay、Next、Flag changed、Safe movement、Mine pending、Lucky survival、Failure、Detection、Airplane、Revive、Claim）注入 commit failure；rejection/no-op zero write；stale revision/runId/both/old run after replacement；同 intent retry Start/Restart/Retry/Replay/Next 的 runId/seed/Board/Rewards、Failure eligibility、Claim card 均稳定。Mutation sanity 必须杀死既定 A–AQ 与新增 waiting lock、Airplane waiting reject、Flag/Claim 过严、null provenance禁 Retry、比较 seed 非 mines、重抽 base seed、account-only Replay 分叉、legacy auto-complete/无 entitlement Replay/Next、末关永远硬编码等错误；临时 mutation 全恢复。
 - Mutation gate clarification（已由 PR #51 复核）：上条所引“A–AQ”在正式仓库和 Git history 中没有逐项定义，不得凭标签虚构 43 个 mutation。其可恢复、可审计的具体错误类别、原合同来源、对应测试及已执行/未执行状态，统一见 `docs/10_S4-08-3_Mutation_Evidence_Matrix.md`；该矩阵展开既有冻结合同，不新增玩法。Independent Reviewer 已按真实证据 PASS；未击杀项不得伪报已击杀。
-- Historical Recovery superseded：本 S4-08.3 closeout 当时的 Design Review 入口及 production Stage3/v2/version2/writer-disabled 状态，均已由上方 S4-08.4 Design/Implementation PASS / CLOSED 取代；既有玩法与 Stage 2 persistence semantics 继续有效，当前 production/Next Action 以上方“唯一下一行动”及 S4-08.4 Implementation 段为准。
+- Historical Recovery superseded：本 S4-08.3 closeout 当时的 Design Review 入口及 production Stage3/v2/version2/writer-disabled 状态，均已由上方 S4-08.4 Design/Implementation 与 S4-09 Design PASS/CLOSED 取代；既有玩法与 Stage 2 persistence semantics 继续有效，当前 production/Next Action 以上方“唯一下一行动”及最新 S4-09 Design 段为准。
 
 ### Stage 4 / S4-08 — Atomic Runtime / Save v3 Activation Design Review — PASS / CLOSED
 
@@ -1035,7 +1046,7 @@ S4-08.4 Design 与 Implementation 均已 PASS / CLOSED；production 已原子切
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12–16）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08.3 与 S4-08.4 Design/Implementation 均已 PASS/CLOSED。Production 已切换到单一 Stage 4 Runtime/full Account，CURRENT_SAVE_VERSION=3，唯一 writer 为 Stage 2 guarded Save v3 path；v1/v2 仅作 strict read-only migration source。唯一下一行动为 Stage 4 / S4-09 — Compatibility Integration Gate Design Review；不得直接实现 S4-09 或重新执行 S4-08.4。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12–17）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08.3、S4-08.4 与 S4-09 Design 均已 PASS/CLOSED。Production 已切换到单一 Stage 4 Runtime/full Account，CURRENT_SAVE_VERSION=3，唯一 writer 为 Stage 2 guarded Save v3 path；v1/v2 仅作 strict read-only migration source。S4-09 必须按 §17 C1–C14 compatibility matrix 复用既有证据并补足真实 production-session integration；默认 production source changes=0。唯一下一行动为 Stage 4 / S4-09 — Compatibility Integration Gate Implementation；不得开始下一 Stage。
 ```
 
 ## 阶段看板
@@ -1046,7 +1057,7 @@ S4-08.4 Design 与 Implementation 均已 PASS / CLOSED；production 已原子切
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R、S4-08B、S4-08C、S4-08 Design、S4-08.1/2/3 与 S4-08.4 Design/Implementation PASS/CLOSED；production Stage 4 Runtime + Save v3 writer ACTIVE | 唯一入口 S4-09 Compatibility Integration Gate Design Review；不得直接进入 Implementation |
+| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R、S4-08B、S4-08C、S4-08 Design、S4-08.1/2/3、S4-08.4 Design/Implementation 与 S4-09 Design PASS/CLOSED；production Stage 4 Runtime + Save v3 writer ACTIVE | 唯一入口 S4-09 Compatibility Integration Gate Implementation；不得开始下一 Stage |
 | 5 | 表现层 | LOCKED | Stage 4 PASS |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
