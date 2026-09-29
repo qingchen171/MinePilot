@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CURRENT_SAVE_VERSION } from '../../src/core/persistence/save-dispatcher';
 import { executeProductionStage4Mutation, loadProductionStage4Runtime } from '../../src/systems/persistence/production-stage4-runtime';
@@ -31,5 +32,30 @@ describe('S4-08.4 atomic production activation guard', () => {
     expect(main + facade).not.toMatch(/persistence\/(?:lucky|detection|revive|airplane|new-attempt)['"]/);
     expect(main + facade).not.toContain('commitCandidateWithWriterLease(');
     expect(main + facade).not.toContain('commitCandidateSaveV2');
+  });
+
+  it('keeps obsolete v2 write imports unreachable while retaining shared persistence infrastructure', () => {
+    const visited = new Set<string>();
+    const imports: Array<{ file: string; names: string; target: string }> = [];
+    const visit = (file: string) => {
+      const absolute = resolve(file);
+      if (visited.has(absolute)) return;
+      visited.add(absolute);
+      const source = readFileSync(absolute, 'utf8');
+      const expression = /import\s+(?:type\s+)?([^'";]+?)\s+from\s+['"](\.[^'"]+)['"]/g;
+      for (const match of source.matchAll(expression)) {
+        const target = resolve(dirname(absolute), `${match[2]}.ts`);
+        imports.push({ file: absolute, names: match[1]!, target });
+        visit(target);
+      }
+    };
+    visit('src/main.ts');
+    const normalized = [...visited].map((file) => file.replaceAll('\\', '/'));
+    expect(normalized.some((file) => file.endsWith('/systems/persistence/production-stage4-runtime.ts'))).toBe(true);
+    expect(normalized.some((file) => file.endsWith('/systems/persistence/guarded-persistence-v3.ts'))).toBe(true);
+    expect(normalized.some((file) => file.endsWith('/systems/persistence/crash-safe-snapshot-store.ts'))).toBe(true);
+    expect(normalized.some((file) => file.endsWith('/systems/persistence/writer-lease.ts'))).toBe(true);
+    expect(imports.some((entry) => /\bcommitCandidateSaveV2\b|\bcommitCandidateWithWriterLease\b/.test(entry.names))).toBe(false);
+    expect(normalized.some((file) => /systems\/persistence\/(lucky|detection|revive|airplane|new-attempt)\.ts$/.test(file))).toBe(false);
   });
 });

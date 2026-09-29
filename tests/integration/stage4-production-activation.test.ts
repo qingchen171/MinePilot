@@ -8,6 +8,12 @@ import { acquireWriterLease, WRITER_LEASE_STORAGE_KEY } from '../../src/systems/
 import { commitCandidateWithWriterLease } from '../../src/systems/persistence/guarded-persistence';
 import { MemoryStorage } from '../helpers/memory-storage';
 import { emptySaveCandidateV2 } from '../helpers/save-v2';
+import { createGameState } from '../../src/core/game-state';
+import { createAccountState } from '../../src/core/account';
+import { createStage4GameState } from '../../src/core/stage4-game-state';
+import { mapStage4RuntimeToSaveV3 } from '../../src/core/persistence/stage4-runtime-mapping';
+import { createInitialBoard } from '../../src/core/initial-board';
+import { createWaitingRunState } from '../../src/core/run';
 
 const identity = { sessionId: 'stage4-owner', leaseToken: 'stage4-token' };
 const clock = { nowMs: () => 100 };
@@ -109,6 +115,84 @@ describe('S4-08.4 activated production authority', () => {
     const result = f.read();
     expect(result).toMatchObject({ status: 'loaded', persistence: { revision: 7, sourceSaveVersion: 1 }, runtime: { currentAttempt: null, account: { inventory: { lucky: 0, detection: 0, airplane: 0, revive: 0 } } } });
     expect(f.storage.operations.slice(before).every((operation) => operation.startsWith('read:'))).toBe(true);
+  });
+
+  it('migrates a rich v1 Attempt read-only and makes its first legal mutation a v3 N+1 commit', () => {
+    const storage = new MemoryStorage();
+    const board = createInitialBoard({ dimensions: { width: 2, height: 1 }, obstacleCoordinates: [], mineCoordinates: [{ x: 1, y: 0 }] });
+    if (board.status !== 'created') throw new Error('v1 board fixture');
+    const serialized = serializeSaveDocumentV1({
+      revision: 6,
+      activeRun: {
+        runId: 'legacy-v1-run',
+        levelId: 'level-001',
+        run: createWaitingRunState(board.board),
+        generationProvenance: { seed: 17, rngVersion: 'mulberry32-v1', generationVersion: 'mine-placement-v1' },
+      },
+    });
+    if (serialized.status !== 'serialized') throw new Error('v1 fixture');
+    expect(commitSnapshot(storage, JSON.stringify(serialized.document), 6).status).toBe('committed');
+    const beforeOperations = storage.operations.length;
+    const session = createProductionStage4Session(storage, identity, clock);
+    expect(session.read()).toMatchObject({ status: 'loaded', persistence: { revision: 6, sourceSaveVersion: 1 }, runtime: {
+      currentAttempt: { runId: 'legacy-v1-run', run: { characterPosition: { kind: 'waiting' } }, generationProvenance: { seed: 17 } },
+    } });
+    expect(storage.operations.slice(beforeOperations).every((operation) => operation.startsWith('read:'))).toBe(true);
+    expect(session.execute({ kind: 'flag', expectedRevision: 6, expectedRunId: 'legacy-v1-run', coordinate: { x: 0, y: 0 }, flagged: true }).status).toBe('committed');
+    const reopened = createProductionStage4Session(storage, identity, clock).read();
+    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 7, sourceSaveVersion: 3 } });
+    if (reopened.status !== 'loaded' || reopened.runtime.currentAttempt === null) return;
+    expect(reopened.runtime.currentAttempt.run.board.cells[0]).toMatchObject({ kind: 'safe', flagged: true });
+  });
+
+  it('preserves rich v2 gameplay and Item facts through a production mutation and exact v3 reopen', () => {
+    const source = fixture();
+    expect(source.start().status).toBe('committed');
+    const initial = source.read();
+    if (initial.status !== 'loaded' || initial.runtime.currentAttempt === null) throw new Error('v2 source fixture');
+    const board = initial.runtime.currentAttempt.run.board;
+    const mine = board.cells.findIndex((cell) => cell.kind === 'mine');
+    const point = (index: number) => ({ x: index % board.dimensions.width, y: Math.floor(index / board.dimensions.width) });
+    expect(source.execute({ kind: 'move', expectedRevision: 0, expectedRunId: 'run-a', coordinate: point(mine) }).status).toBe('committed');
+    expect(source.execute({ kind: 'detection', expectedRevision: 1, expectedRunId: 'run-a', initializeSeed: 99 }).status).toBe('committed');
+    const rich = source.read();
+    if (rich.status !== 'loaded' || rich.runtime.currentAttempt === null) throw new Error('rich v2 fixture');
+    const attempt = rich.runtime.currentAttempt;
+    const serialized = serializeSaveDocumentV2({
+      revision: 3,
+      activeRun: {
+        runId: attempt.runId,
+        levelId: attempt.levelId,
+        gameState: createGameState({ account: createAccountState(rich.runtime.account.inventory), run: attempt.run, runItems: attempt.runItems }),
+        ...(attempt.generationProvenance === null ? {} : { generationProvenance: attempt.generationProvenance }),
+      },
+    });
+    if (serialized.status !== 'serialized') throw new Error('v2 fixture');
+    expect(commitSnapshot(source.storage, JSON.stringify(serialized.document), 3).status).toBe('committed');
+    const session = createProductionStage4Session(source.storage, identity, clock);
+    const migrated = session.read();
+    expect(migrated).toMatchObject({ status: 'loaded', persistence: { revision: 3, sourceSaveVersion: 2 }, runtime: {
+      account: { inventory: rich.runtime.account.inventory }, currentAttempt: {
+        run: { characterPosition: attempt.run.characterPosition, phase: attempt.run.phase }, runItems: attempt.runItems,
+        generationProvenance: attempt.generationProvenance,
+      },
+    } });
+    if (migrated.status !== 'loaded' || migrated.runtime.currentAttempt === null) return;
+    expect(migrated.runtime.currentAttempt.run.board).toEqual(attempt.run.board);
+    const safeIndex = migrated.runtime.currentAttempt.run.board.cells.findIndex((cell) => cell.kind === 'safe' && cell.exploration === 'unexplored');
+    expect(session.execute({ kind: 'flag', expectedRevision: 3, expectedRunId: 'run-a', coordinate: point(safeIndex), flagged: true }).status).toBe('committed');
+    const reopened = createProductionStage4Session(source.storage, identity, clock).read();
+    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 4, sourceSaveVersion: 3 }, runtime: {
+      account: { inventory: rich.runtime.account.inventory }, currentAttempt: {
+        run: { characterPosition: attempt.run.characterPosition, phase: attempt.run.phase }, runItems: attempt.runItems,
+        generationProvenance: attempt.generationProvenance,
+      },
+    } });
+    if (reopened.status !== 'loaded' || reopened.runtime.currentAttempt === null) return;
+    expect(reopened.runtime.currentAttempt.run.board).toEqual({
+      ...attempt.run.board,
+      cells: attempt.run.board.cells.map((cell, index) => index === safeIndex ? { ...cell, flagged: true } : cell),
+    });
   });
 
   it('runs real Flag, Safe movement, Mine encounter and Failure through v3 commits', () => {
@@ -306,5 +390,111 @@ describe('S4-08.4 activated production authority', () => {
     // The head was actually committed; only a fresh authority read may determine the outcome.
     expect(f.read()).toMatchObject({ status: 'loaded', persistence: { revision: 1 }, runtime: { currentAttempt: null } });
     expect(f.execute({ kind: 'abandon', expectedRevision: 0, expectedRunId: 'run-a' })).toMatchObject({ status: 'rejected', reason: 'revision-conflict' });
+  });
+
+  it('keeps cached production-session authority unchanged until an uncertain commit is explicitly reloaded', () => {
+    const storage = new MemoryStorage();
+    const session = createProductionStage4Session(storage, identity, clock);
+    expect(session.execute({ kind: 'start', expectedRevision: null, expectedRunId: null, levelId: 'level-001', creation }).status).toBe('committed');
+    const before = session.read();
+    const originalWrite = storage.write.bind(storage);
+    storage.write = (key, value) => {
+      if (key === SNAPSHOT_STORAGE_KEYS.head) {
+        originalWrite(key, value);
+        return { status: 'failure', operation: 'write', reason: 'exception', key, cause: new Error('ack lost') };
+      }
+      return originalWrite(key, value);
+    };
+
+    expect(session.execute({ kind: 'abandon', expectedRevision: 0, expectedRunId: 'run-a' }))
+      .toMatchObject({ status: 'rejected', reason: 'commit-commit-outcome-uncertain' });
+    expect(session.read()).toBe(before);
+    expect(session.read()).toMatchObject({ status: 'loaded', persistence: { revision: 0 }, runtime: { currentAttempt: { runId: 'run-a' } } });
+    expect(session.reload()).toMatchObject({ status: 'loaded', persistence: { revision: 1 }, runtime: { currentAttempt: null } });
+  });
+
+  it('lets a new production session take an expired lease while the stale session must reload', () => {
+    const storage = new MemoryStorage();
+    let now = 100;
+    const mutableClock = { nowMs: () => now };
+    const first = createProductionStage4Session(storage, { sessionId: 'first', leaseToken: 'first-token' }, mutableClock);
+    const second = createProductionStage4Session(storage, { sessionId: 'second', leaseToken: 'second-token' }, mutableClock);
+    expect(first.execute({ kind: 'start', expectedRevision: null, expectedRunId: null, levelId: 'level-001', creation }).status).toBe('committed');
+    now = 31_000;
+    expect(second.reload()).toMatchObject({ status: 'loaded', persistence: { revision: 0 } });
+    expect(second.execute({ kind: 'abandon', expectedRevision: 0, expectedRunId: 'run-a' }).status).toBe('committed');
+    expect(first.execute({ kind: 'abandon', expectedRevision: 0, expectedRunId: 'run-a' }).status).toBe('rejected');
+    expect(first.read()).toMatchObject({ status: 'loaded', persistence: { revision: 0 }, runtime: { currentAttempt: { runId: 'run-a' } } });
+    expect(first.reload()).toMatchObject({ status: 'loaded', persistence: { revision: 1 }, runtime: { currentAttempt: null } });
+  });
+
+  it('restores a historical missing-catalog Attempt, rejects replacement, and permits legal dismissal', () => {
+    const f = fixture();
+    expect(f.start().status).toBe('committed');
+    const started = f.read();
+    if (started.status !== 'loaded' || started.runtime.currentAttempt === null) throw new Error('historical fixture');
+    const board = started.runtime.currentAttempt.run.board;
+    const safe = board.cells.findIndex((cell) => cell.kind === 'safe');
+    const mine = board.cells.findIndex((cell) => cell.kind === 'mine');
+    const point = (index: number) => ({ x: index % board.dimensions.width, y: Math.floor(index / board.dimensions.width) });
+    expect(f.execute({ kind: 'move', expectedRevision: 0, expectedRunId: 'run-a', coordinate: point(safe) }).status).toBe('committed');
+    expect(f.execute({ kind: 'move', expectedRevision: 1, expectedRunId: 'run-a', coordinate: point(mine) }).status).toBe('committed');
+    expect(f.execute({ kind: 'failure', expectedRevision: 2, expectedRunId: 'run-a' }).status).toBe('committed');
+    const failed = f.read();
+    if (failed.status !== 'loaded' || failed.runtime.currentAttempt === null) throw new Error('failed fixture');
+    const legacy = serializeSaveDocumentV2({
+      revision: 4,
+      activeRun: {
+        runId: 'historical-run',
+        levelId: 'missing-historical-level',
+        gameState: createGameState({
+          account: createAccountState(failed.runtime.account.inventory),
+          run: failed.runtime.currentAttempt.run,
+          runItems: failed.runtime.currentAttempt.runItems,
+        }),
+        ...(failed.runtime.currentAttempt.generationProvenance === null ? {} : { generationProvenance: failed.runtime.currentAttempt.generationProvenance }),
+      },
+    });
+    if (legacy.status !== 'serialized') throw new Error('legacy fixture');
+    expect(commitSnapshot(f.storage, JSON.stringify(legacy.document), 4).status).toBe('committed');
+
+    const session = createProductionStage4Session(f.storage, identity, clock);
+    expect(session.read()).toMatchObject({ status: 'loaded', persistence: { revision: 4, sourceSaveVersion: 2 }, runtime: { currentAttempt: { runId: 'historical-run', levelId: 'missing-historical-level' } } });
+    const before = session.read();
+    expect(session.execute({ kind: 'retry', expectedRevision: 4, expectedRunId: 'historical-run', creation: { ...creation, runId: 'replacement' } }))
+      .toEqual({ status: 'rejected', reason: 'level-not-found' });
+    expect(session.read()).toBe(before);
+    expect(session.execute({ kind: 'dismiss', expectedRevision: 4, expectedRunId: 'historical-run' }).status).toBe('committed');
+    expect(createProductionStage4Session(f.storage, identity, clock).read())
+      .toMatchObject({ status: 'loaded', persistence: { revision: 5, sourceSaveVersion: 3 }, runtime: { currentAttempt: null } });
+  });
+
+  it('keeps one-time Reward and Account claim authority synchronized across production mutation and reopen', () => {
+    const f = fixture();
+    expect(f.start().status).toBe('committed');
+    const started = f.read();
+    if (started.status !== 'loaded' || started.runtime.currentAttempt === null) throw new Error('reward fixture');
+    const attempt = started.runtime.currentAttempt;
+    const reward = attempt.rewards[0];
+    if (reward === undefined) throw new Error('reward fixture');
+    const richRuntime = createStage4GameState({
+      account: started.runtime.account,
+      currentAttempt: {
+        ...attempt,
+        rewards: attempt.rewards.map((entry, index) => index === 0 ? { ...entry, oneTimeClaimId: 'historical-one-time' } : entry),
+      },
+    });
+    const mapped = mapStage4RuntimeToSaveV3(richRuntime, 1);
+    if (mapped.status !== 'mapped') throw new Error('v3 mapping fixture');
+    expect(commitSnapshot(f.storage, JSON.stringify(mapped.document), 1).status).toBe('committed');
+
+    const session = createProductionStage4Session(f.storage, identity, clock);
+    expect(session.execute({ kind: 'move', expectedRevision: 1, expectedRunId: 'run-a', coordinate: reward.coordinate }).status).toBe('committed');
+    const reopened = createProductionStage4Session(f.storage, identity, clock).read();
+    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 2, sourceSaveVersion: 3 }, runtime: { account: { oneTimeClaimIds: ['historical-one-time'] } } });
+    if (reopened.status !== 'loaded' || reopened.runtime.currentAttempt === null) return;
+    expect(reopened.runtime.account.oneTimeClaimIds.filter((id) => id === 'historical-one-time')).toHaveLength(1);
+    expect(reopened.runtime.currentAttempt.rewards.find((entry) => entry.oneTimeClaimId === 'historical-one-time'))
+      .toMatchObject({ claimed: true });
   });
 });
