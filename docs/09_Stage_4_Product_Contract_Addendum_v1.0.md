@@ -434,3 +434,14 @@ Historical recovery note：本节当时的 S4-08.2 Design Review entry 已由下
 - Gates：Implementation须覆盖full mapping/no-alias/exact IDs、fresh/migration隔离、factory same-seed Board+Reward、catalog-independent historical reconstruction、direct/committed/backup v3 legacy rejection、migration legacy恢复、mapper拒绝legacy、read-only reader与Stage3/v2 isolation；mutation须检测字段遗漏/alias/normalization、defaults混用、retro generation/settlement、hidden ID/seed、seed split、reader write/production switch/version3及所有legacy trust escalation。S4-08.4 first-writable gate新增Retry/dismiss清legacy、无其他可达legacy写入、无public/persisted trust bypass与full Account single-authority convergence。
 
 唯一入口现在是 **Stage 4 / S4-08.2 — Stage 4 Runtime Aggregate, Fresh Bootstrap, Complete Attempt Factory & Save v3 Mapping/Reconstruction Foundation Implementation**。一个受控PR，全部保持dormant；不得切production Runtime/Account/reader/dispatcher/coordinator/writer，不得改`CURRENT_SAVE_VERSION`或开始S4-08.3/4/S4-09。
+
+## 16. S4-08.4 Atomic Production Runtime / Save v3 Activation — PASS / CLOSED (2026-09-29)
+
+**ATOMIC ACTIVATION ACCEPTED.** 本节仅同步已验收 implementation 状态，取代 §13–15 中关于 production 仍为 Stage 3/Save v2、writer disabled 及旧 current-entry 的历史描述；既有产品、兼容、迁移、RNG、Stage 2 persistence 与 Benben 合同不变。Implementation commit `81c5b45b8f7802b418db9c06489244b849bfce2e` 经 PR #54 合并，production baseline `3b9e72e7d780806bd1e666dce3e282ab3db384d0`。
+
+- Production authority 现为单一 Stage 4 Runtime/full Account root；`CURRENT_SAVE_VERSION=3`，所有批准的 production mutation 只通过 Save v3 mapper 与既有 Stage 2 lease/revision/A-B guarded commit，commit success 后才 publish。旧 v2 writers 仅保留 historical regression/test compatibility，不由 production entrypoint 到达。
+- Production reader 对 no-save、v1、v2、v3 分层处理；v1/v2 严格验证后只读迁移，load 不回写、不增 revision、不重新生成 gameplay/economy facts，第一次真实 mutation 才写 v3。direct/head/backup v3 继续 strict validation，migration-only legacy trust 不得提升为可写 direct-v3 authority。
+- 本地 quality 为 Unit 877、Integration 181、Playwright 1，Architecture/TypeScript/Build PASS；Independent Reviewer PASS；branch/PR/main Linux Quality runs `35642518513`/`35642658980`/`35642854991` Success。
+- localStorage 无 atomic CAS、lease 仅 best-effort coordination、second ownership verification 仅缩小 race window的限制继续有效。首次真实 v3 write 后不得以 v2-only code rollback、save downgrade 或自动覆盖作为恢复方案。
+
+当前唯一入口是 **Stage 4 / S4-09 — Compatibility Integration Gate Design Review**。本 closeout 不授权直接实施 S4-09。
