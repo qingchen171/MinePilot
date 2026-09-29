@@ -3,7 +3,7 @@
 **项目：MinePilot / Minesweeper Product**  
 **状态更新时间：2026-09-29**
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item foundation/统一揭雷、Lucky/Detection/Revive/Airplane 及跨 Item 生命周期集成均已完成；Stage 4 production Runtime 与 Save v3 authority 已通过 S4-08.4 原子激活。Stage 3 最终冻结状态按下方标签与门禁规则确认；Stage 4 仍 IN PROGRESS，等待 S4-09 Compatibility Integration Gate。**
+**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成；Stage 4 production Runtime 与 Save v3 authority 已激活并通过 S4-09 全链兼容门禁。Stage 0–3 已 FROZEN / PASS；Stage 4 在本 closeout 经 main CI 与 annotated `stage-4-frozen` 标签确认后成为 FROZEN / PASS；Stage 5 尚未开始。**
 
 ## 当前事实
 
@@ -197,9 +197,18 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 4 / S4-09 — Compatibility Integration Gate Implementation**
+**Stage 5 / S5-01 — Presentation Architecture & Runtime-to-UI Integration Design Review**
 
-S4-09 Design Review 已 PASS / CLOSED；本入口只授权按冻结 C1–C14 matrix 建立 compatibility/integration evidence。默认 production behavior/source changes = 0；若测试暴露真实 production defect，必须停止并报告 affected frozen boundary，不得静默扩大范围或进入下一 Stage。
+这是 Stage 5 的首个 DESIGN REVIEW 入口，只允许定义现有 Stage 4 production authority 之上的 presentation-layer integration contract，并建立后续 Stage 5 task decomposition；不授权 implementation，不得静默吸收 Stage 6 的完整 bilingual、skins 或 mobile adaptation。
+
+### Stage 4 / S4-09 — Compatibility Integration Gate Implementation — PASS / CLOSED
+
+- Final evidence：implementation commit `c889c90c232cbd7bda8fb198a04aadf5ae4731ed`，PR #57，merged/final main baseline `2505811928b592f70a46cb7785b4792e2a525925`；production source changes = `0`，仅新增/增强 compatibility evidence 与 production write-reachability guard。
+- Gate closure：冻结 C1–C14 matrix 全部由 `docs/10_S4-09_Compatibility_Evidence_Matrix.md` 中明确分类的既有引用、新增 integration、实际 mutation 与 behavior-only evidence 闭合。rich v1/v2/v3、fresh、legacy、Benben/temporary resource、Reward/terminal、并发/失败/恢复及 obsolete-v2-write reachability 均保留单一 Stage 4 Runtime/Save v3 authority。
+- Mandatory compatibility：production session 已证明 historical missing-catalog Attempt 可恢复、依赖 current catalog 的 replacement 明确拒绝且不污染 authority、适用终局可合法 dismiss；historical one-time Reward 与 Account `oneTimeClaimIds` 在 mutation/reopen 后同步且 claim ID 不重复。
+- Validation：Targeted `28/28`；Unit `878/878`、Integration `187/187`、Playwright `1/1`，Architecture/TypeScript/Build/full quality PASS。Independent Reviewer PASS；branch Linux `Quality` run `36552845849`、PR required run `36552975032`、main run `36553126950` 均 Success；Reverse Scan 与 Final Recovery Test PASS。
+- Final boundary：Production 继续使用单一 Stage 4 Runtime/full Account、Save v3 writer 与 Stage 2 guarded A/B/lease/revision infrastructure；v1/v2 仅为 strict read-only migration source，obsolete v2 write paths 不可从 production roots 到达。localStorage 无 atomic CAS/绝对 mutex、second ownership verification 只缩小 race window、Phaser >500 KB warning、Reward farming 风险与当前仅一个 production Level 等既有已批准限制不变。
+- Stage result：S4-09 是正式 Stage 4 最终兼容门禁；其通过满足 Development Protocol 的功能与证据条件。Closeout 文档合并、main Linux Quality、Recovery Test 全绿后，以 annotated tag `stage-4-frozen` 指向该最终 main closeout commit；标签存在且指向包含本段的已验证提交时，Stage 4 正式为 **FROZEN / PASS**，标签创建前仅为 **FROZEN CANDIDATE**。`2505811928b592f70a46cb7785b4792e2a525925` 保留为最终 implementation baseline，不用正文伪造自引用 closeout hash，不得移动或覆盖 frozen tag。Stage 5 只开放上方 S5-01 Design Review，不在本 closeout 启动。
 
 ### Stage 4 / S4-09 — Compatibility Integration Gate Design Review — PASS / CLOSED
 
@@ -1046,7 +1055,7 @@ S4-09 Design Review 已 PASS / CLOSED；本入口只授权按冻结 C1–C14 mat
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §12–17）、Protocol 和最新 PROJECT_STATUS。Stage 0–3 FROZEN；S4-08.3、S4-08.4 与 S4-09 Design 均已 PASS/CLOSED。Production 已切换到单一 Stage 4 Runtime/full Account，CURRENT_SAVE_VERSION=3，唯一 writer 为 Stage 2 guarded Save v3 path；v1/v2 仅作 strict read-only migration source。S4-09 必须按 §17 C1–C14 compatibility matrix 复用既有证据并补足真实 production-session integration；默认 production source changes=0。唯一下一行动为 Stage 4 / S4-09 — Compatibility Integration Gate Implementation；不得开始下一 Stage。
+请读取 AGENTS、Specification、09_Stage_4_Product_Contract_Addendum_v1.0.md（尤其 §16–17）、10_S4-09_Compatibility_Evidence_Matrix.md、Protocol 和最新 PROJECT_STATUS。Stage 0–4 均已 FROZEN / PASS；S4-08.4 已激活单一 Stage 4 Runtime/full Account 与 Save v3 writer，S4-09 C1–C14 compatibility gate 已 PASS/CLOSED。v1/v2 仅作 strict read-only migration source，obsolete v2 write paths 不可从 production roots 到达；既有 localStorage/lease、bundle、Reward farming 与 production Level 数量限制继续保留。唯一下一行动为 Stage 5 / S5-01 — Presentation Architecture & Runtime-to-UI Integration Design Review；只做设计和 Stage 5 task decomposition，不实现 UI，不吸收 Stage 6 bilingual/skins/mobile 范围。
 ```
 
 ## 阶段看板
@@ -1057,8 +1066,8 @@ S4-09 Design Review 已 PASS / CLOSED；本入口只授权按冻结 C1–C14 mat
 | 1 | 核心棋盘 | FROZEN / PASS（S1-01 至 S1-13） | Stage 0 PASS |
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
-| 4 | 关卡/奖励/商店/笨笨 | IN PROGRESS；PRODUCT CONTRACT FROZEN；S4-02/03/04、S4-05/06/07、S4-08A、S4-07R、S4-08B、S4-08C、S4-08 Design、S4-08.1/2/3、S4-08.4 Design/Implementation 与 S4-09 Design PASS/CLOSED；production Stage 4 Runtime + Save v3 writer ACTIVE | 唯一入口 S4-09 Compatibility Integration Gate Implementation；不得开始下一 Stage |
-| 5 | 表现层 | LOCKED | Stage 4 PASS |
+| 4 | 关卡/奖励/商店/笨笨 | FROZEN CANDIDATE；annotated `stage-4-frozen` 指向已验证 closeout main 后为 FROZEN / PASS；S4-09 PASS/CLOSED；production Stage 4 Runtime + Save v3 writer ACTIVE | Stage 3 FROZEN / PASS |
+| 5 | 表现层 | DESIGN ENTRY OPEN；implementation 未授权 | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-01 Design Review |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
 
