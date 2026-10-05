@@ -3,7 +3,7 @@
 **项目：MinePilot / Minesweeper Product**  
 **状态更新时间：2026-10-05**
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成；Stage 4 production Runtime 与 Save v3 authority 已激活并通过 S4-09 全链兼容门禁。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01 documentation closeout 门禁成功后 PASS/CLOSED；presentation implementation 尚未授权。**
+**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成；Stage 4 production Runtime 与 Save v3 authority 已激活并通过 S4-09 全链兼容门禁。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01 PASS/CLOSED；S5-02 Design Freeze/Closeout 门禁成功后仅授权 S5-02 Implementation，presentation implementation 尚未开始。**
 
 ## 当前事实
 
@@ -197,9 +197,17 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 5 / S5-02 — Presentation Authority Bridge, Operation Envelope, Pure View Models & Copy-Key Foundation Design Review**
+**Stage 5 / S5-02 — Presentation Authority Bridge, Operation Envelope, Pure View Models & Copy-Key Foundation Implementation**
 
-这是 S5-01 closeout 门禁成功后的唯一入口，仅授权 S5-02 Design Review。S5-02 必须独立遵守 Design -> Attack -> Freeze -> Implementation -> Tests -> Review -> CI -> Closeout；不得直接实施，不得吸收 Stage 6 bilingual/skins/mobile。
+这是 S5-02 Design Freeze/Closeout 文档的独立 Reviewer、PR/main Linux Quality 与 Recovery gates 成功后的唯一入口；门禁前不得实施。S5-02 Implementation 仍须独立完成 Tests -> Review -> CI -> Closeout；不得执行 S5-03 或吸收 Stage 6 bilingual/skins/mobile。
+
+### Stage 5 / S5-02 — Presentation Foundation Design — FROZEN / READY FOR IMPLEMENTATION after closeout gates
+
+- 已人工接受 Design Review、Attack Review、Design Correction 与 Final Design Correction；冻结合同见 `docs/12_S5-02_Presentation_Foundation_Design_Contract.md`。本次仅 documentation/governance closeout，production/test/config changes = 0；实际 closeout PR、Reviewer、branch/main Quality 与最终 baseline 由 Git/CI 证据恢复，不在正文预写编号或哈希。
+- 冻结实现边界：presentation-owned narrow structural session port；bootstrap-only 适配单一 production session 与 sanitized facts -> pure ui projector handoff；systems/presentation 不导入 persistence 或 ui，ui 不导入 systems，raw Runtime 不进入 ui/Scene。TypeScript 完整结构兼容加运行时白名单/秘密字段测试是必需门禁。
+- Semantic intent 于 dispatch 捕获权威 revision/runId，形成深度不可变 operation envelope；runId、generation、Detection entropy 与 writer identity 分离。安全熵失败进入非破坏性 unavailable，不用 `Math.random`。S5-06 负责浏览器 gesture/double-click 解释；S5-02 负责 unresolved submission 不生成第二 envelope。
+- 当前 production-session observable reasons 必须按 `docs/12...` 的完整逐字清单分类，涵盖 commit safety、envelope retain/discard、retry usefulness 与 reload/recovery；禁止 prefix 分类。未知原因保守 discard/reload；`commit-commit-outcome-uncertain` 永不 replay；`commit-persistence-commit-failure` 仅在所有来源有穷尽 pre-new-head 证据时可条件保留，否则整类保守 discard/reload。
+- 不改变 Stage 4 Result API、Runtime/Save/persistence authority、Shop、settings/tutorial 或 Stage 6。S5-03/S5-04 的 Elio 产品决策仍各自在其 Design 阶段请求，不阻塞本设计冻结。
 
 ### Stage 5 / S5-01 — Presentation Architecture Design — PASS / CLOSED after closeout gates
 

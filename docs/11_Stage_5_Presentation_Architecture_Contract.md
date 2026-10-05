@@ -93,6 +93,6 @@ Future tests prove: session constructor ownership; no obsolete v2 writes; exact 
 
 Known limitations remain localStorage without atomic CAS/absolute mutex, string-result classification, HMR lifetime, one production Level, Phaser bundle warning and unchosen assets. No new product rule follows from them.
 
-Recovery requires AGENTS, Specification, Protocol, PROJECT_STATUS, this contract and Git history to identify Stage 0–4 FROZEN, S5-01 design-only CLOSED after gates, single production authority, deferred S5-03/S5-04 decisions, finite S5-02–S5-09 sequence and exactly one next entry: **Stage 5 / S5-02 — Presentation Authority Bridge, Operation Envelope, Pure View Models & Copy-Key Foundation Design Review**. Implementation is not yet authorized.
+Recovery requires AGENTS, Specification, Protocol, PROJECT_STATUS, this contract and Git history to identify Stage 0–4 FROZEN, S5-01 design-only CLOSED after gates, single production authority, deferred S5-03/S5-04 decisions and the finite S5-02–S5-09 sequence. The S5-02 detailed design freeze and current unique Next Action are in `12_S5-02_Presentation_Foundation_Design_Contract.md` and `PROJECT_STATUS`; this S5-01 historical entry does not override them.
 
 Closeout evidence lives in its reviewed PR, branch/main Quality runs and Git history; never invent CI identifiers or self-referential baseline hashes. Docs rollback uses a reviewed revert, never moves frozen Stage tags.
