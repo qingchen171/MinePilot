@@ -53,6 +53,10 @@ export function createProductionStage4Session(
       if (authority.status !== 'fresh' && authority.status !== 'loaded') {
         return { status: 'rejected', reason: authority.status };
       }
+      // A disabled Shop never acquires writer authority or touches persistence metadata.
+      if (intent.kind === 'purchase' && shopCatalog === null) {
+        return { status: 'rejected', reason: 'invalid-request' };
+      }
       const lease = acquireWriterLease(storage, identity, clock);
       if (lease.status !== 'acquired' && lease.status !== 'renewed') {
         return { status: 'rejected', reason: lease.status };

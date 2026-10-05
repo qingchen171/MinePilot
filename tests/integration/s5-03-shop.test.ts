@@ -159,7 +159,9 @@ describe('S5-03 Shop production authority', () => {
   it('invalid config disables purchase without altering other production capabilities', () => {
     const { storage } = seeded(5);
     const session = createProductionStage4Session(storage, owner, clock, null);
+    const beforeOperations = storage.operations.length;
     expect(session.execute(purchase(4, 'lucky'))).toEqual({ status: 'rejected', reason: 'invalid-request' });
+    expect(storage.operations.slice(beforeOperations)).toEqual([]);
     expect(session.read()).toMatchObject({ status: 'loaded', runtime: { account: { coins: 5 } } });
     const root = createPresentationRoot(session, { nextRunId: () => 'unused', nextGenerationSeed: () => 0,
       nextDetectionSeed: () => 0 }, null);
