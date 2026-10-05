@@ -36,6 +36,12 @@ test('Shop presents trusted prices, one purchase per activation and explicit buy
   await expect(shop).toContainText('Coins: 19');
   await expect(shop).toContainText('Purchase saved.');
   await expect(shop.locator('button[data-shop-item]')).toHaveCount(0);
+  const repeatPrevented = await shop.getByRole('button', { name: 'Buy again' }).evaluate((button) => {
+    const repeatedEnter = new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true, cancelable: true });
+    button.dispatchEvent(repeatedEnter);
+    return repeatedEnter.defaultPrevented;
+  });
+  expect(repeatPrevented).toBe(true);
   await shop.getByRole('button', { name: 'Buy again' }).click();
   await shop.locator('button[data-shop-item="lucky"]').click();
   await expect(shop).toContainText('Coins: 18');
