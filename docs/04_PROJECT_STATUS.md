@@ -1,9 +1,9 @@
 # PROJECT_STATUS
 
 **项目：MinePilot / Minesweeper Product**  
-**状态更新时间：2026-10-05**
+**状态更新时间：2026-10-06**
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成；Stage 4 production Runtime 与 Save v3 authority 已激活并通过 S4-09 全链兼容门禁。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01 PASS/CLOSED，S5-02 presentation foundation Implementation PASS/CLOSED。**
+**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成；Stage 4 production Runtime 与 Save v3 authority 已激活并通过 S4-09 全链兼容门禁。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01、S5-02 PASS/CLOSED，S5-03 Shop Design FROZEN / READY FOR IMPLEMENTATION；Shop production/UI 尚未实现。**
 
 ## 当前事实
 
@@ -197,9 +197,17 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 5 / S5-03 — Functional Shop Authority & Presentation Design Review**
+**Stage 5 / S5-03 — Functional Shop Authority & Presentation Implementation**
 
-S5-02 已完成 Implementation 与本状态收尾；此处仅授权 S5-03 Design Review，不授权 Shop Implementation。Shop offerings/prices/quantity/insufficient-funds 产品事实须在 S5-03 Design 向 Elio 请求并经过 frozen-boundary change control；不得擅自决定或吸收 Stage 6 bilingual/skins/mobile。
+S5-03 Design 已接受并冻结；此处仅授权 S5-03 Implementation，不授权 S5-04、未批准的经济规则或 Stage 6 bilingual/skins/mobile。唯一 Shop 合同见 `docs/13_S5-03_Functional_Shop_Design_Contract.md`。
+
+### Stage 5 / S5-03 — Functional Shop Design — FROZEN / READY FOR IMPLEMENTATION
+
+- Elio 已批准四种商品与价格：Lucky 1、Detection 2、Revive 4、Airplane 8 coin；每次恰好一件、允许有意重复购买、库存无产品上限；余额不足须有 Shop-specific 提示且由生产规则独立拒绝。S5-03 Design Review、Design Correction、Attack Review 与 Final Design Correction 均已接受。正式设计与测试合同见 `docs/13_S5-03_Functional_Shop_Design_Contract.md`。本 docs-only closeout 不宣称购买代码已存在。
+- 单一 declarative config 价格源由 composition root 经 core 纯验证器验证一次，同一 readonly validated catalog 供生产购买权威和 presentation 使用；core 不导入 config，Scene 只提交 Item、不提交价格。购买分支位于 `start` 后、通用 `no-attempt` 门禁前；仅 `currentAttempt === null` 且 `expectedRunId === null` 可购买。完整 Account candidate 原子扣币、增一件、保留其他所有账户事实，继续由 Save v3 与现有 guarded commit 先持久化再 publish。UI affordability 仅是建议展示，成功展示须从已提交权威重新投影。
+- 新的可达理由仅为 `shop-requires-account-only`/`invalid-shop-item`/`insufficient-coins`（domain）和 `inventory-overflow`（technical）。中央 exact reason-to-copy 映射中 `insufficient-coins -> shop.insufficient-coins`；unknown 保守回退，uncertain commit 永不重放。错误 config 非破坏性禁用 Shop，`invalid-shop-configuration` **不是** production mutation reason。Shop-only、非持久化的 `ready -> submitting -> receipt-disarmed` 状态需独立“再买一次”动作才重新授权，防双击/键盘重复；不改变 S5-06 的一般浏览器/棋盘手势职责。
+- Protocol §7.1 change control：reason 为 MVP functional Shop；受影响 frozen boundary 是 Stage 4 production mutation/Account candidate 以及 S5-02 semantic intent、result/copy/public projection 的加法扩展。Save v3 schema/version/migration、Stage 2 persistence chain 与既有 gameplay 语义不变；v1/v2/v3 Account purchase/reopen、完整 Account 保留、失败零写入、stale/lease/uncertain、重复激活及 mutation sanity 为 Implementation 门禁。回滚为经 review 的 scoped Git revert；已提交购买不自动退款或重定价。跨旧页面/新部署没有报价共识，不虚构 quoteVersion。历史 Stage 4/S5-02 PASS 不能误写成当时已有 Shop。
+- 本 Design Freeze 只修改 authority docs；production/tests/config/Save changes = 0。closeout 的独立 Reviewer、PR/branch/main Linux Quality、Recovery 与最终 baseline 以真实 Git/CI 记录为准，不预填编号或 hash。S5-04 settings/tutorial 产品事实仍待其 Design；本次不发明。
 
 ### Stage 5 / S5-02 — Presentation Foundation Implementation — PASS / CLOSED
 
@@ -1080,7 +1088,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md 与 12_S5-02_Presentation_Foundation_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01 与 S5-02 均 PASS/CLOSED。Production 为单一 Stage 4 Runtime/full Account 与 Save v3 writer，presentation foundation 只提供受限 adapter/ViewModel/copy-key，不产生第二权威。唯一下一行动为 Stage 5 / S5-03 — Functional Shop Authority & Presentation Design Review；仅设计，不授权实现。Shop 产品事实在 S5-03 Design、settings/tutorial 在 S5-04 Design 决定；Stage 6 bilingual/skins/mobile 不提前执行。
+请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md、12_S5-02_Presentation_Foundation_Design_Contract.md 与 13_S5-03_Functional_Shop_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01、S5-02 PASS/CLOSED，S5-03 Design FROZEN。Production 仍为单一 Stage 4 Runtime/full Account 与 Save v3 writer；Shop 尚未实现。唯一下一行动为 Stage 5 / S5-03 — Functional Shop Authority & Presentation Implementation；只按冻结 Shop 合同实施。settings/tutorial 的产品事实留待 S5-04 Design；Stage 6 bilingual/skins/mobile 不提前执行。
 ```
 
 ## 阶段看板
@@ -1092,7 +1100,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | FROZEN CANDIDATE；annotated `stage-4-frozen` 指向已验证 closeout main 后为 FROZEN / PASS；S4-09 PASS/CLOSED；production Stage 4 Runtime + Save v3 writer ACTIVE | Stage 3 FROZEN / PASS |
-| 5 | 表现层 | IN PROGRESS — S5-01、S5-02 PASS/CLOSED | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-03 Design Review |
+| 5 | 表现层 | IN PROGRESS — S5-01、S5-02 PASS/CLOSED；S5-03 Design FROZEN | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-03 Implementation |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
 
@@ -1104,7 +1112,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 - localStorage 不提供 atomic CAS；S2-06 的 best-effort lease 与两次 ownership verification 不能消除所有精确并发 race。若未来实测不足，必须单独评估更强协调机制，不得把当前实现描述为强事务或绝对互斥。
 - Reward farming/反自动化继续保留于 Future Requirements Registry；在出现真实经济破坏证据前不提前实现复杂防刷系统。
 - 游戏正式名称与域名未定。
-- 未冻结的后续关卡/商店平衡（例如价格、level-002+ 的 Reward/难度参数、障碍比例最终值）等待可玩原型数据；不得把已冻结的 `level-001` Reward 配置或 Benben global 阈值重新标为待定。
+- S5-03 四种 Shop Item 的当前 MVP 价格已冻结为 1/2/4/8 coin；其他未冻结的后续关卡平衡（例如 level-002+ 的 Reward/难度参数、障碍比例最终值）等待可玩原型数据；不得把已冻结的 `level-001` Reward 配置或 Benben global 阈值重新标为待定。
 - 美术、音乐与音效素材来源等待核心玩法验证后决定。
 - 目标浏览器最低版本等待 Stage 0/6 兼容性审查。
 - 流程改进候选：现行“同一 Bug 两次修复未通过即 STOP”可能需要区分“未知根因下的连续试错”与“根因已明确的直接连锁修复”；在正式审查并修改 Protocol 前继续严格遵守现行规则，本次不修改 Protocol。
