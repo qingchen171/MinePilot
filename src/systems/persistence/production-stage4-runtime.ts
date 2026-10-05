@@ -1,4 +1,5 @@
 import { PRODUCTION_LEVEL_CATALOG } from '../../core/level-catalog';
+import type { ValidatedShopCatalog } from '../../core/shop';
 import {
   executeDormantStage4Mutation,
   type DormantMutationIntent,
@@ -20,6 +21,7 @@ export function executeProductionStage4Mutation(
   identity: WriterIdentity,
   clock: Clock,
   intent: DormantMutationIntent,
+  shopCatalog: ValidatedShopCatalog | null = null,
 ): DormantMutationResult {
   return executeDormantStage4Mutation(storage, intent, {
     commit(document, expectedRevision) {
@@ -30,7 +32,7 @@ export function executeProductionStage4Mutation(
         ? { status: 'committed' }
         : { status: 'rejected', reason: result.status };
     },
-  }, PRODUCTION_LEVEL_CATALOG);
+  }, PRODUCTION_LEVEL_CATALOG, shopCatalog);
 }
 
 /** Browser composition root: one published Runtime, replaced only after a committed v3 mutation. */
@@ -38,6 +40,7 @@ export function createProductionStage4Session(
   storage: StringKeyValueStorage,
   identity: WriterIdentity,
   clock: Clock,
+  shopCatalog: ValidatedShopCatalog | null = null,
 ) {
   let authority = loadProductionStage4Runtime(storage);
   return {
@@ -50,11 +53,15 @@ export function createProductionStage4Session(
       if (authority.status !== 'fresh' && authority.status !== 'loaded') {
         return { status: 'rejected', reason: authority.status };
       }
+      // A disabled Shop never acquires writer authority or touches persistence metadata.
+      if (intent.kind === 'purchase' && shopCatalog === null) {
+        return { status: 'rejected', reason: 'invalid-request' };
+      }
       const lease = acquireWriterLease(storage, identity, clock);
       if (lease.status !== 'acquired' && lease.status !== 'renewed') {
         return { status: 'rejected', reason: lease.status };
       }
-      const result = executeProductionStage4Mutation(storage, identity, clock, intent);
+      const result = executeProductionStage4Mutation(storage, identity, clock, intent, shopCatalog);
       if (result.status === 'committed') {
         // The candidate becomes visible only after the guarded snapshot commit succeeds.
         authority = {

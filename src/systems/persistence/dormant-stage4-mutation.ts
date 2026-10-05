@@ -18,6 +18,7 @@ import { applyRewardClaimsForExploration } from '../../core/reward-claim';
 import { createReviveCandidateWithTemporaryResource } from '../../core/revive';
 import { setRunFlagged } from '../../core/run-flag';
 import { createStage4AccountState, type Stage4AccountState } from '../../core/stage4-account';
+import { purchaseShopItem, type ValidatedShopCatalog } from '../../core/shop';
 import { createCompleteAttempt } from '../../core/stage4-attempt-factory';
 import { createStage4GameState, type Stage4GameState } from '../../core/stage4-game-state';
 import { createStableId } from '../../core/stable-id';
@@ -45,6 +46,7 @@ export type DormantMutationIntent = Authority & (
   | { readonly kind: 'flag'; readonly coordinate: Coordinate; readonly flagged: boolean }
   | { readonly kind: 'move' | 'airplane'; readonly coordinate: Coordinate }
   | { readonly kind: 'detection'; readonly initializeSeed?: number }
+  | { readonly kind: 'purchase'; readonly item: unknown }
 );
 
 /** Narrow commit port. Production binds it to the Stage 2 lease/revision gate. */
@@ -189,7 +191,8 @@ function composeExploration(old: Stage4GameState, game: GameState, card: Attempt
     claims.status === 'claimed' ? claims.nextRewards : attempt.rewards, game.runItems, card);
 }
 
-function compose(old: Stage4GameState, intent: DormantMutationIntent, catalog: LevelCatalog): Composition {
+function compose(old: Stage4GameState, intent: DormantMutationIntent, catalog: LevelCatalog,
+  shopCatalog: ValidatedShopCatalog | null): Composition {
   const attempt = old.currentAttempt;
   if (intent.kind === 'start') {
     if (attempt !== null) return reject('attempt-already-exists');
@@ -198,6 +201,14 @@ function compose(old: Stage4GameState, intent: DormantMutationIntent, catalog: L
     if (!access.unlocked) return reject('level-locked');
     const next = createNewAttempt(access.level, intent.creation, null);
     return next.status === 'created' ? { status: 'candidate', runtime: createStage4GameState({ account: old.account, currentAttempt: next.attempt }) } : reject(next.reason);
+  }
+  if (intent.kind === 'purchase') {
+    if (shopCatalog === null) return reject('invalid-request');
+    if (attempt !== null) return reject('shop-requires-account-only');
+    const purchase = purchaseShopItem(old.account, intent.item, shopCatalog);
+    return purchase.status === 'purchased'
+      ? { status: 'candidate', runtime: createStage4GameState({ account: purchase.account, currentAttempt: null }) }
+      : reject(purchase.reason);
   }
   if (attempt === null) return reject('no-attempt');
   const phase = attempt.run.phase.kind;
@@ -301,6 +312,7 @@ export function executeDormantStage4Mutation(
   intent: DormantMutationIntent,
   commit: DormantCommitBoundary,
   catalog: LevelCatalog = PRODUCTION_LEVEL_CATALOG,
+  shopCatalog: ValidatedShopCatalog | null = null,
 ): DormantMutationResult {
   const loaded = loadProductionPersistedSave(storage);
   if (loaded.status !== 'fresh' && loaded.status !== 'loaded') return { status: 'rejected', reason: loaded.status };
@@ -311,7 +323,7 @@ export function executeDormantStage4Mutation(
     return { status: 'rejected', reason: 'run-id-conflict' };
   }
   let composed: Composition;
-  try { composed = compose(loaded.runtime, intent, catalog); }
+  try { composed = compose(loaded.runtime, intent, catalog, shopCatalog); }
   catch { return { status: 'rejected', reason: 'invalid-candidate' }; }
   if (composed.status === 'rejected') return composed;
   const revision = actualRevision === null ? 0 : actualRevision + 1;

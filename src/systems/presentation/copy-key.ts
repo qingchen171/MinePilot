@@ -8,6 +8,14 @@ const RESULT_KEYS: Record<ResultCategory, PresentationCopyKey> = {
   technical: 'error.technical', unknown: 'error.unknown',
 };
 
-export function copyKeyForResult(category: ResultCategory): PresentationCopyKey {
+const SHOP_REASON_KEYS: Readonly<Record<string, PresentationCopyKey>> = Object.freeze({
+  'shop-requires-account-only': 'shop.account-only',
+  'invalid-shop-item': 'shop.invalid-item',
+  'insufficient-coins': 'shop.insufficient-coins',
+  'inventory-overflow': 'shop.inventory-unavailable',
+});
+
+export function copyKeyForResult(category: ResultCategory, reason?: string): PresentationCopyKey {
+  if (reason !== undefined && Object.hasOwn(SHOP_REASON_KEYS, reason)) return SHOP_REASON_KEYS[reason]!;
   return RESULT_KEYS[category];
 }

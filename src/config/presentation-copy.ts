@@ -14,6 +14,23 @@ export const PRESENTATION_COPY = Object.freeze({
   'action.reload': 'Reload game',
   'action.retry': 'Try again',
   'action.dismiss': 'Dismiss',
+  'shop.title': 'Shop',
+  'shop.unavailable': 'The Shop is unavailable. Your saved game has not changed.',
+  'shop.account-only': 'Finish or leave the current attempt before shopping.',
+  'shop.invalid-item': 'That item is not offered.',
+  'shop.insufficient-coins': 'You do not have enough coins for this item.',
+  'shop.inventory-unavailable': 'This purchase cannot be completed safely.',
+  'shop.unaffordable': 'Not enough coins',
+  'shop.buy': 'Buy one',
+  'shop.buy-again': 'Buy again',
+  'shop.receipt': 'Purchase saved.',
+  'shop.balance': 'Coins',
+  'shop.coin': 'coins',
+  'shop.owned': 'Owned',
+  'shop.item.lucky': 'Lucky',
+  'shop.item.detection': 'Detection',
+  'shop.item.revive': 'Revive',
+  'shop.item.airplane': 'Airplane',
 } as const);
 
 export type PresentationCopyKey = keyof typeof PRESENTATION_COPY;

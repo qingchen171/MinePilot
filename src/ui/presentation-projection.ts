@@ -1,6 +1,10 @@
 /** Independently owned pure public input; bootstrap proves exact structural compatibility. */
 export type PublicCellAppearance = 'unknown' | 'flagged' | 'explored' | 'obstacle' | 'revealed-mine';
 export interface PublicProjectionInput {
+  readonly shop: {
+    readonly status: 'available' | 'account-only' | 'unavailable';
+    readonly offers: readonly { readonly item: 'lucky' | 'detection' | 'revive' | 'airplane'; readonly price: number; readonly affordable: boolean; readonly owned: number }[];
+  };
   readonly account: {
     readonly coins: number;
     readonly inventory: { readonly lucky: number; readonly detection: number; readonly airplane: number; readonly revive: number };
@@ -45,5 +49,9 @@ export function projectPublicFacts(facts: PublicProjectionInput): PresentationVi
     currentMineCount: facts.attempt.currentMineCount,
     itemUses: Object.freeze({ ...facts.attempt.itemUses }),
   });
-  return Object.freeze({ account, attempt, currentNumberDisplay });
+  const shop = Object.freeze({
+    status: facts.shop.status,
+    offers: Object.freeze(facts.shop.offers.map((offer) => Object.freeze({ ...offer }))),
+  });
+  return Object.freeze({ account, attempt, shop, currentNumberDisplay });
 }

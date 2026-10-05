@@ -1,5 +1,6 @@
 import type { Coordinate } from '../../core/board';
 import type { Stage4GameState } from '../../core/stage4-game-state';
+import type { ShopItem } from '../../core/shop';
 
 /** Presentation-owned structural port; bootstrap alone adapts the production session. */
 export interface CreationFacts {
@@ -17,6 +18,7 @@ export type SessionIntent = Authority & (
   | { readonly kind: 'flag'; readonly coordinate: Coordinate; readonly flagged: boolean }
   | { readonly kind: 'move' | 'airplane'; readonly coordinate: Coordinate }
   | { readonly kind: 'detection'; readonly initializeSeed?: number }
+  | { readonly kind: 'purchase'; readonly item: unknown }
 );
 
 export type SessionRead =
@@ -42,7 +44,8 @@ export type SemanticIntent =
   | { readonly kind: 'restart' | 'retry' | 'replay' | 'next' | 'abandon' | 'dismiss' | 'failure' | 'revive' | 'claim-benben' }
   | { readonly kind: 'flag'; readonly coordinate: Coordinate; readonly flagged: boolean }
   | { readonly kind: 'move' | 'airplane'; readonly coordinate: Coordinate }
-  | { readonly kind: 'detection' };
+  | { readonly kind: 'detection' }
+  | { readonly kind: 'purchase'; readonly item: ShopItem };
 
 export interface TechnicalFactsSource {
   nextRunId(): string;

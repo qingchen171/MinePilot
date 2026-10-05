@@ -26,7 +26,7 @@ describe('S4-08.4 atomic production activation guard', () => {
     expect(main).toContain('createProductionStage4Session(');
     expect(main).toContain('productionSession =');
     expect(main).not.toContain('productionAuthority =');
-    expect(facade).toContain('executeProductionStage4Mutation(storage, identity, clock, intent)');
+    expect(facade).toContain('executeProductionStage4Mutation(storage, identity, clock, intent, shopCatalog)');
     expect(facade).toContain("if (result.status === 'committed')");
     expect(facade).toContain('authority = {');
     expect(main + facade).not.toMatch(/persistence\/(?:lucky|detection|revive|airplane|new-attempt)['"]/);

@@ -1,9 +1,14 @@
 import type { CellState } from '../../core/board';
 import { getCurrentCellMineCount } from '../../core/current-cell-mine-count';
 import type { Stage4GameState } from '../../core/stage4-game-state';
+import { getShopOffers, type ShopItem, type ValidatedShopCatalog } from '../../core/shop';
 
 export type PublicCellAppearance = 'unknown' | 'flagged' | 'explored' | 'obstacle' | 'revealed-mine';
 export interface SanitizedPublicFacts {
+  readonly shop: {
+    readonly status: 'available' | 'account-only' | 'unavailable';
+    readonly offers: readonly { readonly item: ShopItem; readonly price: number; readonly affordable: boolean; readonly owned: number }[];
+  };
   readonly account: {
     readonly coins: number;
     readonly inventory: { readonly lucky: number; readonly detection: number; readonly airplane: number; readonly revive: number };
@@ -30,7 +35,8 @@ function publicCell(cell: CellState): PublicCellAppearance {
 }
 
 /** Explicit public whitelist. No Reward payload, Mine identity, seed or provenance crosses it. */
-export function sanitizeStage4Runtime(runtime: Stage4GameState): SanitizedPublicFacts {
+export function sanitizeStage4Runtime(runtime: Stage4GameState,
+  shopCatalog: ValidatedShopCatalog | null = null): SanitizedPublicFacts {
   const { account, currentAttempt } = runtime;
   const inventory = Object.freeze({
     lucky: account.inventory.lucky, detection: account.inventory.detection,
@@ -39,7 +45,12 @@ export function sanitizeStage4Runtime(runtime: Stage4GameState): SanitizedPublic
   const publicAccount = Object.freeze({
     coins: account.coins, inventory, completedLevelIds: Object.freeze([...account.completedLevelIds]),
   });
-  if (currentAttempt === null) return Object.freeze({ account: publicAccount, attempt: null });
+  const shop = Object.freeze(shopCatalog === null
+    ? { status: 'unavailable' as const, offers: Object.freeze([]) }
+    : currentAttempt !== null
+      ? { status: 'account-only' as const, offers: Object.freeze([]) }
+      : { status: 'available' as const, offers: getShopOffers(account, shopCatalog) });
+  if (currentAttempt === null) return Object.freeze({ account: publicAccount, attempt: null, shop });
   const { run, runItems } = currentAttempt;
   const position = run.characterPosition.kind === 'waiting'
     ? Object.freeze({ kind: 'waiting' as const })
@@ -50,6 +61,7 @@ export function sanitizeStage4Runtime(runtime: Stage4GameState): SanitizedPublic
   const count = getCurrentCellMineCount(run);
   return Object.freeze({
     account: publicAccount,
+    shop,
     attempt: Object.freeze({
       levelId: currentAttempt.levelId, phase: run.phase.kind, hasTakenStep: run.hasTakenStep,
       position,

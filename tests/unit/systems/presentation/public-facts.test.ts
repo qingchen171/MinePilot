@@ -24,7 +24,7 @@ describe('S5-02 public facts and pure projection', () => {
     const mine = cells.findIndex((cell) => cell.kind === 'mine');
     expect(facts.attempt?.board.cells[safe]).toBe('unknown');
     expect(facts.attempt?.board.cells[mine]).toBe('unknown');
-    expect(Object.keys(facts)).toEqual(['account', 'attempt']);
+    expect(Object.keys(facts)).toEqual(['account', 'shop', 'attempt']);
     expect(Object.keys(facts.attempt ?? {})).toEqual(['levelId', 'phase', 'hasTakenStep', 'position', 'board', 'currentMineCount', 'itemUses']);
     const exposed = JSON.stringify(facts);
     for (const secret of ['private-run-id', 'private-rng', 'private-generation', '123456789', 'rewards', 'oneTimeClaimId', 'generationProvenance']) {

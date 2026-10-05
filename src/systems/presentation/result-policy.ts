@@ -10,6 +10,7 @@ export const REASONS = Object.freeze({
     'no-pending-mine-encounter', 'lucky-priority', 'not-waiting', 'wrong-level',
     'no-matching-entitlement', 'entitlement-unavailable', 'entitlement-used',
     'card-already-exists', 'step-already-taken',
+    'shop-requires-account-only', 'invalid-shop-item', 'insufficient-coins',
   ],
   stale: [
     'revision-conflict', 'run-id-conflict', 'owned-by-another-session',
@@ -31,6 +32,7 @@ export const REASONS = Object.freeze({
     'reward-invalid-authority', 'reward-asset-overflow', 'terminal-not-applicable',
     'terminal-rejected', 'invalid-candidate', 'revision-overflow', 'invalid-runtime',
     'not-writable', 'commit-invalid-next-revision',
+    'inventory-overflow',
   ],
 } as const);
 

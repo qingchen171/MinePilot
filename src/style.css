@@ -20,3 +20,7 @@ main {
   max-width: min(100%, 640px);
   height: auto;
 }
+
+#shop { width: min(100%, 640px); padding: 1rem; box-sizing: border-box; }
+#shop > div { display: flex; justify-content: space-between; gap: 1rem; margin: .5rem 0; }
+#shop button { min-width: 7rem; }
