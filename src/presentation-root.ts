@@ -1,6 +1,8 @@
 import { createPresentationAdapter } from './systems/presentation/adapter';
+import { createShopControl } from './systems/presentation/shop-control';
+import type { ValidatedShopCatalog } from './core/shop';
 import type { DormantMutationIntent } from './systems/persistence/dormant-stage4-mutation';
-import type { PresentationSessionPort, SessionIntent, TechnicalFactsSource } from './systems/presentation/session-port';
+import type { PresentationSessionPort, SemanticIntent, SessionIntent, TechnicalFactsSource } from './systems/presentation/session-port';
 import type { SanitizedPublicFacts } from './systems/presentation/public-facts';
 import { projectPublicFacts, type PresentationViewModel, type PublicProjectionInput } from './ui/presentation-projection';
 
@@ -23,12 +25,14 @@ function project(snapshot: ReturnType<ReturnType<typeof createPresentationAdapte
 }
 
 /** Composition only: the trusted adapter sanitizes, then ui projects detached public facts. */
-export function createPresentationRoot(session: PresentationSessionPort, technical: TechnicalFactsSource) {
-  const adapter = createPresentationAdapter(session, technical);
+export function createPresentationRoot(session: PresentationSessionPort, technical: TechnicalFactsSource,
+  shopCatalog: ValidatedShopCatalog | null = null) {
+  const adapter = createPresentationAdapter(session, technical, shopCatalog);
+  const shop = createShopControl(adapter);
   return Object.freeze({
     read: () => project(adapter.read()),
     reload: () => project(adapter.reload()),
-    submit: (choice: Parameters<typeof adapter.submit>[0]) => {
+    submit: (choice: Exclude<SemanticIntent, { readonly kind: 'purchase' }>) => {
       const result = adapter.submit(choice);
       return result.status === 'committed'
         ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey }
@@ -41,5 +45,28 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
         : result;
     },
     cancelRetained: () => adapter.cancelRetained(),
+    shopState: () => shop.state(),
+    shopLast: () => shop.last(),
+    shopCanRearm: () => shop.canRearm(),
+    shopActions: () => shop.actions(),
+    shopPurchase: (item: Parameters<typeof shop.purchase>[0]) => {
+      const result = shop.purchase(item);
+      return result?.status === 'committed'
+        ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey }
+        : result;
+    },
+    shopBuyAgain: () => shop.buyAgain(),
+    shopReload: () => {
+      const snapshot = adapter.reload();
+      shop.afterReload(snapshot);
+      return project(snapshot);
+    },
+    shopRetryRetained: () => {
+      const result = adapter.retryRetained();
+      shop.afterRetainedRetry(result);
+      return result.status === 'committed'
+        ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey }
+        : result;
+    },
   });
 }

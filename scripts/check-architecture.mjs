@@ -166,7 +166,7 @@ export function checkArchitecture() {
     }
     if (relativePath === 'src/systems/persistence/production-stage4-runtime.ts') {
       if (!sourceText.includes('commitCandidateWithWriterLeaseV3') ||
-          !sourceText.includes('executeProductionStage4Mutation(storage, identity, clock, intent)') ||
+           !sourceText.includes('executeProductionStage4Mutation(storage, identity, clock, intent, shopCatalog)') ||
           !sourceText.includes("if (result.status === 'committed')") ||
           !sourceText.includes('authority = {') ||
           /commitCandidateWithWriterLease\(|commitCandidateSaveV2|\.\/(?:lucky|detection|revive|airplane|new-attempt)/.test(sourceText)) {

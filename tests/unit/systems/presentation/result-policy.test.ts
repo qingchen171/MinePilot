@@ -9,9 +9,12 @@ describe('S5-02 exact production result classification', () => {
     const document = readFileSync('docs/12_S5-02_Presentation_Foundation_Design_Contract.md', 'utf8');
     const rows = document.split('\n').filter((line) => line.startsWith('| ') && line.includes('`'));
     const frozen = rows.flatMap((row) => [...row.split('|')[2].matchAll(/`([^`]+)`/g)].map((match) => match[1]));
+    const shopDocument = readFileSync('docs/13_S5-03_Functional_Shop_Design_Contract.md', 'utf8');
+    const shopRows = shopDocument.split('\n').filter((line) => /^\| `(?:shop-requires-account-only|invalid-shop-item|insufficient-coins|inventory-overflow)`/.test(line));
+    const shopReasons = shopRows.map((row) => row.match(/`([^`]+)`/)?.[1]);
     const implementation = Object.values(REASONS).flat();
     expect(new Set(implementation).size).toBe(implementation.length);
-    expect(implementation.slice().sort()).toEqual(frozen.slice().sort());
+    expect(implementation.slice().sort()).toEqual([...frozen, ...shopReasons].sort());
     expect(implementation.length).toBeGreaterThan(70);
   });
 
@@ -36,5 +39,9 @@ describe('S5-02 exact production result classification', () => {
       }
     }
     expect(presentationCopy(copyKeyForResult('unknown'))).toBeTruthy();
+    expect(copyKeyForResult('domain', 'insufficient-coins')).toBe('shop.insufficient-coins');
+    expect(copyKeyForResult('domain', 'invalid-shop-item')).toBe('shop.invalid-item');
+    expect(copyKeyForResult('technical', 'inventory-overflow')).toBe('shop.inventory-unavailable');
+    expect(copyKeyForResult('unknown', 'insufficient-coins-future')).toBe('error.unknown');
   });
 });

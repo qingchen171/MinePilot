@@ -1,5 +1,6 @@
 import type { SanitizedPublicFacts } from './public-facts';
 import type { PresentationCopyKey } from '../../config/presentation-copy';
+import type { ValidatedShopCatalog } from '../../core/shop';
 import { copyKeyForResult } from './copy-key';
 import { sanitizeStage4Runtime } from './public-facts';
 import { classifyProductionReason, type ResultPolicy } from './result-policy';
@@ -27,7 +28,7 @@ function unavailable(reason: 'entropy-unavailable' | 'operation-unresolved' | 'r
 
 function rejected(reason: string): PresentationOutcome {
   const policy = classifyProductionReason(reason);
-  return { status: 'rejected', reason, policy, copyKey: copyKeyForResult(policy.category) };
+  return { status: 'rejected', reason, policy, copyKey: copyKeyForResult(policy.category, reason) };
 }
 
 function available(load: SessionRead): load is Extract<SessionRead, { readonly runtime: unknown }> {
@@ -41,9 +42,9 @@ function authority(load: Extract<SessionRead, { readonly runtime: unknown }>) {
   };
 }
 
-function publicSnapshot(load: SessionRead): PublicSnapshot {
+function publicSnapshot(load: SessionRead, shopCatalog: ValidatedShopCatalog | null): PublicSnapshot {
   return available(load)
-    ? { status: load.status, facts: sanitizeStage4Runtime(load.runtime) }
+    ? { status: load.status, facts: sanitizeStage4Runtime(load.runtime, shopCatalog) }
     : { status: 'recovery', reason: load.status };
 }
 
@@ -76,6 +77,8 @@ function makeEnvelope(choice: SemanticIntent, load: Extract<SessionRead, { reado
     intent = { kind: choice.kind, coordinate: choice.coordinate, ...expected };
   } else if (choice.kind === 'flag') {
     intent = { kind: 'flag', coordinate: choice.coordinate, flagged: choice.flagged, ...expected };
+  } else if (choice.kind === 'purchase') {
+    intent = { kind: 'purchase', item: choice.item, ...expected };
   } else {
     intent = { kind: choice.kind, ...expected };
   }
@@ -83,7 +86,8 @@ function makeEnvelope(choice: SemanticIntent, load: Extract<SessionRead, { reado
 }
 
 /** A session-adjacent command adapter, not a second Runtime owner. */
-export function createPresentationAdapter(session: PresentationSessionPort, technical: TechnicalFactsSource) {
+export function createPresentationAdapter(session: PresentationSessionPort, technical: TechnicalFactsSource,
+  shopCatalog: ValidatedShopCatalog | null = null) {
   let unresolved: OperationEnvelope | null = null;
   let executing = false;
   let reloadRequired = false;
@@ -94,7 +98,7 @@ export function createPresentationAdapter(session: PresentationSessionPort, tech
       const result = session.execute(envelope.intent);
       if (result.status === 'committed') {
         unresolved = null;
-        return { status: 'committed', snapshot: publicSnapshot(session.read()), copyKey: 'status.committed' };
+        return { status: 'committed', snapshot: publicSnapshot(session.read(), shopCatalog), copyKey: 'status.committed' };
       }
       const policy = classifyProductionReason(result.reason);
       unresolved = policy.retainEnvelope ? envelope : null;
@@ -111,7 +115,7 @@ export function createPresentationAdapter(session: PresentationSessionPort, tech
   }
 
   return Object.freeze({
-    read(): PublicSnapshot { return publicSnapshot(session.read()); },
+    read(): PublicSnapshot { return publicSnapshot(session.read(), shopCatalog); },
     submit(choice: SemanticIntent): PresentationOutcome {
       if (executing || unresolved !== null) return unavailable('operation-unresolved');
       if (reloadRequired) return unavailable('reload-required');
@@ -145,7 +149,7 @@ export function createPresentationAdapter(session: PresentationSessionPort, tech
       unresolved = null;
       const load = session.reload();
       reloadRequired = !available(load);
-      return publicSnapshot(load);
+      return publicSnapshot(load, shopCatalog);
     },
     cancelRetained(): void { unresolved = null; },
   });
