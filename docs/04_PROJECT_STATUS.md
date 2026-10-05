@@ -3,7 +3,7 @@
 **项目：MinePilot / Minesweeper Product**  
 **状态更新时间：2026-10-06**
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成；Stage 4 production Runtime 与 Save v3 authority 已激活并通过 S4-09 全链兼容门禁。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01、S5-02 PASS/CLOSED，S5-03 Shop Design FROZEN / READY FOR IMPLEMENTATION；Shop production/UI 尚未实现。**
+**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成；Stage 4 production Runtime 与 Save v3 authority 已激活并通过 S4-09 全链兼容门禁。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01、S5-02、S5-03 PASS/CLOSED；S5-03 functional Shop production/presentation 已合并。**
 
 ## 当前事实
 
@@ -197,12 +197,20 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 5 / S5-03 — Functional Shop Authority & Presentation Implementation**
+**Stage 5 / S5-04 — Persistent Settings/Tutorial Contract & Foundation Design Review**
 
-S5-03 Design 已接受并冻结；此处仅授权 S5-03 Implementation，不授权 S5-04、未批准的经济规则或 Stage 6 bilingual/skins/mobile。唯一 Shop 合同见 `docs/13_S5-03_Functional_Shop_Design_Contract.md`。
+S5-03 Implementation 已人工接受并完成本次 closeout；此处只授权 S5-04 Design Review，不授权 S5-04 Implementation 或 Stage 6 bilingual/skins/mobile。Shop 历史冻结合同见 `docs/13_S5-03_Functional_Shop_Design_Contract.md`；S5-04 的确切 settings/tutorial 持久化产品事实仍须在其 Design 阶段决定。
+
+### Stage 5 / S5-03 — Functional Shop Implementation — PASS / CLOSED
+
+- 已接受 implementation baseline：PR #64 merged main `1317f66f459925117375ef17a090dec8b31587a4`；implementation branch head `eef218361b9c0c722bb840a1bc66a0801ccea46d`。PR #64 仅含 S5-03 Shop core/config、production/presentation/UI 接线、architecture guard 与对应 tests；本 closeout 仅修改本状态文档，production/tests/config/Save 不变。
+- 一个 declarative 价格源经验证后同值传入单一 production session 与 presentation：Lucky 1、Detection 2、Revive 4、Airplane 8 coin；每次购买只增一件，允许明确再次购买。Scene 只提交 Item identity，生产规则查可信价格；仅 account-only 可购买。完整 Account candidate 原子扣币/增库存并保留其他 Account facts，经既有 Save v3 guarded persistence 成功后才 publish；invalid config 非破坏性禁用 Shop，且不先获取 writer lease。
+- Exact Shop reasons/copy 与冻结合同一致；未知理由、uncertain commit、`commit-persistence-commit-failure` 延续 S5-02 保守策略。Shop-only `ready -> submitting -> receipt-disarmed` 阻止同次激活、双击与键盘重复；只有独立“再买一次”才能重新购买，展示从已提交 authority 重新投影。无 ShopState、第二套 economy/save authority、Save v3 schema/version 变更、S5-04 或 Stage 6 提前实现。
+- 验证证据：PR #64 合并前独立只读 Reviewer PASS；本地完整 quality 为 Unit 895/895、Integration 202/202、Playwright 2/2 与 Architecture/TypeScript/Build PASS；branch Linux Quality `37353841103`、PR required Quality `37354052247`、main Quality `37354255985` 均 Success。S5-03 Implementation 的 mutation sanity 与测试范围见 PR #64；本次 docs-only closeout 的 Reviewer、PR/main CI、Recovery 与最终 baseline 以对应 Git/CI 证据为准，不预写结果。
 
 ### Stage 5 / S5-03 — Functional Shop Design — FROZEN / READY FOR IMPLEMENTATION
 
+- Historical Design entry superseded：下方记录设计冻结时的实现入口与当时的代码状态；S5-03 实际完成状态及当前唯一入口以上方 Implementation PASS / CLOSED 和“唯一下一行动”为准。
 - Elio 已批准四种商品与价格：Lucky 1、Detection 2、Revive 4、Airplane 8 coin；每次恰好一件、允许有意重复购买、库存无产品上限；余额不足须有 Shop-specific 提示且由生产规则独立拒绝。S5-03 Design Review、Design Correction、Attack Review 与 Final Design Correction 均已接受。正式设计与测试合同见 `docs/13_S5-03_Functional_Shop_Design_Contract.md`。本 docs-only closeout 不宣称购买代码已存在。
 - 单一 declarative config 价格源由 composition root 经 core 纯验证器验证一次，同一 readonly validated catalog 供生产购买权威和 presentation 使用；core 不导入 config，Scene 只提交 Item、不提交价格。购买分支位于 `start` 后、通用 `no-attempt` 门禁前；仅 `currentAttempt === null` 且 `expectedRunId === null` 可购买。完整 Account candidate 原子扣币、增一件、保留其他所有账户事实，继续由 Save v3 与现有 guarded commit 先持久化再 publish。UI affordability 仅是建议展示，成功展示须从已提交权威重新投影。
 - 新的可达理由仅为 `shop-requires-account-only`/`invalid-shop-item`/`insufficient-coins`（domain）和 `inventory-overflow`（technical）。中央 exact reason-to-copy 映射中 `insufficient-coins -> shop.insufficient-coins`；unknown 保守回退，uncertain commit 永不重放。错误 config 非破坏性禁用 Shop，`invalid-shop-configuration` **不是** production mutation reason。Shop-only、非持久化的 `ready -> submitting -> receipt-disarmed` 状态需独立“再买一次”动作才重新授权，防双击/键盘重复；不改变 S5-06 的一般浏览器/棋盘手势职责。
@@ -1088,7 +1096,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md、12_S5-02_Presentation_Foundation_Design_Contract.md 与 13_S5-03_Functional_Shop_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01、S5-02 PASS/CLOSED，S5-03 Design FROZEN。Production 仍为单一 Stage 4 Runtime/full Account 与 Save v3 writer；Shop 尚未实现。唯一下一行动为 Stage 5 / S5-03 — Functional Shop Authority & Presentation Implementation；只按冻结 Shop 合同实施。settings/tutorial 的产品事实留待 S5-04 Design；Stage 6 bilingual/skins/mobile 不提前执行。
+请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md、12_S5-02_Presentation_Foundation_Design_Contract.md 与 13_S5-03_Functional_Shop_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01、S5-02、S5-03 PASS/CLOSED。Production 仍为单一 Stage 4 Runtime/full Account 与 Save v3 writer；S5-03 functional Shop 已由 PR #64 合并（implementation baseline `1317f66f459925117375ef17a090dec8b31587a4`）。唯一下一行动为 Stage 5 / S5-04 — Persistent Settings/Tutorial Contract & Foundation Design Review；此处不授权其 Implementation。settings/tutorial 的持久化产品事实留待该 Design；Stage 6 bilingual/skins/mobile 不提前执行。
 ```
 
 ## 阶段看板
@@ -1100,7 +1108,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | FROZEN CANDIDATE；annotated `stage-4-frozen` 指向已验证 closeout main 后为 FROZEN / PASS；S4-09 PASS/CLOSED；production Stage 4 Runtime + Save v3 writer ACTIVE | Stage 3 FROZEN / PASS |
-| 5 | 表现层 | IN PROGRESS — S5-01、S5-02 PASS/CLOSED；S5-03 Design FROZEN | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-03 Implementation |
+| 5 | 表现层 | IN PROGRESS — S5-01、S5-02、S5-03 PASS/CLOSED | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-04 Design Review |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
 
