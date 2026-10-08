@@ -38,7 +38,10 @@ export function renderNavigationPages(nav: HTMLElement, page: HTMLElement, route
   view: PresentationViewModel | null, levels: readonly LevelListProjectionInput[] | null,
   confirmation: { readonly target: string; readonly phase: string } | null,
   actions: NavigationPageActions, message: PresentationCopyKey | null = null): void {
-  const previous = document.activeElement instanceof HTMLElement ? document.activeElement.dataset.action : undefined;
+  const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const previous = active?.dataset.action;
+  const hadPageFocus = active !== null && (active.dataset.action !== undefined ||
+    active.dataset.levelId !== undefined || active.dataset.setting !== undefined);
   nav.replaceChildren();
   page.replaceChildren();
   if (view === null && route !== 'feedback') route = 'recovery';
@@ -49,7 +52,9 @@ export function renderNavigationPages(nav: HTMLElement, page: HTMLElement, route
     nav.append(control);
   }
   const title = ROUTES.find((item) => item.page === route)?.key ?? 'nav.recovery';
-  page.append(el('h2', title));
+  const heading = el('h2', title);
+  heading.tabIndex = -1;
+  page.append(heading);
   if (message !== null) {
     const note = el('p', message);
     note.setAttribute('role', 'status');
@@ -111,6 +116,7 @@ export function renderNavigationPages(nav: HTMLElement, page: HTMLElement, route
   if (previous) {
     const next = [...nav.querySelectorAll<HTMLElement>('[data-action]'),
       ...page.querySelectorAll<HTMLElement>('[data-action]')].find((node) => node.dataset.action === previous);
-    next?.focus();
+    if (next) { next.focus(); return; }
   }
+  if (hadPageFocus) heading.focus();
 }

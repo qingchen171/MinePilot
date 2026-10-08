@@ -41,10 +41,15 @@ function encountered(phase: 'pending-mine-encounter' | 'failed') {
       phase: { kind: phase, encounter: { target, occurredOnFirstStep: true } } }),
     terminalDisposition: phase === 'failed' ? 'settled' as const : 'not-applicable' as const };
 }
-function loaded(current = attempt(), revision = 5): SessionRead {
+function loaded(current = attempt(), revision = 5, completedLevelIds: readonly string[] = ['level-001']): SessionRead {
   return { status: 'loaded', persistence: { kind: 'committed', revision, source: 'head', sourceSaveVersion: 4 },
     runtime: createStage4GameState({ ...createInitialStage4GameState(),
-      account: { ...createInitialStage4GameState().account, completedLevelIds: ['level-001'] }, currentAttempt: current }) };
+      account: { ...createInitialStage4GameState().account, completedLevelIds }, currentAttempt: current }) };
+}
+function accountOnly(revision: number, completedLevelIds: readonly string[] = ['level-001']): SessionRead {
+  return { status: 'loaded', persistence: { kind: 'committed', revision, source: 'head', sourceSaveVersion: 4 },
+    runtime: createStage4GameState({ ...createInitialStage4GameState(),
+      account: { ...createInitialStage4GameState().account, completedLevelIds }, currentAttempt: null }) };
 }
 function fixture(initial: SessionRead = loaded()) {
   let authority = initial;
@@ -68,10 +73,11 @@ function fixture(initial: SessionRead = loaded()) {
       return { status: 'committed', revision, runtime };
     },
   };
-  const adapter = createPresentationAdapter(port, tech(), shopCatalog);
+  const technical = tech();
+  const adapter = createPresentationAdapter(port, technical, shopCatalog);
   const exit = vi.fn();
   const nav = createNavigationControl(adapter, catalog, exit);
-  return { nav, adapter, intents, reload, exit, setAuthority: (read: SessionRead) => { authority = read; },
+  return { nav, adapter, technical, intents, reload, exit, setAuthority: (read: SessionRead) => { authority = read; },
     onReload: (hook: (count: number) => void) => { onReload = hook; },
     failNext: (kind: SessionIntent['kind'], reason: string) => { fail = { kind, reason }; }, authority: () => authority };
 }
@@ -136,6 +142,27 @@ describe('S5-05 trusted navigation and replacement', () => {
     expect(f.intents).toHaveLength(0);
   });
 
+  it('does not mutate for a locked target, yet permits Continue of a historical current attempt', () => {
+    const f = fixture(loaded(attempt(), 5, []));
+    expect(f.nav.selectLevel('level-002')).toMatchObject({ status: 'blocked', reason: 'level-unavailable' });
+    expect(f.nav.selectLevel('level-001')).toMatchObject({ status: 'navigated' });
+    expect(f.intents).toHaveLength(0);
+  });
+
+  it('keeps a missing-catalog historical Attempt out of the list but permits Continue and legal replacement', () => {
+    const retiredLevel = { ...catalog.levels[0]!, levelId: 'retired-level' };
+    const made = createCompleteAttempt({ level: retiredLevel, runId: 'old-run', generationProvenance: {
+      seed: 10, rngVersion: 'mulberry32-v1', generationVersion: 'mine-placement-v1',
+    } });
+    if (made.status !== 'created') throw new Error('historical fixture');
+    const f = fixture(loaded(made.attempt));
+    expect(f.nav.levelList()?.some((level) => level.levelId === 'retired-level')).toBe(false);
+    expect(f.nav.selectLevel('retired-level')).toMatchObject({ status: 'navigated' });
+    expect(f.nav.selectLevel('level-002').status).toBe('confirmation-required');
+    expect(f.nav.confirmReplacement().status).toBe('committed');
+    expect(f.intents.map((intent) => intent.kind)).toEqual(['abandon', 'start']);
+  });
+
   it('preserves the committed account-only gap when Start fails; never fabricates rollback', () => {
     const f = fixture();
     f.nav.selectLevel('level-002');
@@ -161,6 +188,24 @@ describe('S5-05 trusted navigation and replacement', () => {
     f.onReload((count) => { if (count === 2) f.setAuthority({ status: 'unavailable-snapshot' }); });
     expect(f.nav.confirmReplacement()).toMatchObject({ status: 'recovery' });
     expect(f.intents.map((intent) => intent.kind)).toEqual(['abandon']);
+  });
+
+  it('does not Start when the target becomes locked after the first committed step', () => {
+    const f = fixture();
+    f.nav.selectLevel('level-002');
+    f.onReload((count) => { if (count === 2) f.setAuthority(accountOnly(6, [])); });
+    expect(f.nav.confirmReplacement()).toMatchObject({ status: 'blocked', reason: 'level-unavailable' });
+    expect(f.intents.map((intent) => intent.kind)).toEqual(['abandon']);
+    expect(f.authority()).toMatchObject({ runtime: { currentAttempt: null } });
+  });
+
+  it('keeps the account-only gap on second-step secure entropy failure', () => {
+    const f = fixture();
+    f.technical.nextRunId.mockImplementationOnce(() => { throw new Error('unavailable'); });
+    f.nav.selectLevel('level-002');
+    expect(f.nav.confirmReplacement()).toMatchObject({ status: 'rejected', outcome: { reason: 'entropy-unavailable' } });
+    expect(f.intents.map((intent) => intent.kind)).toEqual(['abandon']);
+    expect(f.authority()).toMatchObject({ runtime: { currentAttempt: null } });
   });
 
   it('allows only user-triggered retry of the exact second-step Start envelope', () => {
