@@ -15,6 +15,7 @@ import {
 import { createRunItemState } from '../run-item-state';
 import { createRewardState } from '../reward';
 import { createStage4AccountState } from '../stage4-account';
+import { createInitialSettingsState, createInitialTutorialProgressState } from '../settings-tutorial';
 import {
   createStage4GameState,
   type Stage4GameState,
@@ -127,7 +128,9 @@ function reconstruct(
   trusted?: Extract<TrustedMigratedSaveDocumentV3Result, { readonly status: 'validated' }>,
 ): Stage4GameState {
   const account = createStage4AccountState(document.account);
-  if (document.currentAttempt === null) return createStage4GameState({ account, currentAttempt: null });
+  const settings = createInitialSettingsState();
+  const tutorialProgress = createInitialTutorialProgressState();
+  if (document.currentAttempt === null) return createStage4GameState({ account, currentAttempt: null, settings, tutorialProgress });
   const dto = document.currentAttempt;
   const run = createRunState(boardFromDto(dto.run.board), positionFromDto(dto.run.characterPosition), {
     hasTakenStep: dto.run.hasTakenStep,
@@ -144,13 +147,13 @@ function reconstruct(
     terminalDisposition: dto.terminalDisposition,
   };
   if (trusted === undefined) {
-    return createStage4GameState({ account, currentAttempt: createAttemptState(input) });
+    return createStage4GameState({ account, currentAttempt: createAttemptState(input), settings, tutorialProgress });
   }
   if (!isAuthenticTrustedMigrationResult(trusted)) {
     throw new Error('Legacy Runtime reconstruction requires authentic migration authority.');
   }
   const attempt = Object.freeze(input);
-  return Object.freeze({ account, currentAttempt: attempt });
+  return Object.freeze({ account, currentAttempt: attempt, settings, tutorialProgress });
 }
 
 export function reconstructStage4RuntimeFromValidatedV3(

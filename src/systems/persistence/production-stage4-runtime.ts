@@ -1,11 +1,11 @@
 import { PRODUCTION_LEVEL_CATALOG } from '../../core/level-catalog';
 import type { ValidatedShopCatalog } from '../../core/shop';
 import {
-  executeDormantStage4Mutation,
   type DormantMutationIntent,
   type DormantMutationResult,
 } from './dormant-stage4-mutation';
-import { commitCandidateWithWriterLeaseV3 } from './guarded-persistence-v3';
+import { executeStage4MutationV4 } from './production-stage4-mutation-v4';
+import { commitCandidateWithWriterLeaseV4 } from './guarded-persistence-v4';
 import { loadProductionPersistedSave } from './persistence-coordinator';
 import type { StringKeyValueStorage } from './key-value-storage';
 import { acquireWriterLease, type Clock, type WriterIdentity } from './writer-lease';
@@ -23,9 +23,9 @@ export function executeProductionStage4Mutation(
   intent: DormantMutationIntent,
   shopCatalog: ValidatedShopCatalog | null = null,
 ): DormantMutationResult {
-  return executeDormantStage4Mutation(storage, intent, {
+  return executeStage4MutationV4(storage, intent, {
     commit(document, expectedRevision) {
-      const result = commitCandidateWithWriterLeaseV3(
+      const result = commitCandidateWithWriterLeaseV4(
         storage, identity, clock, expectedRevision, document,
       );
       return result.status === 'committed'
@@ -35,7 +35,7 @@ export function executeProductionStage4Mutation(
   }, PRODUCTION_LEVEL_CATALOG, shopCatalog);
 }
 
-/** Browser composition root: one published Runtime, replaced only after a committed v3 mutation. */
+/** Browser composition root: one published Runtime, replaced only after a committed v4 mutation. */
 export function createProductionStage4Session(
   storage: StringKeyValueStorage,
   identity: WriterIdentity,
@@ -66,7 +66,7 @@ export function createProductionStage4Session(
         // The candidate becomes visible only after the guarded snapshot commit succeeds.
         authority = {
           status: 'loaded',
-          persistence: { kind: 'committed', revision: result.revision, source: 'head', sourceSaveVersion: 3 },
+          persistence: { kind: 'committed', revision: result.revision, source: 'head', sourceSaveVersion: 4 },
           runtime: result.runtime,
         };
       }

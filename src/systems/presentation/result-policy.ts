@@ -11,6 +11,7 @@ export const REASONS = Object.freeze({
     'no-matching-entitlement', 'entitlement-unavailable', 'entitlement-used',
     'card-already-exists', 'step-already-taken',
     'shop-requires-account-only', 'invalid-shop-item', 'insufficient-coins',
+    'settings-unchanged', 'tutorial-already-acknowledged',
   ],
   stale: [
     'revision-conflict', 'run-id-conflict', 'owned-by-another-session',

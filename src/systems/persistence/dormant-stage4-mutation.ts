@@ -22,6 +22,7 @@ import { purchaseShopItem, type ValidatedShopCatalog } from '../../core/shop';
 import { createCompleteAttempt } from '../../core/stage4-attempt-factory';
 import { createStage4GameState, type Stage4GameState } from '../../core/stage4-game-state';
 import { createStableId } from '../../core/stable-id';
+import { acknowledgeTutorial, setSetting } from '../../core/settings-tutorial';
 import { settleTerminalOutcome } from '../../core/terminal-settlement';
 import type { RunState } from '../../core/run';
 import { loadProductionPersistedSave } from './persistence-coordinator';
@@ -47,6 +48,8 @@ export type DormantMutationIntent = Authority & (
   | { readonly kind: 'move' | 'airplane'; readonly coordinate: Coordinate }
   | { readonly kind: 'detection'; readonly initializeSeed?: number }
   | { readonly kind: 'purchase'; readonly item: unknown }
+  | { readonly kind: 'set-setting'; readonly key: unknown; readonly enabled: unknown }
+  | { readonly kind: 'acknowledge-tutorial'; readonly milestoneId: unknown }
 );
 
 /** Narrow commit port. Production binds it to the Stage 2 lease/revision gate. */
@@ -60,11 +63,16 @@ export type DormantMutationResult =
   | { readonly status: 'committed'; readonly runtime: Stage4GameState; readonly revision: number }
   | { readonly status: 'rejected'; readonly reason: string };
 
-type Composition =
+export type Composition =
   | { readonly status: 'candidate'; readonly runtime: Stage4GameState }
   | { readonly status: 'rejected'; readonly reason: string };
 
 function reject(reason: string): Composition { return { status: 'rejected', reason }; }
+function replaceRoot(previous: Stage4GameState, account: Stage4AccountState,
+  currentAttempt: AttemptState | null): Stage4GameState {
+  return createStage4GameState({ account, currentAttempt,
+    settings: previous.settings, tutorialProgress: previous.tutorialProgress });
+}
 function bridge(attempt: AttemptState, account: Stage4AccountState): GameState {
   return createGameState({ account: createAccountState(account.inventory), run: attempt.run, runItems: attempt.runItems });
 }
@@ -74,10 +82,8 @@ function gameCandidate(
   temporaryBenbenCard: AttemptState['temporaryBenbenCard'],
 ): Stage4GameState {
   const attempt = previous.currentAttempt!;
-  return createStage4GameState({
-    account: createStage4AccountState({ ...previous.account, inventory: game.account.inventory }),
-    currentAttempt: { ...attempt, run: game.run, runItems: game.runItems, temporaryBenbenCard },
-  });
+  return replaceRoot(previous, createStage4AccountState({ ...previous.account, inventory: game.account.inventory }),
+    { ...attempt, run: game.run, runItems: game.runItems, temporaryBenbenCard });
 }
 function mineKeys(attempt: AttemptState): Set<string> {
   const width = attempt.run.board.dimensions.width;
@@ -162,19 +168,17 @@ function settleWin(
 ): Composition {
   const attempt = old.currentAttempt!;
   if (nextRun.phase.kind !== 'won') {
-    return { status: 'candidate', runtime: createStage4GameState({
-      account: nextAccount, currentAttempt: { ...attempt, run: nextRun, rewards: nextRewards, runItems: nextItems, temporaryBenbenCard: card },
-    }) };
+    return { status: 'candidate', runtime: replaceRoot(old, nextAccount,
+      { ...attempt, run: nextRun, rewards: nextRewards, runItems: nextItems, temporaryBenbenCard: card }) };
   }
   const settled = settleTerminalOutcome({
     levelId: attempt.levelId, nextPhase: nextRun.phase, previousDisposition: attempt.terminalDisposition,
     completedLevelIds: nextAccount.completedLevelIds, benbenByLevel: nextAccount.benbenByLevel,
   });
   if (settled.status !== 'settled') return reject(`terminal-${settled.status}`);
-  return { status: 'candidate', runtime: createStage4GameState({
-    account: { ...nextAccount, completedLevelIds: settled.nextCompletedLevelIds, benbenByLevel: settled.nextBenbenByLevel },
-    currentAttempt: { ...attempt, run: nextRun, rewards: nextRewards, runItems: nextItems, temporaryBenbenCard: null, terminalDisposition: 'settled' },
-  }) };
+  return { status: 'candidate', runtime: replaceRoot(old,
+    createStage4AccountState({ ...nextAccount, completedLevelIds: settled.nextCompletedLevelIds, benbenByLevel: settled.nextBenbenByLevel }),
+    { ...attempt, run: nextRun, rewards: nextRewards, runItems: nextItems, temporaryBenbenCard: null, terminalDisposition: 'settled' }) };
 }
 
 function composeExploration(old: Stage4GameState, game: GameState, card: AttemptState['temporaryBenbenCard']): Composition {
@@ -191,35 +195,48 @@ function composeExploration(old: Stage4GameState, game: GameState, card: Attempt
     claims.status === 'claimed' ? claims.nextRewards : attempt.rewards, game.runItems, card);
 }
 
-function compose(old: Stage4GameState, intent: DormantMutationIntent, catalog: LevelCatalog,
+export function composeStage4MutationCandidate(old: Stage4GameState, intent: DormantMutationIntent, catalog: LevelCatalog,
   shopCatalog: ValidatedShopCatalog | null): Composition {
   const attempt = old.currentAttempt;
+  if (intent.kind === 'set-setting' || intent.kind === 'acknowledge-tutorial') {
+    if (attempt?.terminalDisposition === 'legacy-excluded') return reject('not-writable');
+    if (intent.kind === 'set-setting') {
+      const result = setSetting(old.settings, intent.key, intent.enabled);
+      if (result.status === 'rejected') return reject(result.reason);
+      if (result.status === 'unchanged') return reject('settings-unchanged');
+      return { status: 'candidate', runtime: createStage4GameState({ ...old, settings: result.settings }) };
+    }
+    const result = acknowledgeTutorial(old.tutorialProgress, intent.milestoneId);
+    if (result.status === 'rejected') return reject(result.reason);
+    if (result.status === 'unchanged') return reject('tutorial-already-acknowledged');
+    return { status: 'candidate', runtime: createStage4GameState({ ...old, tutorialProgress: result.tutorialProgress }) };
+  }
   if (intent.kind === 'start') {
     if (attempt !== null) return reject('attempt-already-exists');
     const access = getLevelAccess(catalog, intent.levelId, old.account.completedLevelIds);
     if (access.status !== 'found') return reject('level-not-found');
     if (!access.unlocked) return reject('level-locked');
     const next = createNewAttempt(access.level, intent.creation, null);
-    return next.status === 'created' ? { status: 'candidate', runtime: createStage4GameState({ account: old.account, currentAttempt: next.attempt }) } : reject(next.reason);
+    return next.status === 'created' ? { status: 'candidate', runtime: replaceRoot(old, old.account, next.attempt) } : reject(next.reason);
   }
   if (intent.kind === 'purchase') {
     if (shopCatalog === null) return reject('invalid-request');
     if (attempt !== null) return reject('shop-requires-account-only');
     const purchase = purchaseShopItem(old.account, intent.item, shopCatalog);
     return purchase.status === 'purchased'
-      ? { status: 'candidate', runtime: createStage4GameState({ account: purchase.account, currentAttempt: null }) }
+      ? { status: 'candidate', runtime: replaceRoot(old, purchase.account, null) }
       : reject(purchase.reason);
   }
   if (attempt === null) return reject('no-attempt');
   const phase = attempt.run.phase.kind;
   if (intent.kind === 'abandon') {
     return phase === 'active' || phase === 'pending-mine-encounter'
-      ? { status: 'candidate', runtime: createStage4GameState({ account: old.account, currentAttempt: null }) }
+      ? { status: 'candidate', runtime: replaceRoot(old, old.account, null) }
       : reject('invalid-phase');
   }
   if (intent.kind === 'dismiss') {
     return phase === 'won' || phase === 'failed'
-      ? { status: 'candidate', runtime: createStage4GameState({ account: old.account, currentAttempt: null }) }
+      ? { status: 'candidate', runtime: replaceRoot(old, old.account, null) }
       : reject('invalid-phase');
   }
   if (intent.kind === 'restart' || intent.kind === 'retry' || intent.kind === 'replay' || intent.kind === 'next') {
@@ -234,12 +251,12 @@ function compose(old: Stage4GameState, intent: DormantMutationIntent, catalog: L
     const target = getLevelAccess(catalog, targetId, old.account.completedLevelIds);
     if (target.status !== 'found' || !target.unlocked) return reject('level-locked');
     const next = createNewAttempt(target.level, intent.creation, targetId === attempt.levelId ? attempt : null);
-    return next.status === 'created' ? { status: 'candidate', runtime: createStage4GameState({ account: old.account, currentAttempt: next.attempt }) } : reject(next.reason);
+    return next.status === 'created' ? { status: 'candidate', runtime: replaceRoot(old, old.account, next.attempt) } : reject(next.reason);
   }
   if (intent.kind === 'flag') {
     const result = setRunFlagged(attempt.run, intent.coordinate, intent.flagged);
     return result.outcome === 'changed'
-      ? { status: 'candidate', runtime: createStage4GameState({ account: old.account, currentAttempt: { ...attempt, run: result.state } }) }
+      ? { status: 'candidate', runtime: replaceRoot(old, old.account, { ...attempt, run: result.state }) }
       : reject(result.reason);
   }
   if (intent.kind === 'move') {
@@ -278,10 +295,9 @@ function compose(old: Stage4GameState, intent: DormantMutationIntent, catalog: L
       benbenByLevel: old.account.benbenByLevel, temporaryBenbenCard: attempt.temporaryBenbenCard,
     });
     return result.status === 'claimed'
-      ? { status: 'candidate', runtime: createStage4GameState({
-          account: { ...old.account, benbenByLevel: result.nextBenbenByLevel },
-          currentAttempt: { ...attempt, temporaryBenbenCard: result.temporaryBenbenCard },
-        }) }
+      ? { status: 'candidate', runtime: replaceRoot(old,
+          createStage4AccountState({ ...old.account, benbenByLevel: result.nextBenbenByLevel }),
+          { ...attempt, temporaryBenbenCard: result.temporaryBenbenCard }) }
       : reject(result.reason);
   }
   const failed = settleMineEncounterAsFailure(attempt.run);
@@ -300,10 +316,9 @@ function compose(old: Stage4GameState, intent: DormantMutationIntent, catalog: L
     });
   }
   if (settlement.status !== 'settled') return reject(`terminal-${settlement.status}`);
-  return { status: 'candidate', runtime: createStage4GameState({
-    account: { ...old.account, benbenByLevel: settlement.nextBenbenByLevel },
-    currentAttempt: { ...attempt, run: failed.state, terminalDisposition: 'settled', temporaryBenbenCard: null },
-  }) };
+  return { status: 'candidate', runtime: replaceRoot(old,
+    createStage4AccountState({ ...old.account, benbenByLevel: settlement.nextBenbenByLevel }),
+    { ...attempt, run: failed.state, terminalDisposition: 'settled', temporaryBenbenCard: null }) };
 }
 
 /** Re-reads Stage 2 committed authority for every intent; only a committed port result publishes. */
@@ -323,7 +338,7 @@ export function executeDormantStage4Mutation(
     return { status: 'rejected', reason: 'run-id-conflict' };
   }
   let composed: Composition;
-  try { composed = compose(loaded.runtime, intent, catalog, shopCatalog); }
+  try { composed = composeStage4MutationCandidate(loaded.runtime, intent, catalog, shopCatalog); }
   catch { return { status: 'rejected', reason: 'invalid-candidate' }; }
   if (composed.status === 'rejected') return composed;
   const revision = actualRevision === null ? 0 : actualRevision + 1;

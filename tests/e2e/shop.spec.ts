@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { createInitialStage4AccountState, createStage4AccountState } from '../../src/core/stage4-account';
-import { createStage4GameState } from '../../src/core/stage4-game-state';
+import { createInitialStage4GameState, createStage4GameState } from '../../src/core/stage4-game-state';
 import { mapStage4RuntimeToSaveV3 } from '../../src/core/persistence/stage4-runtime-mapping';
 import { commitSnapshot } from '../../src/systems/persistence/crash-safe-snapshot-store';
 import { MemoryStorage } from '../helpers/memory-storage';
@@ -8,7 +8,7 @@ import { MemoryStorage } from '../helpers/memory-storage';
 function savedAccount() {
   const storage = new MemoryStorage();
   const account = createStage4AccountState({ ...createInitialStage4AccountState(), coins: 20 });
-  const mapped = mapStage4RuntimeToSaveV3(createStage4GameState({ account, currentAttempt: null }), 4);
+  const mapped = mapStage4RuntimeToSaveV3(createStage4GameState({ ...createInitialStage4GameState(), account, currentAttempt: null }), 4);
   if (mapped.status !== 'mapped') throw new Error('browser fixture');
   if (commitSnapshot(storage, JSON.stringify(mapped.document), 4).status !== 'committed') throw new Error('snapshot fixture');
   return [...storage.data];

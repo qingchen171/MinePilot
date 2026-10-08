@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createLevelCatalog, PRODUCTION_LEVEL_CATALOG, type LevelCatalog } from '../../src/core/level-catalog';
-import { createStage4GameState, type Stage4GameState } from '../../src/core/stage4-game-state';
+import { createInitialStage4GameState, createStage4GameState, type Stage4GameState } from '../../src/core/stage4-game-state';
 import { mapStage4RuntimeToSaveV3 } from '../../src/core/persistence/stage4-runtime-mapping';
 import { loadCommittedSnapshot, commitSnapshot } from '../../src/systems/persistence/crash-safe-snapshot-store';
 import { readDormantStage4Runtime } from '../../src/systems/persistence/dormant-stage4-reader';
@@ -111,7 +111,7 @@ function enterPending(f: ReturnType<typeof fixture>) {
 }
 function injectTemporaryCard(f: ReturnType<typeof fixture>, item: RewardItem) {
   const old = f.current();
-  const runtime = createStage4GameState({
+  const runtime = createStage4GameState({ ...createInitialStage4GameState(),
     account: createStage4AccountState({ ...old.runtime.account, benbenByLevel: [{ levelId: 'level-001', status: 'used', failureStreak: 0 }] }),
     currentAttempt: { ...old.runtime.currentAttempt!, temporaryBenbenCard: createTemporaryBenbenCard({ item, consumed: false }) },
   });
@@ -133,7 +133,7 @@ function prepareWritingCommand(kind: string): Prepared {
   if (kind === 'airplane') return { f, intent: { kind: 'airplane', expectedRevision: 0, expectedRunId: 'run-1', coordinate: firstSafe(f) } };
   if (kind === 'claim') {
     const old = f.current().runtime;
-    f.persist(createStage4GameState({ account: createStage4AccountState({ ...old.account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] }), currentAttempt: old.currentAttempt }), 1);
+    f.persist(createStage4GameState({ ...old, account: createStage4AccountState({ ...old.account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] }), currentAttempt: old.currentAttempt }), 1);
     return { f, intent: { kind: 'claim-benben', expectedRevision: 1, expectedRunId: 'run-1' } };
   }
   if (kind === 'next' || kind === 'replay' || kind === 'dismiss') {
@@ -287,7 +287,7 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
       const f = fixture();
       f.start();
       const old = f.current().runtime;
-      f.persist(createStage4GameState({ account: createStage4AccountState({ ...old.account, benbenByLevel: [{ levelId: 'level-001', status, failureStreak: 0 }] }), currentAttempt: old.currentAttempt }), 1);
+      f.persist(createStage4GameState({ ...old, account: createStage4AccountState({ ...old.account, benbenByLevel: [{ levelId: 'level-001', status, failureStreak: 0 }] }), currentAttempt: old.currentAttempt }), 1);
       moveToSafe(f);
       expect(f.run({ kind: 'move', expectedRevision: 2, expectedRunId: 'run-1', coordinate: firstMine(f) }).status).toBe('committed');
       expect(f.run({ kind: 'failure', expectedRevision: 3, expectedRunId: 'run-1' }).status).toBe('committed');
@@ -300,7 +300,7 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
     const f = fixture();
     f.start();
     const before = f.current().runtime;
-    f.persist(createStage4GameState({ account: createStage4AccountState({ ...before.account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] }), currentAttempt: before.currentAttempt }), 1);
+    f.persist(createStage4GameState({ ...before, account: createStage4AccountState({ ...before.account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] }), currentAttempt: before.currentAttempt }), 1);
     const move = { kind: 'move' as const, expectedRevision: 1, expectedRunId: 'run-1', coordinate: firstSafe(f) };
     const claim = { kind: 'claim-benben' as const, expectedRevision: 1, expectedRunId: 'run-1' };
     expect(f.run(claim).status).toBe('committed');
@@ -326,7 +326,7 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
     const f = fixture(smallCatalog(1));
     f.start();
     const old = f.current().runtime;
-    f.persist(createStage4GameState({ account: createStage4AccountState({ ...old.account, coins: Number.MAX_SAFE_INTEGER }), currentAttempt: old.currentAttempt }), 1);
+    f.persist(createStage4GameState({ ...old, account: createStage4AccountState({ ...old.account, coins: Number.MAX_SAFE_INTEGER }), currentAttempt: old.currentAttempt }), 1);
     const before = f.current();
     const commits = f.commits;
     expect(f.run({ kind: 'airplane', expectedRevision: 1, expectedRunId: 'run-1', coordinate: firstSafe(f) })).toEqual({ status: 'rejected', reason: 'reward-asset-overflow' });
@@ -340,7 +340,7 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
     const f = fixture(catalog.catalog);
     f.start();
     const old = f.current().runtime;
-    f.persist(createStage4GameState({ account: createStage4AccountState({ ...old.account, inventory: { ...old.account.inventory, detection: Number.MAX_SAFE_INTEGER } }), currentAttempt: old.currentAttempt }), 1);
+    f.persist(createStage4GameState({ ...old, account: createStage4AccountState({ ...old.account, inventory: { ...old.account.inventory, detection: Number.MAX_SAFE_INTEGER } }), currentAttempt: old.currentAttempt }), 1);
     const before = f.current();
     const commits = f.commits;
     expect(f.run({ kind: 'airplane', expectedRevision: 1, expectedRunId: 'run-1', coordinate: firstSafe(f) })).toEqual({ status: 'rejected', reason: 'reward-asset-overflow' });
@@ -353,7 +353,7 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
     f.start();
     const old = f.current().runtime;
     const attempt = old.currentAttempt!;
-    f.persist(createStage4GameState({
+    f.persist(createStage4GameState({ ...createInitialStage4GameState(),
       account: old.account,
       currentAttempt: { ...attempt, rewards: [{ ...attempt.rewards[0]!, oneTimeClaimId: 'one-time-1' }] },
     }), 1);
@@ -464,7 +464,7 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
   it('waiting Airplane can remain active and Claim Benben without taking a step', () => {
     const f = fixture();
     const started = f.start().runtime;
-    f.persist(createStage4GameState({
+    f.persist(createStage4GameState({ ...createInitialStage4GameState(),
       account: createStage4AccountState({ ...started.account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] }),
       currentAttempt: started.currentAttempt,
     }), 1);
@@ -662,7 +662,7 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
   it('Benben Claim is waiting-only, deterministic and turns available into a temporary card', () => {
     const f = fixture();
     const original = f.start().runtime;
-    const available = createStage4GameState({
+    const available = createStage4GameState({ ...createInitialStage4GameState(),
       account: createStage4AccountState({ ...original.account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] }),
       currentAttempt: original.currentAttempt,
     });

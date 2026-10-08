@@ -31,6 +31,9 @@ export const PRESENTATION_COPY = Object.freeze({
   'shop.item.detection': 'Detection',
   'shop.item.revive': 'Revive',
   'shop.item.airplane': 'Airplane',
+  'settings.already-set': 'This preference is already set.',
+  'tutorial.already-acknowledged': 'This tutorial step is already marked complete.',
+  'error.legacy-read-only': 'This older attempt can be viewed, but cannot be changed until it is dismissed.',
 } as const);
 
 export type PresentationCopyKey = keyof typeof PRESENTATION_COPY;

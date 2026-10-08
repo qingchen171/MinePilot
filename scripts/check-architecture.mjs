@@ -165,13 +165,23 @@ export function checkArchitecture() {
       }
     }
     if (relativePath === 'src/systems/persistence/production-stage4-runtime.ts') {
-      if (!sourceText.includes('commitCandidateWithWriterLeaseV3') ||
+      if (!sourceText.includes('commitCandidateWithWriterLeaseV4') ||
            !sourceText.includes('executeProductionStage4Mutation(storage, identity, clock, intent, shopCatalog)') ||
           !sourceText.includes("if (result.status === 'committed')") ||
           !sourceText.includes('authority = {') ||
-          /commitCandidateWithWriterLease\(|commitCandidateSaveV2|\.\/(?:lucky|detection|revive|airplane|new-attempt)/.test(sourceText)) {
-        violations.push(`${relativePath}: production must use only the guarded v3 commit path`);
+          /commitCandidateWithWriterLeaseV3|commitCandidateWithWriterLease\(|commitCandidateSaveV2|\.\/(?:lucky|detection|revive|airplane|new-attempt)/.test(sourceText)) {
+        violations.push(`${relativePath}: production must use only the guarded v4 commit path`);
       }
+    }
+    if (relativePath === 'src/systems/persistence/production-stage4-mutation-v4.ts' &&
+        (!sourceText.includes('mapStage4RuntimeToSaveV4') ||
+         /mapStage4RuntimeToSaveV3|commitCandidateSaveV3|commitCandidateWithWriterLeaseV3/.test(sourceText))) {
+      violations.push(`${relativePath}: production candidate must map through v4 only`);
+    }
+    if (relativePath === 'src/systems/persistence/guarded-persistence-v4.ts' &&
+        (!sourceText.includes('commitCandidateSaveV4') ||
+         /commitCandidateSaveV3|commitCandidateWithWriterLeaseV3/.test(sourceText))) {
+      violations.push(`${relativePath}: guarded production commit must use v4 only`);
     }
     if (relativePath === 'src/systems/persistence/dormant-stage4-mutation.ts' &&
         /commitCandidateWithWriterLease\(|commitCandidateSaveV2|loadPersistedSave\(/.test(sourceText)) {

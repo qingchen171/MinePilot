@@ -312,16 +312,16 @@ describe('Save v3 isolated DTO validation and migration', () => {
     expect(current.status).toBe('loaded');
     expect(target).toMatchObject({ status: 'validated', document: { revision: 9, account: { inventory: { lucky: 0, detection: 0, airplane: 0, revive: 0 } }, currentAttempt: { generationProvenance: null, temporaryBenbenCard: null, runItems: { detectionRandomSeed: null } } } });
   });
-  it('activates the v3 dispatcher while old migration still refuses direct v3 input', () => {
-    expect(CURRENT_SAVE_VERSION).toBe(3);
+  it('loads historical v3 while old migration still refuses direct v3 input', () => {
+    expect(CURRENT_SAVE_VERSION).toBe(4);
     expect(loadSaveDocument(v3()).status).toBe('loaded');
     expect(migrateOldSaveDocumentToV3(v3()).status).toBe('invalid');
   });
   it('classifies v3 corruption and future versions without downgrading to v2', () => {
     const invalid = v3();
     setPath(invalid, 'account.unexpected', true);
-    expect(loadSaveDocument(invalid).status).toBe('invalid-current-version-document');
-    expect(loadSaveDocument({ saveVersion: 4 })).toEqual({ status: 'unsupported-future-version', saveVersion: 4 });
+    expect(loadSaveDocument(invalid).status).toBe('invalid-old-version-document');
+    expect(loadSaveDocument({ saveVersion: 5 })).toEqual({ status: 'unsupported-future-version', saveVersion: 5 });
     expect(loadSaveDocument({ saveVersion: '3' })).toEqual({ status: 'invalid-version', reason: 'invalid-type' });
     expect(loadSaveDocument({ saveVersion: 3.5 })).toEqual({ status: 'invalid-version', reason: 'invalid-number' });
   });

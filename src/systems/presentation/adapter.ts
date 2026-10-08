@@ -79,6 +79,10 @@ function makeEnvelope(choice: SemanticIntent, load: Extract<SessionRead, { reado
     intent = { kind: 'flag', coordinate: choice.coordinate, flagged: choice.flagged, ...expected };
   } else if (choice.kind === 'purchase') {
     intent = { kind: 'purchase', item: choice.item, ...expected };
+  } else if (choice.kind === 'set-setting') {
+    intent = { kind: choice.kind, key: choice.key, enabled: choice.enabled, ...expected };
+  } else if (choice.kind === 'acknowledge-tutorial') {
+    intent = { kind: choice.kind, milestoneId: choice.milestoneId, ...expected };
   } else {
     intent = { kind: choice.kind, ...expected };
   }

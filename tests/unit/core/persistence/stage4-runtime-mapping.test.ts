@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createLevelCatalog } from '../../../../src/core/level-catalog';
 import { createCompleteAttempt } from '../../../../src/core/stage4-attempt-factory';
 import { createStage4AccountState } from '../../../../src/core/stage4-account';
-import { createStage4GameState } from '../../../../src/core/stage4-game-state';
+import { createInitialStage4GameState, createStage4GameState } from '../../../../src/core/stage4-game-state';
 import {
   mapStage4RuntimeToSaveV3,
   reconstructStage4RuntimeFromTrustedMigration,
@@ -21,7 +21,7 @@ function runtime() {
   if (catalog.status !== 'created') throw new Error('fixture');
   const attempt = createCompleteAttempt({ level: catalog.catalog.levels[0]!, runId: ' run-001 ', generationProvenance: { seed: 2, rngVersion: 'rng-v1', generationVersion: 'generation-v1' } });
   if (attempt.status !== 'created') throw new Error('fixture');
-  return createStage4GameState({
+  return createStage4GameState({ ...createInitialStage4GameState(),
     account: createStage4AccountState({
       inventory: { lucky: 1, detection: 2, airplane: 3, revive: 4 }, coins: 5,
       completedLevelIds: [' completed-001 '], oneTimeClaimIds: [],
@@ -97,7 +97,7 @@ describe('dormant Stage4 Runtime and Save v3 mapping', () => {
   });
 
   it('supports account-only without manufacturing an Attempt', () => {
-    const source = createStage4GameState({ account: runtime().account, currentAttempt: null });
+    const source = createStage4GameState({ ...createInitialStage4GameState(), account: runtime().account, currentAttempt: null });
     const mapped = mapStage4RuntimeToSaveV3(source, 0);
     expect(mapped).toMatchObject({ status: 'mapped', document: { revision: 0, currentAttempt: null } });
   });
@@ -115,7 +115,7 @@ describe('dormant Stage4 Runtime and Save v3 mapping', () => {
       benbenByLevel: [{ levelId: source.currentAttempt.levelId, failureStreak: 0, status: 'used' }],
     });
     const currentAttempt = createAttemptState({ ...source.currentAttempt, temporaryBenbenCard: { item: 'revive', consumed } });
-    const mapped = mapStage4RuntimeToSaveV3(createStage4GameState({ account, currentAttempt }), 2);
+    const mapped = mapStage4RuntimeToSaveV3(createStage4GameState({ ...createInitialStage4GameState(), account, currentAttempt }), 2);
     expect(mapped.status === 'mapped' && mapped.document.currentAttempt?.temporaryBenbenCard).toEqual({ item: 'revive', consumed });
   });
 
@@ -134,7 +134,7 @@ describe('dormant Stage4 Runtime and Save v3 mapping', () => {
       run,
       terminalDisposition: kind === 'failed' ? 'settled' : 'not-applicable',
     });
-    const aggregate = createStage4GameState({ account: source.account, currentAttempt });
+    const aggregate = createStage4GameState({ ...createInitialStage4GameState(), account: source.account, currentAttempt });
     const mapped = mapStage4RuntimeToSaveV3(aggregate, 10);
     expect(mapped.status).toBe('mapped');
     if (mapped.status !== 'mapped') return;
@@ -154,7 +154,7 @@ describe('dormant Stage4 Runtime and Save v3 mapping', () => {
     const rewards = source.currentAttempt.rewards.map((reward) => ({ ...reward, claimed: true }));
     const currentAttempt = createAttemptState({ ...source.currentAttempt, run, rewards, terminalDisposition: 'settled' });
     const account = createStage4AccountState({ ...source.account, completedLevelIds: [source.currentAttempt.levelId] });
-    const mapped = mapStage4RuntimeToSaveV3(createStage4GameState({ account, currentAttempt }), 8);
+    const mapped = mapStage4RuntimeToSaveV3(createStage4GameState({ ...createInitialStage4GameState(), account, currentAttempt }), 8);
     expect(mapped.status === 'mapped' && mapped.document.currentAttempt?.terminalDisposition).toBe('settled');
   });
 
@@ -192,7 +192,7 @@ describe('dormant Stage4 Runtime and Save v3 mapping', () => {
     const rewards = source.currentAttempt.rewards.map((reward) => ({ ...reward, claimed: true }));
     const currentAttempt = createAttemptState({ ...source.currentAttempt, run, rewards, terminalDisposition: 'settled' });
     const account = createStage4AccountState({ ...source.account, completedLevelIds: [source.currentAttempt.levelId] });
-    const mapped = mapStage4RuntimeToSaveV3(createStage4GameState({ account, currentAttempt }), 3);
+    const mapped = mapStage4RuntimeToSaveV3(createStage4GameState({ ...createInitialStage4GameState(), account, currentAttempt }), 3);
     if (mapped.status !== 'mapped' || mapped.document.currentAttempt === null) throw new Error('fixture');
     const direct = { ...mapped.document, currentAttempt: { ...mapped.document.currentAttempt, terminalDisposition: 'legacy-excluded' } };
     expect(validateSaveDocumentV3(direct)).toMatchObject({ status: 'invalid', issues: [{ code: 'legacy-migration-required' }] });

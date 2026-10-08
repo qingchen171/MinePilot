@@ -10,7 +10,7 @@ import { MemoryStorage } from '../helpers/memory-storage';
 import { emptySaveCandidateV2 } from '../helpers/save-v2';
 import { createGameState } from '../../src/core/game-state';
 import { createAccountState } from '../../src/core/account';
-import { createStage4GameState } from '../../src/core/stage4-game-state';
+import { createInitialStage4GameState, createStage4GameState } from '../../src/core/stage4-game-state';
 import { mapStage4RuntimeToSaveV3 } from '../../src/core/persistence/stage4-runtime-mapping';
 import { createInitialBoard } from '../../src/core/initial-board';
 import { createWaitingRunState } from '../../src/core/run';
@@ -37,11 +37,11 @@ describe('S4-08.4 activated production authority', () => {
     expect(before.status).toBe('fresh');
     const committed = session.execute({ kind: 'start', expectedRevision: null, expectedRunId: null, levelId: 'level-001', creation });
     expect(committed.status).toBe('committed');
-    expect(session.read()).toMatchObject({ status: 'loaded', persistence: { revision: 0, sourceSaveVersion: 3 }, runtime: { currentAttempt: { runId: 'run-a' } } });
+    expect(session.read()).toMatchObject({ status: 'loaded', persistence: { revision: 0, sourceSaveVersion: 4 }, runtime: { currentAttempt: { runId: 'run-a' } } });
     expect(session.read()).not.toBe(before);
     const selected = loadCommittedSnapshot(storage);
     expect(selected.status).toBe('loaded');
-    if (selected.status === 'loaded') expect(JSON.parse(selected.serializedPayload)).toMatchObject({ saveVersion: 3, revision: 0 });
+    if (selected.status === 'loaded') expect(JSON.parse(selected.serializedPayload)).toMatchObject({ saveVersion: 4, revision: 0 });
   });
 
   it('does not publish after lease denial through the browser root', () => {
@@ -140,7 +140,7 @@ describe('S4-08.4 activated production authority', () => {
     expect(storage.operations.slice(beforeOperations).every((operation) => operation.startsWith('read:'))).toBe(true);
     expect(session.execute({ kind: 'flag', expectedRevision: 6, expectedRunId: 'legacy-v1-run', coordinate: { x: 0, y: 0 }, flagged: true }).status).toBe('committed');
     const reopened = createProductionStage4Session(storage, identity, clock).read();
-    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 7, sourceSaveVersion: 3 } });
+    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 7, sourceSaveVersion: 4 } });
     if (reopened.status !== 'loaded' || reopened.runtime.currentAttempt === null) return;
     expect(reopened.runtime.currentAttempt.run.board.cells[0]).toMatchObject({ kind: 'safe', flagged: true });
   });
@@ -182,7 +182,7 @@ describe('S4-08.4 activated production authority', () => {
     const safeIndex = migrated.runtime.currentAttempt.run.board.cells.findIndex((cell) => cell.kind === 'safe' && cell.exploration === 'unexplored');
     expect(session.execute({ kind: 'flag', expectedRevision: 3, expectedRunId: 'run-a', coordinate: point(safeIndex), flagged: true }).status).toBe('committed');
     const reopened = createProductionStage4Session(source.storage, identity, clock).read();
-    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 4, sourceSaveVersion: 3 }, runtime: {
+    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 4, sourceSaveVersion: 4 }, runtime: {
       account: { inventory: rich.runtime.account.inventory }, currentAttempt: {
         run: { characterPosition: attempt.run.characterPosition, phase: attempt.run.phase }, runItems: attempt.runItems,
         generationProvenance: attempt.generationProvenance,
@@ -215,7 +215,7 @@ describe('S4-08.4 activated production authority', () => {
     expect(f.read()).toMatchObject({ status: 'loaded', runtime: { currentAttempt: { run: { phase: { kind: 'pending-mine-encounter' } } } } });
     expect(f.execute({ kind: 'failure', expectedRevision: 4, expectedRunId: 'run-a' }).status).toBe('committed');
     const reopened = f.read();
-    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 5, sourceSaveVersion: 3 }, runtime: { currentAttempt: { run: { phase: { kind: 'failed' } }, terminalDisposition: 'settled' } } });
+    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 5, sourceSaveVersion: 4 }, runtime: { currentAttempt: { run: { phase: { kind: 'failed' } }, terminalDisposition: 'settled' } } });
   });
 
   it('runs first-step automatic Lucky then pending Revive without a v2 writer', () => {
@@ -258,7 +258,7 @@ describe('S4-08.4 activated production authority', () => {
     expect(f.execute({ kind: 'detection', expectedRevision: 1, expectedRunId: 'run-a', initializeSeed: 42 }).status).toBe('committed');
     expect(f.execute({ kind: 'airplane', expectedRevision: 2, expectedRunId: 'run-a', coordinate: safePoint }).status).toBe('committed');
     const reopened = f.read();
-    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 3, sourceSaveVersion: 3 }, runtime: {
+    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 3, sourceSaveVersion: 4 }, runtime: {
       account: { inventory: { detection: 1, airplane: 0 } }, currentAttempt: { runItems: { successfulDetectionUses: 1, successfulAirplaneUses: 1, detectionRandomSeed: 43 } },
     } });
     if (reopened.status !== 'loaded' || reopened.runtime.currentAttempt === null) return;
@@ -358,7 +358,7 @@ describe('S4-08.4 activated production authority', () => {
     expect(f.start().status).toBe('committed');
     const oldWriter = commitCandidateWithWriterLease(f.storage, identity, clock, 0, emptySaveCandidateV2(1));
     expect(oldWriter.status).toBe('persistence-load-failure');
-    expect(f.read()).toMatchObject({ status: 'loaded', persistence: { revision: 0, sourceSaveVersion: 3 } });
+    expect(f.read()).toMatchObject({ status: 'loaded', persistence: { revision: 0, sourceSaveVersion: 4 } });
   });
 
   it('recovers an older committed v2 backup without promoting a bare v3 slot', () => {
@@ -368,7 +368,7 @@ describe('S4-08.4 activated production authority', () => {
     expect(commitSnapshot(f.storage, JSON.stringify(serialized.document), 2).status).toBe('committed');
     f.storage.failOnOccurrence('write', SNAPSHOT_STORAGE_KEYS.headBackup, 2);
     expect(f.execute({ kind: 'start', expectedRevision: 2, expectedRunId: null, levelId: 'level-001', creation }).status).toBe('committed');
-    expect(f.read()).toMatchObject({ status: 'loaded', persistence: { revision: 3, sourceSaveVersion: 3 } });
+    expect(f.read()).toMatchObject({ status: 'loaded', persistence: { revision: 3, sourceSaveVersion: 4 } });
     f.storage.data.set(SNAPSHOT_STORAGE_KEYS.head, '{bad-head');
     expect(f.read()).toMatchObject({ status: 'loaded', persistence: { revision: 2, source: 'head-backup', sourceSaveVersion: 2 }, runtime: { currentAttempt: null } });
   });
@@ -466,7 +466,7 @@ describe('S4-08.4 activated production authority', () => {
     expect(session.read()).toBe(before);
     expect(session.execute({ kind: 'dismiss', expectedRevision: 4, expectedRunId: 'historical-run' }).status).toBe('committed');
     expect(createProductionStage4Session(f.storage, identity, clock).read())
-      .toMatchObject({ status: 'loaded', persistence: { revision: 5, sourceSaveVersion: 3 }, runtime: { currentAttempt: null } });
+      .toMatchObject({ status: 'loaded', persistence: { revision: 5, sourceSaveVersion: 4 }, runtime: { currentAttempt: null } });
   });
 
   it('keeps one-time Reward and Account claim authority synchronized across production mutation and reopen', () => {
@@ -477,7 +477,7 @@ describe('S4-08.4 activated production authority', () => {
     const attempt = started.runtime.currentAttempt;
     const reward = attempt.rewards[0];
     if (reward === undefined) throw new Error('reward fixture');
-    const richRuntime = createStage4GameState({
+    const richRuntime = createStage4GameState({ ...createInitialStage4GameState(),
       account: started.runtime.account,
       currentAttempt: {
         ...attempt,
@@ -491,7 +491,7 @@ describe('S4-08.4 activated production authority', () => {
     const session = createProductionStage4Session(f.storage, identity, clock);
     expect(session.execute({ kind: 'move', expectedRevision: 1, expectedRunId: 'run-a', coordinate: reward.coordinate }).status).toBe('committed');
     const reopened = createProductionStage4Session(f.storage, identity, clock).read();
-    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 2, sourceSaveVersion: 3 }, runtime: { account: { oneTimeClaimIds: ['historical-one-time'] } } });
+    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 2, sourceSaveVersion: 4 }, runtime: { account: { oneTimeClaimIds: ['historical-one-time'] } } });
     if (reopened.status !== 'loaded' || reopened.runtime.currentAttempt === null) return;
     expect(reopened.runtime.account.oneTimeClaimIds.filter((id) => id === 'historical-one-time')).toHaveLength(1);
     expect(reopened.runtime.currentAttempt.rewards.find((entry) => entry.oneTimeClaimId === 'historical-one-time'))

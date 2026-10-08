@@ -36,6 +36,9 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
       const result = adapter.submit(choice);
       return result.status === 'committed'
         ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey }
+        : result.status === 'rejected' &&
+          (result.reason === 'settings-unchanged' || result.reason === 'tutorial-already-acknowledged')
+          ? { ...result, snapshot: project(adapter.read()) }
         : result;
     },
     retryRetained: () => {
