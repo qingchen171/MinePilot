@@ -1,10 +1,10 @@
 import { createInitialStage4GameState, type Stage4GameState } from '../../core/stage4-game-state';
 import { loadSaveDocument } from '../../core/persistence/save-dispatcher';
-import type { SaveV3ValidationIssue } from '../../core/persistence/save-v3';
+import type { SaveV4ValidationIssue } from '../../core/persistence/save-v4';
 import {
   reconstructStage4RuntimeFromTrustedMigration,
-  reconstructStage4RuntimeFromValidatedV3,
 } from '../../core/persistence/stage4-runtime-mapping';
+import { reconstructStage4RuntimeFromValidatedV4 } from '../../core/persistence/stage4-runtime-mapping-v4';
 import type { LoadCommittedSnapshotResult } from './crash-safe-snapshot-store';
 
 export type DormantStage4LoadResult =
@@ -19,12 +19,12 @@ export type DormantStage4LoadResult =
         readonly kind: 'committed';
         readonly revision: number;
         readonly source: 'head' | 'head-backup';
-        readonly sourceSaveVersion: 1 | 2 | 3;
+        readonly sourceSaveVersion: 1 | 2 | 3 | 4;
       };
       readonly runtime: Stage4GameState;
     }
   | { readonly status: 'invalid-json' }
-  | { readonly status: 'invalid-save'; readonly issues: readonly SaveV3ValidationIssue[] }
+  | { readonly status: 'invalid-save'; readonly issues: readonly SaveV4ValidationIssue[] }
   | { readonly status: 'revision-mismatch' }
   | { readonly status: 'unavailable-snapshot'; readonly reason: 'corrupt' | 'storage-failure' };
 
@@ -54,9 +54,9 @@ export function readDormantStage4Runtime(
       ? dispatched.issues : [{ code: 'invalid-save-version', path: '$.saveVersion' }] };
   }
   const revision = dispatched.document.revision;
-  const runtime = dispatched.sourceSaveVersion === 3
-    ? reconstructStage4RuntimeFromValidatedV3(dispatched.validation)
-    : reconstructStage4RuntimeFromTrustedMigration(dispatched.migration);
+  const runtime = 'migration' in dispatched
+    ? reconstructStage4RuntimeFromTrustedMigration(dispatched.migration)
+    : reconstructStage4RuntimeFromValidatedV4(dispatched.validation);
   if (revision !== selected.revision) return { status: 'revision-mismatch' };
   return {
     status: 'loaded',

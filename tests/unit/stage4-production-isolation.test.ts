@@ -5,18 +5,23 @@ import { CURRENT_SAVE_VERSION } from '../../src/core/persistence/save-dispatcher
 import { executeProductionStage4Mutation, loadProductionStage4Runtime } from '../../src/systems/persistence/production-stage4-runtime';
 
 describe('S4-08.4 atomic production activation guard', () => {
-  it('uses v3 as the only current Save version', () => {
-    expect(CURRENT_SAVE_VERSION).toBe(3);
+  it('uses v4 as the only current Save version', () => {
+    expect(CURRENT_SAVE_VERSION).toBe(4);
   });
   it('exposes the Stage 4 reader and mutation surface', () => {
     expect(loadProductionStage4Runtime).toBeTypeOf('function');
     expect(executeProductionStage4Mutation).toBeTypeOf('function');
   });
-  it('routes production mutations through the real v3 guarded writer', () => {
+  it('routes production mutations through the real v4 guarded writer', () => {
     const facade = readFileSync('src/systems/persistence/production-stage4-runtime.ts', 'utf8');
-    const guard = readFileSync('src/systems/persistence/guarded-persistence-v3.ts', 'utf8');
-    expect(facade).toContain('commitCandidateWithWriterLeaseV3');
-    expect(guard).toContain('commitCandidateSaveV3');
+    const guard = readFileSync('src/systems/persistence/guarded-persistence-v4.ts', 'utf8');
+    const mutation = readFileSync('src/systems/persistence/production-stage4-mutation-v4.ts', 'utf8');
+    expect(facade).toContain('commitCandidateWithWriterLeaseV4');
+    expect(facade).not.toContain('commitCandidateWithWriterLeaseV3');
+    expect(guard).toContain('commitCandidateSaveV4');
+    expect(mutation).toContain('mapStage4RuntimeToSaveV4');
+    expect(mutation).not.toContain('mapStage4RuntimeToSaveV3');
+    expect(guard).not.toContain('commitCandidateSaveV3');
     expect(facade).not.toContain('commitCandidateWithWriterLease(');
     expect(facade).not.toContain('commitCandidateSaveV2');
   });
@@ -52,7 +57,8 @@ describe('S4-08.4 atomic production activation guard', () => {
     visit('src/main.ts');
     const normalized = [...visited].map((file) => file.replaceAll('\\', '/'));
     expect(normalized.some((file) => file.endsWith('/systems/persistence/production-stage4-runtime.ts'))).toBe(true);
-    expect(normalized.some((file) => file.endsWith('/systems/persistence/guarded-persistence-v3.ts'))).toBe(true);
+    expect(normalized.some((file) => file.endsWith('/systems/persistence/guarded-persistence-v4.ts'))).toBe(true);
+    expect(imports.some((entry) => /\bcommitCandidateWithWriterLeaseV3\b|\bcommitCandidateSaveV3\b/.test(entry.names))).toBe(false);
     expect(normalized.some((file) => file.endsWith('/systems/persistence/crash-safe-snapshot-store.ts'))).toBe(true);
     expect(normalized.some((file) => file.endsWith('/systems/persistence/writer-lease.ts'))).toBe(true);
     expect(imports.some((entry) => /\bcommitCandidateSaveV2\b|\bcommitCandidateWithWriterLease\b/.test(entry.names))).toBe(false);

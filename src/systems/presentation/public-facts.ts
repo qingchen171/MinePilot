@@ -5,6 +5,8 @@ import { getShopOffers, type ShopItem, type ValidatedShopCatalog } from '../../c
 
 export type PublicCellAppearance = 'unknown' | 'flagged' | 'explored' | 'obstacle' | 'revealed-mine';
 export interface SanitizedPublicFacts {
+  readonly settings: { readonly musicEnabled: boolean; readonly soundEffectsEnabled: boolean };
+  readonly tutorialProgress: { readonly acknowledgedMilestoneIds: readonly string[] };
   readonly shop: {
     readonly status: 'available' | 'account-only' | 'unavailable';
     readonly offers: readonly { readonly item: ShopItem; readonly price: number; readonly affordable: boolean; readonly owned: number }[];
@@ -38,6 +40,10 @@ function publicCell(cell: CellState): PublicCellAppearance {
 export function sanitizeStage4Runtime(runtime: Stage4GameState,
   shopCatalog: ValidatedShopCatalog | null = null): SanitizedPublicFacts {
   const { account, currentAttempt } = runtime;
+  const settings = Object.freeze({ musicEnabled: runtime.settings.musicEnabled,
+    soundEffectsEnabled: runtime.settings.soundEffectsEnabled });
+  const tutorialProgress = Object.freeze({ acknowledgedMilestoneIds:
+    Object.freeze([...runtime.tutorialProgress.acknowledgedMilestoneIds]) });
   const inventory = Object.freeze({
     lucky: account.inventory.lucky, detection: account.inventory.detection,
     airplane: account.inventory.airplane, revive: account.inventory.revive,
@@ -50,7 +56,7 @@ export function sanitizeStage4Runtime(runtime: Stage4GameState,
     : currentAttempt !== null
       ? { status: 'account-only' as const, offers: Object.freeze([]) }
       : { status: 'available' as const, offers: getShopOffers(account, shopCatalog) });
-  if (currentAttempt === null) return Object.freeze({ account: publicAccount, attempt: null, shop });
+  if (currentAttempt === null) return Object.freeze({ account: publicAccount, attempt: null, shop, settings, tutorialProgress });
   const { run, runItems } = currentAttempt;
   const position = run.characterPosition.kind === 'waiting'
     ? Object.freeze({ kind: 'waiting' as const })
@@ -62,6 +68,8 @@ export function sanitizeStage4Runtime(runtime: Stage4GameState,
   return Object.freeze({
     account: publicAccount,
     shop,
+    settings,
+    tutorialProgress,
     attempt: Object.freeze({
       levelId: currentAttempt.levelId, phase: run.phase.kind, hasTakenStep: run.hasTakenStep,
       position,

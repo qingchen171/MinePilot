@@ -33,7 +33,7 @@ describe('S5-02 real production session bridge', () => {
     expect(f.storage.operations.every((operation) => operation.startsWith('read:'))).toBe(true);
     const result = f.presentation.submit(choice);
     expect(result).toMatchObject({ status: 'committed', snapshot: { status: 'loaded', view: { attempt: { levelId: 'level-001' } } } });
-    expect(f.session.read()).toMatchObject({ status: 'loaded', persistence: { revision: 0, sourceSaveVersion: 3 } });
+    expect(f.session.read()).toMatchObject({ status: 'loaded', persistence: { revision: 0, sourceSaveVersion: 4 } });
     expect(loadCommittedSnapshot(f.storage)).toMatchObject({ status: 'loaded', revision: 0 });
     const view = f.presentation.read();
     expect(JSON.stringify(view)).not.toContain('stable-run-id');

@@ -14,7 +14,7 @@ describe('S5-02 exact production result classification', () => {
     const shopReasons = shopRows.map((row) => row.match(/`([^`]+)`/)?.[1]);
     const implementation = Object.values(REASONS).flat();
     expect(new Set(implementation).size).toBe(implementation.length);
-    expect(implementation.slice().sort()).toEqual([...frozen, ...shopReasons].sort());
+    expect(implementation.slice().sort()).toEqual([...frozen, ...shopReasons, 'settings-unchanged', 'tutorial-already-acknowledged'].sort());
     expect(implementation.length).toBeGreaterThan(70);
   });
 

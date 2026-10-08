@@ -14,8 +14,14 @@ const SHOP_REASON_KEYS: Readonly<Record<string, PresentationCopyKey>> = Object.f
   'insufficient-coins': 'shop.insufficient-coins',
   'inventory-overflow': 'shop.inventory-unavailable',
 });
+const PREFERENCE_REASON_KEYS: Readonly<Record<string, PresentationCopyKey>> = Object.freeze({
+  'settings-unchanged': 'settings.already-set',
+  'tutorial-already-acknowledged': 'tutorial.already-acknowledged',
+  'not-writable': 'error.legacy-read-only',
+});
 
 export function copyKeyForResult(category: ResultCategory, reason?: string): PresentationCopyKey {
   if (reason !== undefined && Object.hasOwn(SHOP_REASON_KEYS, reason)) return SHOP_REASON_KEYS[reason]!;
+  if (reason !== undefined && Object.hasOwn(PREFERENCE_REASON_KEYS, reason)) return PREFERENCE_REASON_KEYS[reason]!;
   return RESULT_KEYS[category];
 }

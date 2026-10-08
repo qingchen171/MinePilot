@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createLevelCatalog, PRODUCTION_LEVEL_CATALOG, type LevelCatalog } from '../../src/core/level-catalog';
-import { createStage4GameState, type Stage4GameState } from '../../src/core/stage4-game-state';
+import { createInitialStage4GameState, createStage4GameState, type Stage4GameState } from '../../src/core/stage4-game-state';
 import { mapStage4RuntimeToSaveV3 } from '../../src/core/persistence/stage4-runtime-mapping';
 import { loadCommittedSnapshot, commitSnapshot } from '../../src/systems/persistence/crash-safe-snapshot-store';
 import { readDormantStage4Runtime } from '../../src/systems/persistence/dormant-stage4-reader';
 import {
+  composeStage4MutationCandidate,
   executeDormantStage4Mutation,
   type DormantCommitBoundary,
   type DormantMutationIntent,
@@ -22,6 +23,8 @@ import { deriveBenbenEligibility } from '../../src/core/benben-random';
 import { selectMineCoordinates } from '../../src/core/mine-placement';
 import { createSeededRandomSource } from '../../src/core/random';
 import { acquireWriterLease, inspectWriterLease, WRITER_LEASE_STORAGE_KEY } from '../../src/systems/persistence/writer-lease';
+import { createSettingsState, createTutorialProgressState } from '../../src/core/settings-tutorial';
+import { validateShopCatalog } from '../../src/core/shop';
 
 const creation = (runId: string, baseSeed = 123456789) => ({
   runId, baseSeed, rngVersion: 'mulberry32-v1', generationVersion: 'mine-placement-v1',
@@ -111,7 +114,7 @@ function enterPending(f: ReturnType<typeof fixture>) {
 }
 function injectTemporaryCard(f: ReturnType<typeof fixture>, item: RewardItem) {
   const old = f.current();
-  const runtime = createStage4GameState({
+  const runtime = createStage4GameState({ ...createInitialStage4GameState(),
     account: createStage4AccountState({ ...old.runtime.account, benbenByLevel: [{ levelId: 'level-001', status: 'used', failureStreak: 0 }] }),
     currentAttempt: { ...old.runtime.currentAttempt!, temporaryBenbenCard: createTemporaryBenbenCard({ item, consumed: false }) },
   });
@@ -133,7 +136,7 @@ function prepareWritingCommand(kind: string): Prepared {
   if (kind === 'airplane') return { f, intent: { kind: 'airplane', expectedRevision: 0, expectedRunId: 'run-1', coordinate: firstSafe(f) } };
   if (kind === 'claim') {
     const old = f.current().runtime;
-    f.persist(createStage4GameState({ account: createStage4AccountState({ ...old.account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] }), currentAttempt: old.currentAttempt }), 1);
+    f.persist(createStage4GameState({ ...old, account: createStage4AccountState({ ...old.account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] }), currentAttempt: old.currentAttempt }), 1);
     return { f, intent: { kind: 'claim-benben', expectedRevision: 1, expectedRunId: 'run-1' } };
   }
   if (kind === 'next' || kind === 'replay' || kind === 'dismiss') {
@@ -162,6 +165,67 @@ function prepareWritingCommand(kind: string): Prepared {
   if (kind === 'revive') return { f, intent: { kind: 'revive', expectedRevision: 2, expectedRunId: 'run-1' } };
   throw new Error(`unknown writing command: ${kind}`);
 }
+
+describe('S5-04 existing candidate-family preservation', () => {
+  for (const kind of ['start', 'abandon', 'dismiss', 'restart', 'retry', 'replay', 'next',
+    'flag', 'safe-movement', 'mine-movement', 'lucky-survival', 'failure',
+    'detection', 'airplane', 'revive', 'claim'] as const) {
+    it(`${kind} retains nondefault settings and tutorial facts in the production-shared candidate composer`, () => {
+      const { f, intent } = prepareWritingCommand(kind);
+      const previous = createStage4GameState({ ...f.current().runtime,
+        settings: createSettingsState({ musicEnabled: false, soundEffectsEnabled: false }),
+        tutorialProgress: createTutorialProgressState({ acknowledgedMilestoneIds: ['first-shop', 'first-items'] }),
+      });
+      const catalog = kind === 'next' || kind === 'replay' || kind === 'dismiss'
+        ? smallCatalog() : PRODUCTION_LEVEL_CATALOG;
+      const result = composeStage4MutationCandidate(previous, intent, catalog, null);
+      expect(result.status).toBe('candidate');
+      if (result.status !== 'candidate') return;
+      expect(result.runtime.settings).toEqual(previous.settings);
+      expect(result.runtime.tutorialProgress).toEqual(previous.tutorialProgress);
+      expect(previous.settings.musicEnabled).toBe(false);
+      expect(previous.tutorialProgress.acknowledgedMilestoneIds).toEqual(['first-items', 'first-shop']);
+    });
+  }
+
+  it('Shop debit/credit preserves nondefault settings and tutorial facts', () => {
+    const initial = createInitialStage4GameState();
+    const previous = createStage4GameState({ ...initial,
+      account: createStage4AccountState({ ...initial.account, coins: 9 }),
+      settings: createSettingsState({ musicEnabled: false, soundEffectsEnabled: false }),
+      tutorialProgress: createTutorialProgressState({ acknowledgedMilestoneIds: ['first-shop'] }),
+    });
+    const validated = validateShopCatalog({ lucky: 1, detection: 2, revive: 4, airplane: 8 });
+    if (validated.status !== 'valid') throw new Error('shop catalog');
+    const result = composeStage4MutationCandidate(previous,
+      { kind: 'purchase', item: 'revive', expectedRevision: null, expectedRunId: null },
+      PRODUCTION_LEVEL_CATALOG, validated.catalog);
+    expect(result.status).toBe('candidate');
+    if (result.status !== 'candidate') return;
+    expect(result.runtime.account).toMatchObject({ coins: 5,
+      inventory: { revive: previous.account.inventory.revive + 1 } });
+    expect(result.runtime.settings).toEqual(previous.settings);
+    expect(result.runtime.tutorialProgress).toEqual(previous.tutorialProgress);
+  });
+
+  it('Safe Reward claim and same-transition Victory preserve nondefault settings and tutorial facts', () => {
+    const f = fixture(smallCatalog(1));
+    f.start();
+    const previous = createStage4GameState({ ...f.current().runtime,
+      settings: createSettingsState({ musicEnabled: false, soundEffectsEnabled: false }),
+      tutorialProgress: createTutorialProgressState({ acknowledgedMilestoneIds: ['first-items'] }),
+    });
+    const result = composeStage4MutationCandidate(previous,
+      { kind: 'move', coordinate: firstSafe(f), expectedRevision: 0, expectedRunId: 'run-1' },
+      smallCatalog(1), null);
+    expect(result.status).toBe('candidate');
+    if (result.status !== 'candidate') return;
+    expect(result.runtime.currentAttempt?.rewards[0]?.claimed).toBe(true);
+    expect(result.runtime.currentAttempt?.run.phase.kind).toBe('won');
+    expect(result.runtime.settings).toEqual(previous.settings);
+    expect(result.runtime.tutorialProgress).toEqual(previous.tutorialProgress);
+  });
+});
 
 describe('S4-08.3 dormant committed-read mutation chain', () => {
   for (const kind of ['start', 'abandon', 'dismiss', 'restart', 'retry', 'replay', 'next', 'flag', 'safe-movement', 'mine-movement', 'lucky-survival', 'failure', 'detection', 'airplane', 'revive', 'claim']) {
@@ -287,7 +351,7 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
       const f = fixture();
       f.start();
       const old = f.current().runtime;
-      f.persist(createStage4GameState({ account: createStage4AccountState({ ...old.account, benbenByLevel: [{ levelId: 'level-001', status, failureStreak: 0 }] }), currentAttempt: old.currentAttempt }), 1);
+      f.persist(createStage4GameState({ ...old, account: createStage4AccountState({ ...old.account, benbenByLevel: [{ levelId: 'level-001', status, failureStreak: 0 }] }), currentAttempt: old.currentAttempt }), 1);
       moveToSafe(f);
       expect(f.run({ kind: 'move', expectedRevision: 2, expectedRunId: 'run-1', coordinate: firstMine(f) }).status).toBe('committed');
       expect(f.run({ kind: 'failure', expectedRevision: 3, expectedRunId: 'run-1' }).status).toBe('committed');
@@ -300,7 +364,7 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
     const f = fixture();
     f.start();
     const before = f.current().runtime;
-    f.persist(createStage4GameState({ account: createStage4AccountState({ ...before.account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] }), currentAttempt: before.currentAttempt }), 1);
+    f.persist(createStage4GameState({ ...before, account: createStage4AccountState({ ...before.account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] }), currentAttempt: before.currentAttempt }), 1);
     const move = { kind: 'move' as const, expectedRevision: 1, expectedRunId: 'run-1', coordinate: firstSafe(f) };
     const claim = { kind: 'claim-benben' as const, expectedRevision: 1, expectedRunId: 'run-1' };
     expect(f.run(claim).status).toBe('committed');
@@ -326,7 +390,7 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
     const f = fixture(smallCatalog(1));
     f.start();
     const old = f.current().runtime;
-    f.persist(createStage4GameState({ account: createStage4AccountState({ ...old.account, coins: Number.MAX_SAFE_INTEGER }), currentAttempt: old.currentAttempt }), 1);
+    f.persist(createStage4GameState({ ...old, account: createStage4AccountState({ ...old.account, coins: Number.MAX_SAFE_INTEGER }), currentAttempt: old.currentAttempt }), 1);
     const before = f.current();
     const commits = f.commits;
     expect(f.run({ kind: 'airplane', expectedRevision: 1, expectedRunId: 'run-1', coordinate: firstSafe(f) })).toEqual({ status: 'rejected', reason: 'reward-asset-overflow' });
@@ -340,7 +404,7 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
     const f = fixture(catalog.catalog);
     f.start();
     const old = f.current().runtime;
-    f.persist(createStage4GameState({ account: createStage4AccountState({ ...old.account, inventory: { ...old.account.inventory, detection: Number.MAX_SAFE_INTEGER } }), currentAttempt: old.currentAttempt }), 1);
+    f.persist(createStage4GameState({ ...old, account: createStage4AccountState({ ...old.account, inventory: { ...old.account.inventory, detection: Number.MAX_SAFE_INTEGER } }), currentAttempt: old.currentAttempt }), 1);
     const before = f.current();
     const commits = f.commits;
     expect(f.run({ kind: 'airplane', expectedRevision: 1, expectedRunId: 'run-1', coordinate: firstSafe(f) })).toEqual({ status: 'rejected', reason: 'reward-asset-overflow' });
@@ -353,7 +417,7 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
     f.start();
     const old = f.current().runtime;
     const attempt = old.currentAttempt!;
-    f.persist(createStage4GameState({
+    f.persist(createStage4GameState({ ...createInitialStage4GameState(),
       account: old.account,
       currentAttempt: { ...attempt, rewards: [{ ...attempt.rewards[0]!, oneTimeClaimId: 'one-time-1' }] },
     }), 1);
@@ -464,7 +528,7 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
   it('waiting Airplane can remain active and Claim Benben without taking a step', () => {
     const f = fixture();
     const started = f.start().runtime;
-    f.persist(createStage4GameState({
+    f.persist(createStage4GameState({ ...createInitialStage4GameState(),
       account: createStage4AccountState({ ...started.account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] }),
       currentAttempt: started.currentAttempt,
     }), 1);
@@ -662,7 +726,7 @@ describe('S4-08.3 dormant committed-read mutation chain', () => {
   it('Benben Claim is waiting-only, deterministic and turns available into a temporary card', () => {
     const f = fixture();
     const original = f.start().runtime;
-    const available = createStage4GameState({
+    const available = createStage4GameState({ ...createInitialStage4GameState(),
       account: createStage4AccountState({ ...original.account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] }),
       currentAttempt: original.currentAttempt,
     });

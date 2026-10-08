@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialBoard } from '../../../../src/core/initial-board';
-import { createStage4GameState } from '../../../../src/core/stage4-game-state';
+import { createInitialStage4GameState, createStage4GameState } from '../../../../src/core/stage4-game-state';
 import { createInitialStage4AccountState } from '../../../../src/core/stage4-account';
 import { createCompleteAttempt } from '../../../../src/core/stage4-attempt-factory';
 import { PRODUCTION_LEVEL_CATALOG } from '../../../../src/core/level-catalog';
@@ -17,14 +17,14 @@ describe('S5-02 public facts and pure projection', () => {
       generationProvenance: { seed: 123456789, rngVersion: 'private-rng', generationVersion: 'private-generation' },
     });
     if (made.status !== 'created') throw new Error('fixture');
-    const runtime = createStage4GameState({ account: createInitialStage4AccountState(), currentAttempt: made.attempt });
+    const runtime = createStage4GameState({ ...createInitialStage4GameState(), account: createInitialStage4AccountState(), currentAttempt: made.attempt });
     const facts = sanitizeStage4Runtime(runtime);
     const cells = made.attempt.run.board.cells;
     const safe = cells.findIndex((cell) => cell.kind === 'safe');
     const mine = cells.findIndex((cell) => cell.kind === 'mine');
     expect(facts.attempt?.board.cells[safe]).toBe('unknown');
     expect(facts.attempt?.board.cells[mine]).toBe('unknown');
-    expect(Object.keys(facts)).toEqual(['account', 'shop', 'attempt']);
+    expect(Object.keys(facts)).toEqual(['account', 'shop', 'settings', 'tutorialProgress', 'attempt']);
     expect(Object.keys(facts.attempt ?? {})).toEqual(['levelId', 'phase', 'hasTakenStep', 'position', 'board', 'currentMineCount', 'itemUses']);
     const exposed = JSON.stringify(facts);
     for (const secret of ['private-run-id', 'private-rng', 'private-generation', '123456789', 'rewards', 'oneTimeClaimId', 'generationProvenance']) {
@@ -44,7 +44,7 @@ describe('S5-02 public facts and pure projection', () => {
     const waiting = createWaitingRunState(created.board);
     const run = createRunState({ ...created.board, cells: [{ kind: 'safe', exploration: 'explored', flagged: false }] },
       createOnBoardPosition({ x: 0, y: 0 }), { hasTakenStep: true, phase: { kind: 'won' } });
-    const runtime = createStage4GameState({
+    const runtime = createStage4GameState({ ...createInitialStage4GameState(),
       account: createStage4AccountState({ ...createInitialStage4AccountState(), completedLevelIds: ['level-1'] }),
       currentAttempt: {
         runId: 'run-1', levelId: 'level-1', generationProvenance: null, run,

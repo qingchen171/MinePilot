@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SHOP_PRICES } from '../../src/config/shop-prices';
 import { validateShopCatalog } from '../../src/core/shop';
 import { createInitialStage4AccountState, createStage4AccountState } from '../../src/core/stage4-account';
-import { createStage4GameState } from '../../src/core/stage4-game-state';
+import { createInitialStage4GameState, createStage4GameState } from '../../src/core/stage4-game-state';
 import { createInitialBoard } from '../../src/core/initial-board';
 import { createBoard, createCellState } from '../../src/core/board';
 import { createOnBoardPosition, createRunState, createWaitingPosition } from '../../src/core/run';
@@ -27,7 +27,7 @@ const clock = { nowMs: () => 100 };
 function seeded(coins: number, inventoryOverride: Record<string, number> = {}) {
   const storage = new MemoryStorage();
   const initial = createInitialStage4AccountState();
-  const runtime = createStage4GameState({
+  const runtime = createStage4GameState({ ...createInitialStage4GameState(),
     account: createStage4AccountState({ ...initial, coins,
       inventory: { ...initial.inventory, ...inventoryOverride },
       completedLevelIds: ['completed-a'], oneTimeClaimIds: ['claim-a'],
@@ -54,7 +54,7 @@ describe('S5-03 Shop production authority', () => {
     const result = session.execute(purchase(4, 'airplane'));
     expect(result).toMatchObject({ status: 'committed', revision: 5, runtime: { account: { coins: 12, inventory: { airplane: 2 } }, currentAttempt: null } });
     const reopened = createProductionStage4Session(storage, owner, clock, catalog).read();
-    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 5, sourceSaveVersion: 3 }, runtime: {
+    expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: 5, sourceSaveVersion: 4 }, runtime: {
       account: { coins: 12, inventory: { airplane: 2 }, completedLevelIds: ['completed-a'], oneTimeClaimIds: ['claim-a'],
         benbenByLevel: [{ levelId: 'level-001', failureStreak: 2, status: 'unavailable' }] },
       currentAttempt: null,
@@ -92,7 +92,7 @@ describe('S5-03 Shop production authority', () => {
         },
       });
       const initial = createInitialStage4AccountState();
-      const runtime = createStage4GameState({
+      const runtime = createStage4GameState({ ...createInitialStage4GameState(),
         account: createStage4AccountState({ ...initial, coins: 20, completedLevelIds: phase === 'won' ? ['level-001'] : [] }),
         currentAttempt: {
           runId: 'shop-run', levelId: 'level-001', generationProvenance: null, run,
@@ -233,7 +233,7 @@ describe('S5-03 Shop production authority', () => {
       expect(bought).toMatchObject({ status: 'committed', runtime: { currentAttempt: null } });
       if (bought.status !== 'committed') return;
       const reopened = createProductionStage4Session(storage, owner, clock, catalog).read();
-      expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: bought.revision, sourceSaveVersion: 3 },
+      expect(reopened).toMatchObject({ status: 'loaded', persistence: { revision: bought.revision, sourceSaveVersion: 4 },
         runtime: { account: { inventory: { lucky: bought.runtime.account.inventory.lucky }, coins: bought.runtime.account.coins } } });
     }
   });

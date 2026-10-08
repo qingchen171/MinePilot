@@ -13,6 +13,7 @@ import {
   type SaveV2ValidationIssue,
 } from '../../core/persistence/save-v2';
 import { validateSaveDocumentV3, type SaveDocumentV3, type SaveV3ValidationIssue } from '../../core/persistence/save-v3';
+import { validateSaveDocumentV4, type SaveDocumentV4, type SaveV4ValidationIssue } from '../../core/persistence/save-v4';
 import {
   commitSnapshot,
   loadCommittedSnapshot,
@@ -26,11 +27,17 @@ import { readDormantStage4Runtime } from './dormant-stage4-reader';
 export type CandidateSaveV1 = SaveDocumentPersistenceInputV1;
 export type CandidateSaveV2 = SaveDocumentPersistenceInputV2;
 
-/** The activated writer accepts only a complete, strictly valid v3 DTO. */
+/** Historical v3 writer retained for regression; not a production mutation path. */
 export type CommitCandidateSaveV3Result =
   | { readonly status: 'committed'; readonly slot: SnapshotSlot; readonly revision: number;
       readonly backupUpdate: 'updated' | 'failed'; readonly backupFailure?: Extract<CommitSnapshotResult, { readonly status: 'committed' }>['backupFailure'] }
   | { readonly status: 'serialization-failure'; readonly stage: 'save-document'; readonly issues: readonly SaveV3ValidationIssue[] }
+  | { readonly status: 'serialization-failure'; readonly stage: 'json'; readonly cause: unknown }
+  | { readonly status: 'persistence-failure'; readonly failure: CommitFailure };
+export type CommitCandidateSaveV4Result =
+  | { readonly status: 'committed'; readonly slot: SnapshotSlot; readonly revision: number;
+      readonly backupUpdate: 'updated' | 'failed'; readonly backupFailure?: Extract<CommitSnapshotResult, { readonly status: 'committed' }>['backupFailure'] }
+  | { readonly status: 'serialization-failure'; readonly stage: 'save-document'; readonly issues: readonly SaveV4ValidationIssue[] }
   | { readonly status: 'serialization-failure'; readonly stage: 'json'; readonly cause: unknown }
   | { readonly status: 'persistence-failure'; readonly failure: CommitFailure };
 
@@ -195,6 +202,29 @@ export function commitCandidateSaveV3(
   candidate: SaveDocumentV3,
 ): CommitCandidateSaveV3Result {
   const validated = validateSaveDocumentV3(candidate);
+  if (validated.status === 'invalid') {
+    return { status: 'serialization-failure', stage: 'save-document', issues: validated.issues };
+  }
+  let serializedPayload: string;
+  try {
+    serializedPayload = JSON.stringify(validated.document);
+  } catch (cause) {
+    return { status: 'serialization-failure', stage: 'json', cause };
+  }
+  const committed = commitSnapshot(storage, serializedPayload, validated.document.revision);
+  return committed.status === 'committed'
+    ? { status: 'committed', slot: committed.slot, revision: committed.revision,
+        backupUpdate: committed.backupUpdate,
+        ...(committed.backupFailure === undefined ? {} : { backupFailure: committed.backupFailure }) }
+    : { status: 'persistence-failure', failure: committed };
+}
+
+/** Sole production DTO writer after S5-04 activation; historical writers remain regression-only. */
+export function commitCandidateSaveV4(
+  storage: StringKeyValueStorage,
+  candidate: SaveDocumentV4,
+): CommitCandidateSaveV4Result {
+  const validated = validateSaveDocumentV4(candidate);
   if (validated.status === 'invalid') {
     return { status: 'serialization-failure', stage: 'save-document', issues: validated.issues };
   }
