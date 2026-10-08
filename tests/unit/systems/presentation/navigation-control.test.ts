@@ -1,0 +1,234 @@
+import { describe, expect, it, vi } from 'vitest';
+import { createLevelCatalog, PRODUCTION_LEVEL_CATALOG } from '../../../../src/core/level-catalog';
+import { createCompleteAttempt } from '../../../../src/core/stage4-attempt-factory';
+import { createInitialStage4GameState, createStage4GameState } from '../../../../src/core/stage4-game-state';
+import { validateShopCatalog } from '../../../../src/core/shop';
+import { SHOP_PRICES } from '../../../../src/config/shop-prices';
+import { createPresentationAdapter } from '../../../../src/systems/presentation/adapter';
+import { createNavigationControl } from '../../../../src/systems/presentation/navigation-control';
+import { projectLevelList } from '../../../../src/systems/presentation/level-list';
+import { sanitizeStage4Runtime } from '../../../../src/systems/presentation/public-facts';
+import { createPresentationRoot } from '../../../../src/presentation-root';
+import { createRunState, createWaitingPosition } from '../../../../src/core/run';
+import type { PresentationSessionPort, SessionIntent, SessionRead } from '../../../../src/systems/presentation/session-port';
+
+const made = createLevelCatalog([
+  PRODUCTION_LEVEL_CATALOG.levels[0]!,
+  { ...PRODUCTION_LEVEL_CATALOG.levels[0]!, levelId: 'level-002' },
+]);
+if (made.status !== 'created') throw new Error('catalog fixture');
+const catalog = made.catalog;
+const shop = validateShopCatalog(SHOP_PRICES);
+if (shop.status !== 'valid') throw new Error('shop fixture');
+const shopCatalog = shop.catalog;
+const tech = () => ({ nextRunId: vi.fn(() => 'next-run'), nextGenerationSeed: vi.fn(() => 11), nextDetectionSeed: vi.fn(() => 12) });
+
+function attempt(levelId = 'level-001') {
+  const level = catalog.levels.find((entry) => entry.levelId === levelId)!;
+  const result = createCompleteAttempt({ level, runId: 'old-run', generationProvenance: {
+    seed: 10, rngVersion: 'mulberry32-v1', generationVersion: 'mine-placement-v1',
+  } });
+  if (result.status !== 'created') throw new Error('attempt fixture');
+  return result.attempt;
+}
+function encountered(phase: 'pending-mine-encounter' | 'failed') {
+  const base = attempt();
+  const index = base.run.board.cells.findIndex((cell) => cell.kind === 'mine');
+  const target = { x: index % base.run.board.dimensions.width,
+    y: Math.floor(index / base.run.board.dimensions.width) };
+  return { ...base,
+    run: createRunState(base.run.board, createWaitingPosition(), { hasTakenStep: true,
+      phase: { kind: phase, encounter: { target, occurredOnFirstStep: true } } }),
+    terminalDisposition: phase === 'failed' ? 'settled' as const : 'not-applicable' as const };
+}
+function loaded(current = attempt(), revision = 5): SessionRead {
+  return { status: 'loaded', persistence: { kind: 'committed', revision, source: 'head', sourceSaveVersion: 4 },
+    runtime: createStage4GameState({ ...createInitialStage4GameState(),
+      account: { ...createInitialStage4GameState().account, completedLevelIds: ['level-001'] }, currentAttempt: current }) };
+}
+function fixture(initial: SessionRead = loaded()) {
+  let authority = initial;
+  const intents: SessionIntent[] = [];
+  let reloadCount = 0;
+  let onReload: ((count: number) => void) | null = null;
+  const reload = vi.fn(() => { reloadCount++; onReload?.(reloadCount); return authority; });
+  let fail: { reason: string; kind: SessionIntent['kind'] } | null = null;
+  const port: PresentationSessionPort = {
+    read: () => authority, reload,
+    execute(intent) {
+      intents.push(intent);
+      if (fail !== null && fail.kind === intent.kind) { const { reason } = fail; fail = null; return { status: 'rejected', reason }; }
+      const current = authority;
+      if (current.status !== 'loaded' && current.status !== 'fresh') throw new Error('recovery fixture');
+      const next = intent.kind === 'start' ? attempt(intent.levelId) : null;
+      const runtime = createStage4GameState({ ...current.runtime, currentAttempt: next });
+      const revision = current.status === 'loaded' ? current.persistence.revision + 1 : 0;
+      authority = { status: 'loaded', persistence: { kind: 'committed', revision,
+        source: 'head', sourceSaveVersion: 4 }, runtime };
+      return { status: 'committed', revision, runtime };
+    },
+  };
+  const adapter = createPresentationAdapter(port, tech(), shopCatalog);
+  const exit = vi.fn();
+  const nav = createNavigationControl(adapter, catalog, exit);
+  return { nav, adapter, intents, reload, exit, setAuthority: (read: SessionRead) => { authority = read; },
+    onReload: (hook: (count: number) => void) => { onReload = hook; },
+    failNext: (kind: SessionIntent['kind'], reason: string) => { fail = { kind, reason }; }, authority: () => authority };
+}
+
+describe('S5-05 trusted navigation and replacement', () => {
+  it('projects one validated catalog with no LevelDefinition, Reward or generation data', () => {
+    const facts = sanitizeStage4Runtime((loaded() as Extract<SessionRead, { status: 'loaded' }>).runtime);
+    const levels = projectLevelList(catalog, facts);
+    expect(levels).toEqual([
+      { levelId: 'level-001', order: 0, access: 'completed', current: true },
+      { levelId: 'level-002', order: 1, access: 'available', current: false },
+    ]);
+    expect(JSON.stringify(levels)).not.toMatch(/rewards|payload|mineCount|generation|seed|runId/);
+    expect(Object.isFrozen(levels)).toBe(true);
+  });
+
+  it('keeps Shop account-only and menu navigation read-only', () => {
+    const f = fixture();
+    expect(f.nav.navigate('shop')).toMatchObject({ status: 'blocked' });
+    for (const route of ['home', 'levels', 'game', 'settings', 'feedback'] as const) {
+      expect(f.nav.navigate(route).status).toBe('navigated');
+    }
+    expect(f.intents).toHaveLength(0);
+    expect(f.nav.leaveAttemptForShop().status).toBe('committed');
+    expect(f.intents.map((value) => value.kind)).toEqual(['abandon']);
+    expect(f.nav.route()).toBe('shop');
+  });
+
+  it('blocks Shop for pending and failed attempts and uses their legal replacement command', () => {
+    for (const phase of ['pending-mine-encounter', 'failed'] as const) {
+      const f = fixture(loaded(encountered(phase)));
+      expect(f.nav.navigate('shop')).toMatchObject({ status: 'blocked' });
+      expect(f.nav.selectLevel('level-002').status).toBe('confirmation-required');
+      expect(f.nav.confirmReplacement().status).toBe('committed');
+      expect(f.intents[0]?.kind).toBe(phase === 'failed' ? 'dismiss' : 'abandon');
+    }
+  });
+
+  it('binds confirmation, rereads both times, and commits abandon then Start exactly once', () => {
+    const f = fixture();
+    f.nav.navigate('levels');
+    expect(f.nav.selectLevel('level-002').status).toBe('confirmation-required');
+    expect(f.nav.confirmReplacement().status).toBe('committed');
+    expect(f.nav.confirmReplacement()).toMatchObject({ status: 'blocked' });
+    expect(f.intents.map((value) => value.kind)).toEqual(['abandon', 'start']);
+    expect(f.intents[0]).toMatchObject({ expectedRevision: 5, expectedRunId: 'old-run' });
+    expect(f.intents[1]).toMatchObject({ levelId: 'level-002', expectedRevision: 6, expectedRunId: null });
+    expect(f.reload).toHaveBeenCalledTimes(2);
+    expect(f.nav.route()).toBe('game');
+  });
+
+  it('stops on changed authority before first mutation; invalid, same-level and cancellation do not write', () => {
+    const f = fixture();
+    expect(f.nav.selectLevel('missing')).toMatchObject({ status: 'blocked' });
+    expect(f.nav.selectLevel('level-001').status).toBe('navigated');
+    expect(f.nav.selectLevel('level-002').status).toBe('confirmation-required');
+    f.nav.cancelSelection();
+    expect(f.intents).toHaveLength(0);
+    expect(f.nav.selectLevel('level-002').status).toBe('confirmation-required');
+    f.setAuthority(loaded(attempt(), 6));
+    expect(f.nav.confirmReplacement()).toMatchObject({ status: 'blocked', reason: 'authority-changed' });
+    expect(f.intents).toHaveLength(0);
+  });
+
+  it('preserves the committed account-only gap when Start fails; never fabricates rollback', () => {
+    const f = fixture();
+    f.nav.selectLevel('level-002');
+    f.failNext('start', 'commit-persistence-commit-failure');
+    expect(f.nav.confirmReplacement()).toMatchObject({ status: 'rejected', outcome: { reason: 'commit-persistence-commit-failure' } });
+    expect(f.intents.map((value) => value.kind)).toEqual(['abandon', 'start']);
+    expect(f.authority()).toMatchObject({ runtime: { currentAttempt: null }, persistence: { revision: 6 } });
+    expect(f.nav.pendingSelection()).toBeNull();
+  });
+
+  it('stops after a committed first step if a competing Attempt appears before the second reload', () => {
+    const f = fixture();
+    f.nav.selectLevel('level-002');
+    f.onReload((count) => { if (count === 2) f.setAuthority(loaded(attempt('level-002'), 7)); });
+    expect(f.nav.confirmReplacement()).toMatchObject({ status: 'blocked', reason: 'authority-changed' });
+    expect(f.intents.map((intent) => intent.kind)).toEqual(['abandon']);
+    expect(f.authority()).toMatchObject({ persistence: { revision: 7 }, runtime: { currentAttempt: { levelId: 'level-002' } } });
+  });
+
+  it('stops at recovery if the committed reread after abandon fails', () => {
+    const f = fixture();
+    f.nav.selectLevel('level-002');
+    f.onReload((count) => { if (count === 2) f.setAuthority({ status: 'unavailable-snapshot' }); });
+    expect(f.nav.confirmReplacement()).toMatchObject({ status: 'recovery' });
+    expect(f.intents.map((intent) => intent.kind)).toEqual(['abandon']);
+  });
+
+  it('allows only user-triggered retry of the exact second-step Start envelope', () => {
+    const f = fixture();
+    f.failNext('start', 'storage-failure');
+    f.nav.selectLevel('level-002');
+    expect(f.nav.confirmReplacement()).toMatchObject({ status: 'rejected', outcome: { policy: { retainEnvelope: true } } });
+    const firstStart = f.intents[1];
+    expect(f.nav.retryReplacement().status).toBe('committed');
+    expect(f.intents.map((intent) => intent.kind)).toEqual(['abandon', 'start', 'start']);
+    expect(f.intents[2]).toBe(firstStart);
+    expect(f.nav.route()).toBe('game');
+  });
+
+  it('never continues to Start after first-step uncertainty or ownership loss', () => {
+    for (const reason of ['commit-commit-outcome-uncertain', 'owned-by-another-session']) {
+      const f = fixture();
+      f.failNext('abandon', reason);
+      f.nav.selectLevel('level-002');
+      expect(f.nav.confirmReplacement()).toMatchObject({ status: 'rejected', outcome: { reason } });
+      expect(f.intents.map((intent) => intent.kind)).toEqual(['abandon']);
+      expect(f.nav.pendingSelection()).toBeNull();
+      expect(f.nav.retryReplacement()).toMatchObject({ status: 'blocked' });
+    }
+  });
+
+  it('does not turn a recovery read into a fresh route or Start', () => {
+    const f = fixture({ status: 'invalid-save' });
+    expect(f.nav.navigate('levels')).toMatchObject({ status: 'recovery' });
+    expect(f.nav.navigate('feedback')).toMatchObject({ status: 'navigated' });
+    expect(f.nav.selectLevel('level-001')).toMatchObject({ status: 'recovery' });
+    expect(f.intents).toHaveLength(0);
+  });
+
+  it('exits Shop by cancelling only a retained purchase and keeping the receipt disarmed', () => {
+    const fresh: SessionRead = { status: 'fresh', persistence: { kind: 'no-save' }, runtime: createInitialStage4GameState() };
+    const execute = vi.fn(() => ({ status: 'rejected' as const, reason: 'storage-failure' }));
+    const root = createPresentationRoot({ read: () => fresh, reload: () => fresh, execute }, tech(), shopCatalog, catalog);
+    expect(root.navigation.navigate('shop').status).toBe('navigated');
+    expect(root.shopPurchase('lucky')).toMatchObject({ status: 'rejected', policy: { retainEnvelope: true } });
+    expect(root.shopActions().retry).toBe(true);
+    expect(root.navigation.navigate('home').status).toBe('navigated');
+    expect(root.navigation.navigate('shop').status).toBe('navigated');
+    expect(root.shopActions()).toMatchObject({ retry: false, reload: true, buyAgain: false });
+    expect(root.shopBuyAgain()).toBe(false);
+    expect(root.shopRetryRetained()).toMatchObject({ status: 'unavailable', reason: 'operation-unresolved' });
+    root.shopReload();
+    expect(root.shopBuyAgain()).toBe(true);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not cancel an unrelated retained operation when exiting Shop', () => {
+    const fresh: SessionRead = { status: 'fresh', persistence: { kind: 'no-save' }, runtime: createInitialStage4GameState() };
+    const execute = vi.fn(() => ({ status: 'rejected' as const, reason: 'storage-failure' }));
+    const root = createPresentationRoot({ read: () => fresh, reload: () => fresh, execute }, tech(), shopCatalog, catalog);
+    root.navigation.navigate('shop');
+    expect(root.submit({ kind: 'start', levelId: 'level-001' })).toMatchObject({ status: 'rejected', policy: { retainEnvelope: true } });
+    root.navigation.navigate('home');
+    expect(root.retryRetained()).toMatchObject({ status: 'rejected', reason: 'storage-failure' });
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it('never passes confirmation run identity into the UI-facing root result', () => {
+    const read = loaded();
+    const root = createPresentationRoot({ read: () => read, reload: () => read,
+      execute: () => ({ status: 'rejected', reason: 'unused' }) }, tech(), shopCatalog, catalog);
+    expect(root.navigation.selectLevel('level-002').status).toBe('confirmation-required');
+    expect(root.navigation.pendingSelection()).toEqual({ target: 'level-002', phase: 'confirm' });
+    expect(JSON.stringify(root.navigation.pendingSelection())).not.toContain('old-run');
+  });
+});

@@ -53,5 +53,13 @@ export function createShopControl(port: {
       canRearm = result.status === 'committed' ||
         (result.status === 'rejected' && !result.policy.reloadRequired && !result.policy.retainEnvelope);
     },
+    /** Exiting cannot re-authorize a purchase or leave a dead Retry control. */
+    afterExit(): void {
+      if (state !== 'receipt-disarmed') return;
+      if (last?.status === 'rejected' && last.policy.retainEnvelope) {
+        last = null;
+        canRearm = false;
+      }
+    },
   });
 }

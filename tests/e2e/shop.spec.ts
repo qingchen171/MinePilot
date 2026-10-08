@@ -22,6 +22,7 @@ test('Shop presents trusted prices, one purchase per activation and explicit buy
     sessionStorage.setItem('shop-fixture-seeded', 'yes');
   }, entries);
   await page.goto('/');
+  await page.getByRole('button', { name: 'Shop' }).click();
   const shop = page.locator('#shop');
   await expect(shop.getByRole('heading', { name: 'Shop' })).toBeVisible();
   await expect(shop).toContainText('Lucky — 1 coins');
@@ -46,6 +47,7 @@ test('Shop presents trusted prices, one purchase per activation and explicit buy
   await shop.locator('button[data-shop-item="lucky"]').click();
   await expect(shop).toContainText('Coins: 18');
   await page.reload();
+  await page.getByRole('button', { name: 'Shop' }).click();
   await expect(shop).toContainText('Coins: 18');
   await expect(shop).toContainText('Lucky — 1 coins · Owned: 3');
 });
