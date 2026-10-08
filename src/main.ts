@@ -5,6 +5,8 @@ import { SHOP_PRICES } from './config/shop-prices';
 import { validateShopCatalog } from './core/shop';
 import { createPresentationRoot } from './presentation-root';
 import { renderShopPanel, renderShopRecoveryPanel } from './ui/shop-presentation';
+import { renderNavigationPages, type PublicPage } from './ui/navigation-pages';
+import type { PresentationCopyKey } from './config/presentation-copy';
 import { createLocalStorageAdapter } from './systems/persistence/key-value-storage';
 import { createProductionStage4Session } from './systems/persistence/production-stage4-runtime';
 import { createSystemClock, createWriterIdentity } from './systems/persistence/writer-lease';
@@ -51,34 +53,81 @@ class BaselineScene extends Phaser.Scene {
 }
 
 const status = document.querySelector<HTMLElement>('#status');
+const navigationPanel = document.querySelector<HTMLElement>('#navigation');
+const pagePanel = document.querySelector<HTMLElement>('#page');
+const gamePanel = document.querySelector<HTMLElement>('#game');
 const shopPanel = document.querySelector<HTMLElement>('#shop');
-if (shopPanel !== null && presentationRoot !== null) {
-  const draw = (message: Parameters<typeof renderShopPanel>[4] = null) => {
+document.title = presentationCopy('app.title');
+if (status !== null) status.textContent = presentationCopy('status.loading');
+navigationPanel?.setAttribute('aria-label', presentationCopy('nav.main-label'));
+gamePanel?.setAttribute('aria-label', presentationCopy('game.region-label'));
+if (shopPanel !== null && navigationPanel !== null && pagePanel !== null && presentationRoot !== null) {
+  const resultMessage = (result: { readonly status: string; readonly reason?: string;
+    readonly priorCommit?: boolean;
+    readonly outcome?: { readonly status: string; readonly copyKey: PresentationCopyKey } }): PresentationCopyKey | null => {
+    if (result.status === 'committed') return 'status.committed';
+    if (result.priorCommit) return 'nav.two-step-gap';
+    if (result.status === 'rejected') return result.outcome?.copyKey ?? 'error.unknown';
+    if (result.status === 'recovery') return 'error.recovery';
+    if (result.status !== 'blocked') return null;
+    if (result.reason === 'shop.account-only') return 'nav.shop-restricted';
+    if (result.reason === 'shop.unavailable') return 'shop.unavailable';
+    if (result.reason === 'level-unavailable') return 'nav.level-unavailable';
+    if (result.reason === 'no-attempt') return 'nav.no-attempt';
+    if (result.reason === 'authority-changed') return 'nav.authority-changed';
+    return 'nav.operation-unresolved';
+  };
+  const draw = (message: PresentationCopyKey | null = null) => {
     const current = presentationRoot.read();
-    if (current.status === 'recovery') {
+    const route = presentationRoot.navigation.route() as PublicPage;
+    gamePanel!.hidden = route !== 'game' || current.status === 'recovery';
+    shopPanel.hidden = route !== 'shop' || current.status === 'recovery';
+    renderNavigationPages(navigationPanel, pagePanel, route,
+      current.status === 'recovery' ? null : current.view,
+      presentationRoot.navigation.levels(), presentationRoot.navigation.pendingSelection(), {
+        navigate(next) { draw(resultMessage(presentationRoot.navigation.navigate(next))); },
+        selectLevel(id) { draw(resultMessage(presentationRoot.navigation.selectLevel(id))); },
+        confirmReplacement() { draw(resultMessage(presentationRoot.navigation.confirmReplacement())); },
+        cancelReplacement() { presentationRoot.navigation.cancelSelection(); draw(); },
+        retryReplacement() { draw(resultMessage(presentationRoot.navigation.retryReplacement())); },
+        leaveForShop() { draw(resultMessage(presentationRoot.navigation.leaveAttemptForShop())); },
+        setSetting(key, enabled) {
+          const outcome = presentationRoot.submit({ kind: 'set-setting', key, enabled });
+          draw(outcome.status === 'committed' ? 'settings.saved' : outcome.copyKey);
+        },
+        reload() { presentationRoot.reload(); draw(); },
+      }, message);
+    if (route === 'shop' && current.status !== 'recovery') {
+      renderShopPanel(shopPanel, current.view, presentationRoot.shopState(), {
+        purchase(item) {
+          const outcome = presentationRoot.shopPurchase(item);
+          if (outcome !== null) draw(outcome.status === 'committed' ? 'shop.receipt' : outcome.copyKey);
+        },
+        buyAgain() { if (presentationRoot.shopBuyAgain()) draw(); },
+        retry() {
+          const outcome = presentationRoot.shopRetryRetained();
+          draw(outcome.status === 'committed' ? 'shop.receipt' : outcome.copyKey);
+        },
+        reload() {
+          const snapshot = presentationRoot.shopReload();
+          draw(snapshot.status === 'recovery' ? 'error.recovery' : null);
+        },
+      }, message, presentationRoot.shopActions());
+    } else if (route === 'shop' && current.status === 'recovery') {
       renderShopRecoveryPanel(shopPanel, () => { presentationRoot.shopReload(); draw(); });
-      return;
-    }
-    renderShopPanel(shopPanel, current.view, presentationRoot.shopState(), {
-      purchase(item) {
-        const outcome = presentationRoot.shopPurchase(item);
-        if (outcome === null) return;
-        draw(outcome?.status === 'committed' ? 'shop.receipt' : outcome?.copyKey ?? null);
-      },
-      buyAgain() { if (presentationRoot.shopBuyAgain()) draw(); },
-      retry() {
-        const outcome = presentationRoot.shopRetryRetained();
-        draw(outcome.status === 'committed' ? 'shop.receipt' : outcome.copyKey);
-      },
-      reload() {
-        const snapshot = presentationRoot.shopReload();
-        draw(snapshot.status === 'recovery' ? 'error.recovery' : null);
-      },
-    }, message, presentationRoot.shopActions());
+    } else shopPanel.replaceChildren();
   };
   draw();
-} else if (shopPanel !== null) {
-  shopPanel.textContent = presentationCopy('status.unavailable');
+} else if (shopPanel !== null && navigationPanel !== null && pagePanel !== null) {
+  shopPanel.hidden = true;
+  if (gamePanel !== null) gamePanel.hidden = true;
+  let route: PublicPage = 'recovery';
+  const drawUnavailable = () => renderNavigationPages(navigationPanel, pagePanel, route, null, null, null, {
+    navigate(next) { route = next === 'feedback' ? 'feedback' : 'recovery'; drawUnavailable(); },
+    selectLevel() {}, confirmReplacement() {}, cancelReplacement() {}, retryReplacement() {},
+    leaveForShop() {}, setSetting() {}, reload() { window.location.reload(); },
+  });
+  drawUnavailable();
 }
 
 new Phaser.Game({

@@ -120,6 +120,13 @@ export function createPresentationAdapter(session: PresentationSessionPort, tech
 
   return Object.freeze({
     read(): PublicSnapshot { return publicSnapshot(session.read(), shopCatalog); },
+    /** Trusted application coordination only; never handed to ui or a Scene. */
+    readAuthority() {
+      const load = session.read();
+      return available(load) ? { status: 'available' as const, ...authority(load),
+        facts: sanitizeStage4Runtime(load.runtime, shopCatalog) }
+        : { status: 'recovery' as const, reason: load.status };
+    },
     submit(choice: SemanticIntent): PresentationOutcome {
       if (executing || unresolved !== null) return unavailable('operation-unresolved');
       if (reloadRequired) return unavailable('reload-required');
@@ -154,6 +161,20 @@ export function createPresentationAdapter(session: PresentationSessionPort, tech
       const load = session.reload();
       reloadRequired = !available(load);
       return publicSnapshot(load, shopCatalog);
+    },
+    reloadAuthority() {
+      unresolved = null;
+      const load = session.reload();
+      reloadRequired = !available(load);
+      return available(load) ? { status: 'available' as const, ...authority(load),
+        facts: sanitizeStage4Runtime(load.runtime, shopCatalog) }
+        : { status: 'recovery' as const, reason: load.status };
+    },
+    retainedKind(): SessionIntent['kind'] | null { return unresolved?.intent.kind ?? null; },
+    cancelRetainedKind(kind: SessionIntent['kind']): boolean {
+      if (unresolved?.intent.kind !== kind) return false;
+      unresolved = null;
+      return true;
     },
     cancelRetained(): void { unresolved = null; },
   });

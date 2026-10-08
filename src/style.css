@@ -11,9 +11,23 @@ body {
 main {
   display: grid;
   min-height: 100vh;
-  place-content: center;
-  justify-items: center;
+  width: min(100%, 720px);
+  margin: 0 auto;
+  align-content: start;
+  gap: .75rem;
+  padding: 1rem;
+  box-sizing: border-box;
 }
+
+#navigation { display: flex; flex-wrap: wrap; gap: .5rem; }
+#navigation [aria-current="page"] { font-weight: bold; }
+#page { display: grid; gap: .6rem; }
+#page > * { margin: 0; }
+#page label { display: flex; gap: .5rem; align-items: center; }
+#page button { justify-self: start; }
+#page [role="status"] { padding: .5rem; border: 1px solid #698aa0; }
+
+#game[hidden], #shop[hidden] { display: none; }
 
 #game canvas {
   display: block;

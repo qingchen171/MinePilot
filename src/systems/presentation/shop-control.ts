@@ -45,6 +45,8 @@ export function createShopControl(port: {
     },
     afterReload(snapshot: PublicSnapshot): void {
       if (state !== 'receipt-disarmed') return;
+      // Reload consumes the exact retained envelope in the adapter. Never leave a dead Retry.
+      if (last?.status === 'rejected' && last.policy.retainEnvelope) last = null;
       canRearm = snapshot.status !== 'recovery' && snapshot.facts.shop.status === 'available';
     },
     afterRetainedRetry(result: PresentationOutcome): void {
@@ -52,6 +54,14 @@ export function createShopControl(port: {
       last = result;
       canRearm = result.status === 'committed' ||
         (result.status === 'rejected' && !result.policy.reloadRequired && !result.policy.retainEnvelope);
+    },
+    /** Exiting cannot re-authorize a purchase or leave a dead Retry control. */
+    afterExit(): void {
+      if (state !== 'receipt-disarmed') return;
+      if (last?.status === 'rejected' && last.policy.retainEnvelope) {
+        last = null;
+        canRearm = false;
+      }
     },
   });
 }
