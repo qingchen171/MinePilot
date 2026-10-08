@@ -1,5 +1,5 @@
 import type { LevelCatalog } from '../../core/level-catalog';
-import type { createPresentationAdapter, PresentationOutcome } from './adapter';
+import type { createPresentationAdapter, PresentationOutcome, PublicSnapshot } from './adapter';
 import { canSelectLevel, projectLevelList } from './level-list';
 
 export type PageRoute = 'home' | 'levels' | 'game' | 'shop' | 'settings' | 'feedback' | 'recovery';
@@ -27,6 +27,17 @@ export function createNavigationControl(adapter: Adapter, catalog: LevelCatalog,
     }
     if (selection?.phase === 'second-retry') adapter.cancelRetainedKind('start');
     selection = null;
+  }
+  /** Reconcile the ephemeral route with one newly read committed authority. */
+  function reconcileReloaded(snapshot: PublicSnapshot): void {
+    if (snapshot.status === 'recovery') {
+      if (route === 'shop') leaveShop();
+      selection = null;
+      route = 'recovery';
+    } else if (route === 'shop' && (snapshot.facts.attempt !== null || snapshot.facts.shop.status !== 'available')) {
+      leaveShop();
+      route = 'home';
+    }
   }
   function navigate(next: PageRoute): NavigationResult {
     if (submitting) return { status: 'blocked', reason: 'submitting' };
@@ -152,6 +163,6 @@ export function createNavigationControl(adapter: Adapter, catalog: LevelCatalog,
     } finally { submitting = false; }
   }
   return Object.freeze({ route: () => route, pendingSelection: () => selection,
-    navigate, levelList, selectLevel, confirmReplacement, cancelSelection,
+    navigate, reconcileReloaded, levelList, selectLevel, confirmReplacement, cancelSelection,
     retryReplacement, leaveAttemptForShop });
 }

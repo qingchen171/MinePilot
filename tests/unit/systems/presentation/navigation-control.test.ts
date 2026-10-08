@@ -343,12 +343,84 @@ describe('S5-05 trusted navigation and replacement', () => {
     expect(root.shopActions().retry).toBe(true);
     reloadValue = { status: 'invalid-save' };
     expect(root.reload().status).toBe('recovery');
+    expect(root.navigation.route()).toBe('recovery');
     expect(root.shopActions()).toMatchObject({ retry: false, reload: true, buyAgain: false });
     expect(root.navigation.navigate('home').status).toBe('recovery');
     reloadValue = fresh;
     expect(root.reload().status).toBe('fresh');
     expect(root.navigation.navigate('shop').status).toBe('navigated');
     expect(root.shopActions().retry).toBe(false);
+  });
+
+  it.each(['active', 'pending-mine-encounter', 'failed', 'won'] as const)(
+    'exits a resident Shop after committed reload discovers a %s Attempt without mutating it', (phase) => {
+      const original = accountOnly(4);
+      let cached: SessionRead = original;
+      let committed: SessionRead = original;
+      const execute = vi.fn(() => ({ status: 'rejected' as const, reason: 'unexpected-mutation' }));
+      const root = createPresentationRoot({ read: () => cached,
+        reload: () => { cached = committed; return cached; }, execute }, tech(), shopCatalog, catalog);
+      expect(root.navigation.navigate('shop').status).toBe('navigated');
+      committed = loaded(phase === 'active' ? attempt() : phase === 'won' ? won() : encountered(phase), 5);
+      expect(root.reload()).toMatchObject({ status: 'loaded', view: { attempt: { phase } } });
+      expect(root.navigation.route()).toBe('home');
+      expect(root.read()).toMatchObject({ status: 'loaded', view: { attempt: { phase } } });
+      expect(execute).not.toHaveBeenCalled();
+    },
+  );
+
+  it('Shop-specific reload also exits for a competing committed Attempt and preserves a disarmed receipt', () => {
+    const original = accountOnly(4);
+    let cached: SessionRead = original;
+    let committed: SessionRead = original;
+    const execute = vi.fn(() => ({ status: 'rejected' as const, reason: 'storage-failure' }));
+    const root = createPresentationRoot({ read: () => cached,
+      reload: () => { cached = committed; return cached; }, execute }, tech(), shopCatalog, catalog);
+    root.navigation.navigate('shop');
+    expect(root.shopPurchase('lucky')).toMatchObject({ status: 'rejected', policy: { retainEnvelope: true } });
+    expect(root.shopActions().retry).toBe(true);
+    committed = loaded(attempt(), 5);
+    expect(root.shopReload()).toMatchObject({ status: 'loaded', view: { attempt: { phase: 'active' } } });
+    expect(root.navigation.route()).toBe('home');
+    expect(root.shopActions()).toMatchObject({ retry: false, buyAgain: false });
+    expect(root.shopBuyAgain()).toBe(false);
+    expect(root.shopRetryRetained()).toMatchObject({ status: 'unavailable', reason: 'operation-unresolved' });
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it('a retained Shop retry that rereads a competing Attempt exits Shop without replaying the purchase', () => {
+    const original = accountOnly(4);
+    let cached: SessionRead = original;
+    let committed: SessionRead = original;
+    const execute = vi.fn(() => ({ status: 'rejected' as const, reason: 'storage-failure' }));
+    const root = createPresentationRoot({ read: () => cached,
+      reload: () => { cached = committed; return cached; }, execute }, tech(), shopCatalog, catalog);
+    root.navigation.navigate('shop');
+    root.shopPurchase('lucky');
+    expect(root.shopActions().retry).toBe(true);
+    committed = loaded(attempt(), 5);
+    expect(root.shopRetryRetained()).toMatchObject({ status: 'rejected', reason: 'revision-conflict' });
+    expect(root.navigation.route()).toBe('home');
+    expect(root.shopActions()).toMatchObject({ retry: false, buyAgain: false });
+    expect(root.read()).toMatchObject({ status: 'loaded', view: { attempt: { phase: 'active' } } });
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it('account-only reload keeps Shop; unavailable reload enters Recovery without a mutation', () => {
+    const original = accountOnly(4);
+    let cached: SessionRead = original;
+    let committed: SessionRead = original;
+    const execute = vi.fn(() => ({ status: 'rejected' as const, reason: 'unexpected-mutation' }));
+    const root = createPresentationRoot({ read: () => cached,
+      reload: () => { cached = committed; return cached; }, execute }, tech(), shopCatalog, catalog);
+    root.navigation.navigate('shop');
+    committed = accountOnly(5);
+    expect(root.reload().status).toBe('loaded');
+    expect(root.navigation.route()).toBe('shop');
+    committed = { status: 'unavailable-snapshot' };
+    expect(root.shopReload().status).toBe('recovery');
+    expect(root.navigation.route()).toBe('recovery');
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it('does not cancel an unrelated retained operation when exiting Shop', () => {
