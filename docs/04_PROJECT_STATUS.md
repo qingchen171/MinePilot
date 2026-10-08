@@ -3,7 +3,7 @@
 **项目：MinePilot / Minesweeper Product**  
 **状态更新时间：2026-10-06**
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成；Stage 4 production Runtime 与 Save v3 authority 已激活并通过 S4-09 全链兼容门禁。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01、S5-02、S5-03 PASS/CLOSED；S5-03 functional Shop production/presentation 已合并。**
+**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成；Stage 4 production Runtime 与 Save v3 authority 已激活并通过 S4-09 全链兼容门禁。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01、S5-02、S5-03 PASS/CLOSED；S5-04 Design FROZEN / READY FOR IMPLEMENTATION after this documentation closeout gates；production Save v4 尚未实现/激活。**
 
 ## 当前事实
 
@@ -197,9 +197,19 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 5 / S5-04 — Persistent Settings/Tutorial Contract & Foundation Design Review**
+**Stage 5 / S5-04 — Persistent Settings/Tutorial Contract & Foundation Implementation**
 
-S5-03 Implementation 已人工接受并完成本次 closeout；此处只授权 S5-04 Design Review，不授权 S5-04 Implementation 或 Stage 6 bilingual/skins/mobile。Shop 历史冻结合同见 `docs/13_S5-03_Functional_Shop_Design_Contract.md`；S5-04 的确切 settings/tutorial 持久化产品事实仍须在其 Design 阶段决定。
+S5-04 Design Review、Design Correction、Attack Review 与 Final Design Correction 已获人工接受；本次 documentation-only Freeze 经 Reviewer、PR/main Linux Quality 与 Recovery gate 成功后，只授权上方唯一 S5-04 Implementation，不授权 S5-05 或 Stage 6 bilingual/skins/mobile。完整 S5-04 冻结设计见 `docs/14_S5-04_Settings_Tutorial_Persistence_Design_Contract.md`；下方 S5-01/S5-02/S5-03 中“settings/tutorial 待决定”的表述仅是当时的历史状态，已被本段取代。当前 production 仍是 Save v3，`CURRENT_SAVE_VERSION = 3`，未启用 v4 writer。
+
+### Stage 5 / S5-04 — Persistent Settings/Tutorial Design — FROZEN / READY FOR IMPLEMENTATION after closeout gates
+
+- 产品事实：只持久化 `musicEnabled`、`soundEffectsEnabled`，fresh 与 v1/v2/v3 legacy 默认均为 `true/true`；教程仅记录已实际确认/完成的九个语义里程碑，旧档默认为空，不从显示、关卡或奖励推断；MVP 无 reset，未来只读 replay 不清除进度或重复奖励。九个精确 ID、set-like 验证与 canonical writer order 见 `docs/14_S5-04_Settings_Tutorial_Persistence_Design_Contract.md` §4；S5-07 才定义实际教程交互。
+- Runtime/authority：单一历史 `Stage4GameState` 根增加必填 `settings` 与 `tutorialProgress`，只在 fresh/validated legacy migration 赋默认值；普通 gameplay、Shop、Reward、Item、Benben、terminal/lifecycle candidate 必须结构性保留，设置/教程命令完整保留 Account 与 Attempt。禁止独立 Settings/Tutorial store、localStorage key 或第二 Runtime/Save 链。
+- Save v4 设计：严格根 DTO、v1/v2 authenticated private migration、direct v3 strict-first 纯迁移、direct v4 strict validation；读迁移不写盘/不增 revision；首次真实 mutation 走既有 lease/revision/A-B guarded commit 写 v4，`sourceSaveVersion` 覆盖 1/2/3/4。直接 v4 不得伪造 `legacy-excluded`；历史受信终局可读但未合法清除前仍 `not-writable`，设置/教程写入不得暗中 dismiss/settle。详见 `docs/14_S5-04_Settings_Tutorial_Persistence_Design_Contract.md` §2。
+- 一次性激活门禁：Runtime root、v4 validator/mapper、旧版 read dispatch、版本常量、reader、唯一 v4 guarded writer、mutation/session、S5-02 structural port/public projection 与架构写入可达性检查共同切换；不得生产 v3/v4 并行或 fallback writer。设计冻结不等于 v4 writer enabled；当前生产 Save v3 与 Stage 4 gameplay/economy authority 保持不变。
+- 命令：`set-setting(key, enabled)` 与 `acknowledge-tutorial(milestoneId)` 复用现有 lease -> committed reread -> expected revision/runId -> pure rule -> guarded commit。`settings-unchanged`、`tutorial-already-acknowledged` 是精确 domain/no-op，lease 元数据可更新，但不写 Save/head/slot、不加 revision、不发布 candidate；central neutral copy + adapter read projection，不显示保存成功、不自动 retry/reload。invalid input 可复用 `invalid-request`，历史不可写复用 `not-writable`；stale/uncertain/unknown 保持 S5-02 保守政策。
+- Protocol §7.1 已在 `docs/14_S5-04_Settings_Tutorial_Persistence_Design_Contract.md` §5 记录 reason、Stage 4 Runtime/Save 与 S5-02 presentation 受影响边界、迁移/版本、回滚及 Stage 1–5 regression/mutation 计划。首次 v4 写入后旧 v3-only build 只能安全拒绝，不可作为直接回滚 writer，不得自动降级/覆盖。Implementation 必须完成 §5 验证与 full quality/Reviewer/branch-PR-main Linux/Recovery；本 docs closeout 不冒充这些未来证据。
+- 本次设计冻结只允许 authority docs，production/tests/config/Save implementation changes = 0。实际 Reviewer、PR/branch/main Linux Quality、Recovery 与最终 baseline 以 Git/CI 记录为准；不预填不存在的运行编号或自引用 commit hash。Stage 5 保持 IN PROGRESS，S5-05 不提前启动。
 
 ### Stage 5 / S5-03 — Functional Shop Implementation — PASS / CLOSED
 
@@ -1096,7 +1106,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md、12_S5-02_Presentation_Foundation_Design_Contract.md 与 13_S5-03_Functional_Shop_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01、S5-02、S5-03 PASS/CLOSED。Production 仍为单一 Stage 4 Runtime/full Account 与 Save v3 writer；S5-03 functional Shop 已由 PR #64 合并（implementation baseline `1317f66f459925117375ef17a090dec8b31587a4`）。唯一下一行动为 Stage 5 / S5-04 — Persistent Settings/Tutorial Contract & Foundation Design Review；此处不授权其 Implementation。settings/tutorial 的持久化产品事实留待该 Design；Stage 6 bilingual/skins/mobile 不提前执行。
+请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md、12_S5-02_Presentation_Foundation_Design_Contract.md、13_S5-03_Functional_Shop_Design_Contract.md 与 14_S5-04_Settings_Tutorial_Persistence_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01、S5-02、S5-03 PASS/CLOSED，S5-04 Design FROZEN / READY FOR IMPLEMENTATION。Production 仍为单一 Stage 4 Runtime/full Account 与 Save v3 writer，Save v4 尚未激活。唯一下一行动为 Stage 5 / S5-04 — Persistent Settings/Tutorial Contract & Foundation Implementation；不得启动 S5-05 或 Stage 6 bilingual/skins/mobile。
 ```
 
 ## 阶段看板
@@ -1108,7 +1118,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN CANDIDATE；已验证 annotated stage-3-frozen 标签成立后为 FROZEN / PASS | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | FROZEN CANDIDATE；annotated `stage-4-frozen` 指向已验证 closeout main 后为 FROZEN / PASS；S4-09 PASS/CLOSED；production Stage 4 Runtime + Save v3 writer ACTIVE | Stage 3 FROZEN / PASS |
-| 5 | 表现层 | IN PROGRESS — S5-01、S5-02、S5-03 PASS/CLOSED | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-04 Design Review |
+| 5 | 表现层 | IN PROGRESS — S5-01、S5-02、S5-03 PASS/CLOSED；S5-04 Design FROZEN / READY FOR IMPLEMENTATION | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-04 Implementation |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
 
