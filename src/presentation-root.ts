@@ -58,7 +58,11 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
       leaveAttemptForShop: navigation.leaveAttemptForShop,
     }),
     read: () => project(adapter.read()),
-    reload: () => project(adapter.reload()),
+    reload: () => {
+      const snapshot = adapter.reload();
+      shop.afterReload(snapshot);
+      return project(snapshot);
+    },
     submit: (choice: Exclude<SemanticIntent, { readonly kind: 'purchase' }>) => {
       const result = adapter.submit(choice);
       return result.status === 'committed'

@@ -38,6 +38,7 @@ export function createNavigationControl(adapter: Adapter, catalog: LevelCatalog,
     const read = (next === 'shop' || next === 'game') && route !== next
       ? adapter.reloadAuthority() : adapter.readAuthority();
     if (read.status === 'recovery' && next !== 'recovery' && next !== 'feedback') {
+      if (route === 'shop') leaveShop();
       route = 'recovery';
       return { status: 'recovery', reason: read.reason };
     }
@@ -75,7 +76,7 @@ export function createNavigationControl(adapter: Adapter, catalog: LevelCatalog,
     if (submitting || selection !== null || adapter.retainedKind() !== null) return { status: 'blocked', reason: 'operation-unresolved' };
     const read = adapter.readAuthority();
     if (read.status !== 'available') return { status: 'recovery', reason: read.reason };
-    if (read.facts.attempt?.levelId === target) { route = 'game'; return { status: 'navigated' }; }
+    if (read.facts.attempt?.levelId === target) return navigate('game');
     if (!canSelectLevel(catalog, read.facts, target)) return { status: 'blocked', reason: 'level-unavailable' };
     if (read.facts.attempt !== null) {
       selection = { target, observed: stamp(read), phase: 'confirm' };

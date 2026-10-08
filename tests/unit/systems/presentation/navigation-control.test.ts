@@ -10,6 +10,7 @@ import { projectLevelList } from '../../../../src/systems/presentation/level-lis
 import { sanitizeStage4Runtime } from '../../../../src/systems/presentation/public-facts';
 import { createPresentationRoot } from '../../../../src/presentation-root';
 import { createRunState, createWaitingPosition } from '../../../../src/core/run';
+import { createBoard } from '../../../../src/core/board';
 import type { PresentationSessionPort, SessionIntent, SessionRead } from '../../../../src/systems/presentation/session-port';
 
 const made = createLevelCatalog([
@@ -31,8 +32,7 @@ function attempt(levelId = 'level-001') {
   if (result.status !== 'created') throw new Error('attempt fixture');
   return result.attempt;
 }
-function encountered(phase: 'pending-mine-encounter' | 'failed') {
-  const base = attempt();
+function asEncounter(base: ReturnType<typeof attempt>, phase: 'pending-mine-encounter' | 'failed') {
   const index = base.run.board.cells.findIndex((cell) => cell.kind === 'mine');
   const target = { x: index % base.run.board.dimensions.width,
     y: Math.floor(index / base.run.board.dimensions.width) };
@@ -40,6 +40,15 @@ function encountered(phase: 'pending-mine-encounter' | 'failed') {
     run: createRunState(base.run.board, createWaitingPosition(), { hasTakenStep: true,
       phase: { kind: phase, encounter: { target, occurredOnFirstStep: true } } }),
     terminalDisposition: phase === 'failed' ? 'settled' as const : 'not-applicable' as const };
+}
+function encountered(phase: 'pending-mine-encounter' | 'failed') { return asEncounter(attempt(), phase); }
+function won() {
+  const base = attempt();
+  const board = createBoard(base.run.board.dimensions,
+    base.run.board.cells.map((cell) => cell.kind === 'safe'
+      ? { kind: 'safe' as const, exploration: 'explored' as const, flagged: false as const } : cell));
+  return { ...base, run: createRunState(board, createWaitingPosition(), { phase: { kind: 'won' } }),
+    rewards: base.rewards.map((reward) => ({ ...reward, claimed: true })), terminalDisposition: 'settled' as const };
 }
 function loaded(current = attempt(), revision = 5, completedLevelIds: readonly string[] = ['level-001']): SessionRead {
   return { status: 'loaded', persistence: { kind: 'committed', revision, source: 'head', sourceSaveVersion: 4 },
@@ -107,12 +116,12 @@ describe('S5-05 trusted navigation and replacement', () => {
   });
 
   it('blocks Shop for pending and failed attempts and uses their legal replacement command', () => {
-    for (const phase of ['pending-mine-encounter', 'failed'] as const) {
-      const f = fixture(loaded(encountered(phase)));
+    for (const phase of ['pending-mine-encounter', 'failed', 'won'] as const) {
+      const f = fixture(loaded(phase === 'won' ? won() : encountered(phase)));
       expect(f.nav.navigate('shop')).toMatchObject({ status: 'blocked' });
       expect(f.nav.selectLevel('level-002').status).toBe('confirmation-required');
       expect(f.nav.confirmReplacement().status).toBe('committed');
-      expect(f.intents[0]?.kind).toBe(phase === 'failed' ? 'dismiss' : 'abandon');
+      expect(f.intents[0]?.kind).toBe(phase === 'failed' || phase === 'won' ? 'dismiss' : 'abandon');
     }
   });
 
@@ -163,6 +172,18 @@ describe('S5-05 trusted navigation and replacement', () => {
     expect(f.intents.map((intent) => intent.kind)).toEqual(['abandon', 'start']);
   });
 
+  it('legally dismisses a historical terminal Attempt absent from the current catalog', () => {
+    const retiredLevel = { ...catalog.levels[0]!, levelId: 'retired-level' };
+    const made = createCompleteAttempt({ level: retiredLevel, runId: 'old-run', generationProvenance: {
+      seed: 10, rngVersion: 'mulberry32-v1', generationVersion: 'mine-placement-v1',
+    } });
+    if (made.status !== 'created') throw new Error('historical fixture');
+    const f = fixture(loaded(asEncounter(made.attempt, 'failed')));
+    expect(f.nav.selectLevel('level-002').status).toBe('confirmation-required');
+    expect(f.nav.confirmReplacement().status).toBe('committed');
+    expect(f.intents.map((intent) => intent.kind)).toEqual(['dismiss', 'start']);
+  });
+
   it('preserves the committed account-only gap when Start fails; never fabricates rollback', () => {
     const f = fixture();
     f.nav.selectLevel('level-002');
@@ -196,6 +217,13 @@ describe('S5-05 trusted navigation and replacement', () => {
     f.onReload((count) => { if (count === 1) f.setAuthority(accountOnly(6)); });
     expect(f.nav.navigate('game')).toMatchObject({ status: 'blocked', reason: 'no-attempt' });
     expect(f.nav.route()).toBe('home');
+    expect(f.intents).toHaveLength(0);
+  });
+
+  it('same-level selection also rereads rather than continuing a stale cached Attempt', () => {
+    const f = fixture();
+    f.onReload((count) => { if (count === 1) f.setAuthority(accountOnly(6)); });
+    expect(f.nav.selectLevel('level-001')).toMatchObject({ status: 'blocked', reason: 'no-attempt' });
     expect(f.intents).toHaveLength(0);
   });
 
@@ -254,6 +282,18 @@ describe('S5-05 trusted navigation and replacement', () => {
     expect(f.authority()).toMatchObject({ runtime: { currentAttempt: null } });
   });
 
+  it('keeps the committed first step and rejects stale, lost-lease, or invalid second-step Start', () => {
+    for (const reason of ['revision-conflict', 'commit-writer-not-owner', 'invalid-candidate']) {
+      const f = fixture();
+      f.failNext('start', reason);
+      f.nav.selectLevel('level-002');
+      expect(f.nav.confirmReplacement()).toMatchObject({ status: 'rejected', priorCommit: true,
+        outcome: { reason, policy: { retainEnvelope: false } } });
+      expect(f.authority()).toMatchObject({ runtime: { currentAttempt: null }, persistence: { revision: 6 } });
+      expect(f.nav.retryReplacement()).toMatchObject({ status: 'blocked' });
+    }
+  });
+
   it('never continues to Start after first-step uncertainty or ownership loss', () => {
     for (const reason of ['commit-commit-outcome-uncertain', 'owned-by-another-session']) {
       const f = fixture();
@@ -289,6 +329,26 @@ describe('S5-05 trusted navigation and replacement', () => {
     root.shopReload();
     expect(root.shopBuyAgain()).toBe(true);
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it('a global reload into recovery clears purchase Retry and Shop-exit latch consistently', () => {
+    const fresh: SessionRead = { status: 'fresh', persistence: { kind: 'no-save' }, runtime: createInitialStage4GameState() };
+    let read: SessionRead = fresh;
+    let reloadValue: SessionRead = fresh;
+    const root = createPresentationRoot({ read: () => read,
+      reload: () => { read = reloadValue; return read; },
+      execute: () => ({ status: 'rejected', reason: 'storage-failure' }) }, tech(), shopCatalog, catalog);
+    root.navigation.navigate('shop');
+    root.shopPurchase('lucky');
+    expect(root.shopActions().retry).toBe(true);
+    reloadValue = { status: 'invalid-save' };
+    expect(root.reload().status).toBe('recovery');
+    expect(root.shopActions()).toMatchObject({ retry: false, reload: true, buyAgain: false });
+    expect(root.navigation.navigate('home').status).toBe('recovery');
+    reloadValue = fresh;
+    expect(root.reload().status).toBe('fresh');
+    expect(root.navigation.navigate('shop').status).toBe('navigated');
+    expect(root.shopActions().retry).toBe(false);
   });
 
   it('does not cancel an unrelated retained operation when exiting Shop', () => {

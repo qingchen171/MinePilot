@@ -45,6 +45,8 @@ export function createShopControl(port: {
     },
     afterReload(snapshot: PublicSnapshot): void {
       if (state !== 'receipt-disarmed') return;
+      // Reload consumes the exact retained envelope in the adapter. Never leave a dead Retry.
+      if (last?.status === 'rejected' && last.policy.retainEnvelope) last = null;
       canRearm = snapshot.status !== 'recovery' && snapshot.facts.shop.status === 'available';
     },
     afterRetainedRetry(result: PresentationOutcome): void {
