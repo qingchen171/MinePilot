@@ -6,10 +6,10 @@ export type PageRoute = 'home' | 'levels' | 'game' | 'shop' | 'settings' | 'feed
 type Adapter = ReturnType<typeof createPresentationAdapter>;
 type Stamp = { readonly revision: number | null; readonly runId: string | null };
 type Selection = { readonly target: string; readonly observed: Stamp; readonly phase: 'confirm' | 'first-retry' | 'second-retry' };
-export type NavigationResult =
+export type NavigationResult = (
   | { readonly status: 'navigated' | 'confirmation-required' | 'cancelled' | 'blocked' | 'recovery'; readonly reason?: string }
   | { readonly status: 'committed'; readonly outcome: PresentationOutcome }
-  | { readonly status: 'rejected'; readonly outcome: PresentationOutcome };
+  | { readonly status: 'rejected'; readonly outcome: PresentationOutcome }) & { readonly priorCommit?: boolean };
 
 /** Ephemeral route/confirmation flow; only the injected adapter may submit a mutation. */
 export function createNavigationControl(adapter: Adapter, catalog: LevelCatalog,
@@ -32,10 +32,11 @@ export function createNavigationControl(adapter: Adapter, catalog: LevelCatalog,
     if (submitting) return { status: 'blocked', reason: 'submitting' };
     // Entering Shop proves current account-only authority from committed storage.
     // Never let that reload silently discard an unrelated retained envelope.
-    if (next === 'shop' && route !== 'shop' && adapter.retainedKind() !== null) {
+    if ((next === 'shop' || next === 'game') && route !== next && adapter.retainedKind() !== null) {
       return { status: 'blocked', reason: 'operation-unresolved' };
     }
-    const read = next === 'shop' && route !== 'shop' ? adapter.reloadAuthority() : adapter.readAuthority();
+    const read = (next === 'shop' || next === 'game') && route !== next
+      ? adapter.reloadAuthority() : adapter.readAuthority();
     if (read.status === 'recovery' && next !== 'recovery' && next !== 'feedback') {
       route = 'recovery';
       return { status: 'recovery', reason: read.reason };
@@ -58,17 +59,17 @@ export function createNavigationControl(adapter: Adapter, catalog: LevelCatalog,
     const read = adapter.readAuthority();
     return read.status === 'available' ? projectLevelList(catalog, read.facts) : null;
   }
-  function afterFirst(target: string): NavigationResult {
+  function afterFirst(target: string, priorCommit: boolean): NavigationResult {
     const reread = adapter.reloadAuthority();
-    if (reread.status !== 'available') return { status: 'recovery', reason: reread.reason };
-    if (reread.facts.attempt !== null) return { status: 'blocked', reason: 'authority-changed' };
-    if (!canSelectLevel(catalog, reread.facts, target)) return { status: 'blocked', reason: 'level-unavailable' };
+    if (reread.status !== 'available') return { status: 'recovery', reason: reread.reason, priorCommit };
+    if (reread.facts.attempt !== null) return { status: 'blocked', reason: 'authority-changed', priorCommit };
+    if (!canSelectLevel(catalog, reread.facts, target)) return { status: 'blocked', reason: 'level-unavailable', priorCommit };
     const result = adapter.submit({ kind: 'start', levelId: target });
     if (result.status === 'committed') { route = 'game'; selection = null; return { status: 'committed', outcome: result }; }
     if (result.status === 'rejected' && result.policy.retainEnvelope) {
       selection = { target, observed: stamp(reread), phase: 'second-retry' };
     } else selection = null;
-    return { status: 'rejected', outcome: result };
+    return { status: 'rejected', outcome: result, priorCommit };
   }
   function selectLevel(target: string): NavigationResult {
     if (submitting || selection !== null || adapter.retainedKind() !== null) return { status: 'blocked', reason: 'operation-unresolved' };
@@ -85,7 +86,7 @@ export function createNavigationControl(adapter: Adapter, catalog: LevelCatalog,
       const reread = adapter.reloadAuthority();
       if (reread.status !== 'available') return { status: 'recovery', reason: reread.reason };
       if (!same(read, reread) || reread.facts.attempt !== null) return { status: 'blocked', reason: 'authority-changed' };
-      return afterFirst(target);
+      return afterFirst(target, false);
     } finally { submitting = false; }
   }
   function confirmReplacement(): NavigationResult {
@@ -108,7 +109,7 @@ export function createNavigationControl(adapter: Adapter, catalog: LevelCatalog,
         }
         return { status: 'rejected', outcome: first };
       }
-      return afterFirst(bound.target);
+      return afterFirst(bound.target, true);
     } finally { submitting = false; }
   }
   function retryReplacement(): NavigationResult {
@@ -121,9 +122,9 @@ export function createNavigationControl(adapter: Adapter, catalog: LevelCatalog,
       const result = adapter.retryRetained();
       if (result.status !== 'committed') {
         if (!(result.status === 'rejected' && result.policy.retainEnvelope)) selection = null;
-        return { status: 'rejected', outcome: result };
+        return { status: 'rejected', outcome: result, priorCommit: bound.phase === 'second-retry' };
       }
-      if (bound.phase === 'first-retry') { selection = null; return afterFirst(bound.target); }
+      if (bound.phase === 'first-retry') { selection = null; return afterFirst(bound.target, true); }
       selection = null;
       route = 'game';
       return { status: 'committed', outcome: result };

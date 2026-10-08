@@ -46,7 +46,7 @@ export function renderNavigationPages(nav: HTMLElement, page: HTMLElement, route
   page.replaceChildren();
   if (view === null && route !== 'feedback') route = 'recovery';
   for (const item of ROUTES) {
-    if (route === 'recovery' && item.page !== 'feedback') continue;
+    if (view === null && item.page !== 'feedback') continue;
     const control = button(item.key, () => actions.navigate(item.page), `route-${item.page}`);
     control.setAttribute('aria-current', item.page === route ? 'page' : 'false');
     nav.append(control);
@@ -112,6 +112,7 @@ export function renderNavigationPages(nav: HTMLElement, page: HTMLElement, route
     const link = el('a', 'feedback.open-mail');
     link.href = 'mailto:qingchen6757@gmail.com';
     link.dataset.action = 'feedback-mail'; page.append(link);
+    if (view === null) page.append(button('nav.recovery', () => actions.navigate('recovery'), 'route-recovery'));
   }
   if (previous) {
     const next = [...nav.querySelectorAll<HTMLElement>('[data-action]'),

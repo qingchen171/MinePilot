@@ -57,10 +57,16 @@ const navigationPanel = document.querySelector<HTMLElement>('#navigation');
 const pagePanel = document.querySelector<HTMLElement>('#page');
 const gamePanel = document.querySelector<HTMLElement>('#game');
 const shopPanel = document.querySelector<HTMLElement>('#shop');
+document.title = presentationCopy('app.title');
+if (status !== null) status.textContent = presentationCopy('status.loading');
+navigationPanel?.setAttribute('aria-label', presentationCopy('nav.main-label'));
+gamePanel?.setAttribute('aria-label', presentationCopy('game.region-label'));
 if (shopPanel !== null && navigationPanel !== null && pagePanel !== null && presentationRoot !== null) {
   const resultMessage = (result: { readonly status: string; readonly reason?: string;
+    readonly priorCommit?: boolean;
     readonly outcome?: { readonly status: string; readonly copyKey: PresentationCopyKey } }): PresentationCopyKey | null => {
     if (result.status === 'committed') return 'status.committed';
+    if (result.priorCommit) return 'nav.two-step-gap';
     if (result.status === 'rejected') return result.outcome?.copyKey ?? 'error.unknown';
     if (result.status === 'recovery') return 'error.recovery';
     if (result.status !== 'blocked') return null;

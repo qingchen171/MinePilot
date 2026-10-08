@@ -6,7 +6,7 @@ test('Phaser initializes in a real browser', async ({ page }) => {
 
   await page.goto('/');
 
-  await expect(page).toHaveTitle('MinePilot Engineering Baseline');
+  await expect(page).toHaveTitle('MinePilot');
   await expect(page.locator('html')).toHaveAttribute('data-phaser-ready', 'true');
   await expect(page.locator('html')).toHaveAttribute('data-phaser-version', '3.90.0');
   await expect(page.getByRole('status')).toHaveText('Phaser 3 engineering baseline ready');

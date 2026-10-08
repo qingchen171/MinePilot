@@ -37,6 +37,16 @@ test('Shop presents trusted prices, one purchase per activation and explicit buy
   await expect(shop).toContainText('Coins: 19');
   await expect(shop).toContainText('Purchase saved.');
   await expect(shop.locator('button[data-shop-item]')).toHaveCount(0);
+  const writerIdentity = () => page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('minepilot:persistence:writer-lease') ?? 'null');
+    return { sessionId: stored?.sessionId, leaseToken: stored?.leaseToken };
+  });
+  const ownerBeforeRoute = await writerIdentity();
+  await page.getByRole('button', { name: 'Home' }).click();
+  await page.getByRole('button', { name: 'Shop', exact: true }).click();
+  await expect(shop).toContainText('Coins: 19');
+  await expect(shop.getByRole('button', { name: 'Buy again' })).toBeVisible();
+  expect(await writerIdentity()).toEqual(ownerBeforeRoute);
   const repeatPrevented = await shop.getByRole('button', { name: 'Buy again' }).evaluate((button) => {
     const repeatedEnter = new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true, cancelable: true });
     button.dispatchEvent(repeatedEnter);
@@ -46,8 +56,42 @@ test('Shop presents trusted prices, one purchase per activation and explicit buy
   await shop.getByRole('button', { name: 'Buy again' }).click();
   await shop.locator('button[data-shop-item="lucky"]').click();
   await expect(shop).toContainText('Coins: 18');
+  expect(await writerIdentity()).toEqual(ownerBeforeRoute);
   await page.reload();
   await page.getByRole('button', { name: 'Shop' }).click();
   await expect(shop).toContainText('Coins: 18');
   await expect(shop).toContainText('Lucky — 1 coins · Owned: 3');
+});
+
+test('Shop exit cancels a retained purchase Retry without silently re-authorizing it', async ({ page }) => {
+  const entries = savedAccount();
+  await page.addInitScript((values) => {
+    for (const [key, value] of values) localStorage.setItem(key, value);
+  }, entries);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Shop', exact: true }).click();
+  await page.evaluate(() => {
+    const original = Storage.prototype.getItem;
+    let once = true;
+    Storage.prototype.getItem = function (key) {
+      if (once && key === 'minepilot:persistence:writer-lease') {
+        once = false;
+        throw new Error('browser-injected pre-commit lease read failure');
+      }
+      return original.call(this, key);
+    };
+  });
+  const shop = page.locator('#shop');
+  await shop.locator('button[data-shop-item="lucky"]').click();
+  await expect(shop.getByRole('button', { name: 'Try again' })).toBeVisible();
+  await page.getByRole('button', { name: 'Home' }).click();
+  await page.getByRole('button', { name: 'Shop', exact: true }).click();
+  await expect(shop.getByRole('button', { name: 'Try again' })).toHaveCount(0);
+  await expect(shop.getByRole('button', { name: 'Reload game' })).toBeVisible();
+  await expect(shop).toContainText('Coins: 20');
+  await shop.getByRole('button', { name: 'Reload game' }).click();
+  await expect(shop.getByRole('button', { name: 'Buy again' })).toBeVisible();
+  await shop.getByRole('button', { name: 'Buy again' }).click();
+  await shop.locator('button[data-shop-item="lucky"]').click();
+  await expect(shop).toContainText('Coins: 19');
 });

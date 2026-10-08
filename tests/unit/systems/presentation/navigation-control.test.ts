@@ -167,7 +167,8 @@ describe('S5-05 trusted navigation and replacement', () => {
     const f = fixture();
     f.nav.selectLevel('level-002');
     f.failNext('start', 'commit-persistence-commit-failure');
-    expect(f.nav.confirmReplacement()).toMatchObject({ status: 'rejected', outcome: { reason: 'commit-persistence-commit-failure' } });
+    expect(f.nav.confirmReplacement()).toMatchObject({ status: 'rejected', priorCommit: true,
+      outcome: { reason: 'commit-persistence-commit-failure' } });
     expect(f.intents.map((value) => value.kind)).toEqual(['abandon', 'start']);
     expect(f.authority()).toMatchObject({ runtime: { currentAttempt: null }, persistence: { revision: 6 } });
     expect(f.nav.pendingSelection()).toBeNull();
@@ -186,8 +187,16 @@ describe('S5-05 trusted navigation and replacement', () => {
     const f = fixture();
     f.nav.selectLevel('level-002');
     f.onReload((count) => { if (count === 2) f.setAuthority({ status: 'unavailable-snapshot' }); });
-    expect(f.nav.confirmReplacement()).toMatchObject({ status: 'recovery' });
+    expect(f.nav.confirmReplacement()).toMatchObject({ status: 'recovery', priorCommit: true });
     expect(f.intents.map((intent) => intent.kind)).toEqual(['abandon']);
+  });
+
+  it('Continue rereads committed authority and cannot display an obsolete cached Attempt', () => {
+    const f = fixture();
+    f.onReload((count) => { if (count === 1) f.setAuthority(accountOnly(6)); });
+    expect(f.nav.navigate('game')).toMatchObject({ status: 'blocked', reason: 'no-attempt' });
+    expect(f.nav.route()).toBe('home');
+    expect(f.intents).toHaveLength(0);
   });
 
   it('does not Start when the target becomes locked after the first committed step', () => {
@@ -218,6 +227,31 @@ describe('S5-05 trusted navigation and replacement', () => {
     expect(f.intents.map((intent) => intent.kind)).toEqual(['abandon', 'start', 'start']);
     expect(f.intents[2]).toBe(firstStart);
     expect(f.nav.route()).toBe('game');
+  });
+
+  it('retries a proven pre-commit first step without creating another lifecycle envelope', () => {
+    const f = fixture();
+    f.failNext('abandon', 'storage-failure');
+    f.nav.selectLevel('level-002');
+    expect(f.nav.confirmReplacement()).toMatchObject({ status: 'rejected', outcome: { policy: { retainEnvelope: true } } });
+    const first = f.intents[0];
+    expect(f.nav.retryReplacement().status).toBe('committed');
+    expect(f.intents.map((intent) => intent.kind)).toEqual(['abandon', 'abandon', 'start']);
+    expect(f.intents[1]).toBe(first);
+    expect(f.technical.nextRunId).toHaveBeenCalledTimes(1);
+  });
+
+  it('never replays an uncertain second-step Start or rebuilds its creation facts', () => {
+    const f = fixture();
+    f.failNext('start', 'commit-commit-outcome-uncertain');
+    f.nav.selectLevel('level-002');
+    expect(f.nav.confirmReplacement()).toMatchObject({ status: 'rejected', outcome: {
+      reason: 'commit-commit-outcome-uncertain', policy: { retainEnvelope: false },
+    } });
+    expect(f.intents.map((intent) => intent.kind)).toEqual(['abandon', 'start']);
+    expect(f.nav.retryReplacement()).toMatchObject({ status: 'blocked' });
+    expect(f.technical.nextRunId).toHaveBeenCalledTimes(1);
+    expect(f.authority()).toMatchObject({ runtime: { currentAttempt: null } });
   });
 
   it('never continues to Start after first-step uncertainty or ownership loss', () => {

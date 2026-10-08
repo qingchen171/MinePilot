@@ -53,7 +53,7 @@ function fixture() {
   };
   const technical = { nextRunId: vi.fn(() => 'new-run'), nextGenerationSeed: vi.fn(() => 123), nextDetectionSeed: vi.fn(() => 1) };
   const root = createPresentationRoot(port, technical, null, catalog);
-  return { root, storage, technical };
+  return { root, storage, technical, port };
 }
 
 describe('S5-05 controlled-catalog v4 production chain', () => {
@@ -87,5 +87,11 @@ describe('S5-05 controlled-catalog v4 production chain', () => {
       runtime: { currentAttempt: null } });
     expect(second.root.navigation.pendingSelection()).toBeNull();
     expect(second.technical.nextRunId).toHaveBeenCalledTimes(1);
+    // A fresh presentation lifetime sees only committed account-only authority, not a queued target.
+    second.port.reload();
+    const reopened = createPresentationRoot(second.port, second.technical, null, catalog);
+    expect(reopened.navigation.route()).toBe('home');
+    expect(reopened.navigation.pendingSelection()).toBeNull();
+    expect(reopened.read()).toMatchObject({ status: 'loaded', view: { attempt: null } });
   });
 });

@@ -1,5 +1,6 @@
 /** Working-language semantic resources. Stage 6 owns full bilingual delivery. */
 export const PRESENTATION_COPY = Object.freeze({
+  'app.title': 'MinePilot',
   'status.loading': 'Loading your game…',
   'status.unavailable': 'We could not safely open this game. Your saved progress has not been changed.',
   'status.committed': 'Saved.',
@@ -35,6 +36,7 @@ export const PRESENTATION_COPY = Object.freeze({
   'tutorial.already-acknowledged': 'This tutorial step is already marked complete.',
   'error.legacy-read-only': 'This older attempt can be viewed, but cannot be changed until it is dismissed.',
   'nav.home': 'Home',
+  'nav.main-label': 'Main navigation',
   'nav.levels': 'Levels',
   'nav.game': 'Game',
   'nav.shop': 'Shop',
@@ -57,7 +59,7 @@ export const PRESENTATION_COPY = Object.freeze({
   'nav.level-unavailable': 'This level is unavailable. Your saved game has not changed.',
   'nav.authority-changed': 'Your saved game changed. Reload and choose again.',
   'nav.operation-unresolved': 'Finish or cancel the current action first.',
-  'nav.two-step-gap': 'The old attempt was saved as closed. Starting the new level did not finish; reload before choosing again.',
+  'nav.two-step-gap': 'The old attempt was saved as closed. Reload to check the current save; do not assume the new level started or the old attempt was restored.',
   'settings.title': 'Settings',
   'settings.music': 'Music enabled',
   'settings.effects': 'Sound effects enabled',
@@ -68,6 +70,7 @@ export const PRESENTATION_COPY = Object.freeze({
   'recovery.title': 'Saved game unavailable',
   'recovery.note': 'Reload to try reading your save again, or contact us. Nothing has been reset or overwritten.',
   'game.placeholder': 'The current attempt is ready. Board controls arrive in the next presentation task.',
+  'game.region-label': 'Game presentation',
   'home.account': 'Your account',
   'home.attempt': 'An attempt is in progress.',
   'home.no-attempt': 'Choose a level to begin.',
