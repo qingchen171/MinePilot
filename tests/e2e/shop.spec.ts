@@ -95,3 +95,44 @@ test('Shop exit cancels a retained purchase Retry without silently re-authorizin
   await shop.locator('button[data-shop-item="lucky"]').click();
   await expect(shop).toContainText('Coins: 19');
 });
+
+test('Shop reload exits when another tab commits an active Attempt', async ({ page }) => {
+  await page.addInitScript((values) => {
+    if (sessionStorage.getItem('shop-fixture-seeded') === 'yes') return;
+    for (const [key, value] of values) localStorage.setItem(key, value);
+    sessionStorage.setItem('shop-fixture-seeded', 'yes');
+  }, savedAccount());
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Shop', exact: true }).click();
+  const shop = page.locator('#shop');
+  await page.evaluate(() => {
+    const original = Storage.prototype.getItem;
+    let once = true;
+    Storage.prototype.getItem = function (key) {
+      if (once && key === 'minepilot:persistence:writer-lease') {
+        once = false;
+        throw new Error('browser-injected pre-commit lease read failure');
+      }
+      return original.call(this, key);
+    };
+  });
+  await shop.locator('button[data-shop-item="lucky"]').click();
+  await expect(shop.getByRole('button', { name: 'Try again' })).toBeVisible();
+  await page.getByRole('button', { name: 'Home' }).click();
+  await page.getByRole('button', { name: 'Shop', exact: true }).click();
+  await expect(shop.getByRole('button', { name: 'Reload game' })).toBeVisible();
+
+  const rival = await page.context().newPage();
+  await rival.goto('/');
+  await rival.getByRole('button', { name: 'Levels' }).first().click();
+  await rival.locator('[data-level-id="level-001"]').click();
+  await expect(rival.getByRole('heading', { name: 'Game' })).toBeVisible();
+  const committedHead = await page.evaluate(() => localStorage.getItem('minepilot:persistence:head'));
+
+  await shop.getByRole('button', { name: 'Reload game' }).click();
+  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
+  await expect(shop).toBeHidden();
+  expect(await page.evaluate(() => localStorage.getItem('minepilot:persistence:head'))).toBe(committedHead);
+  await rival.close();
+});

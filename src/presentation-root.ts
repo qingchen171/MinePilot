@@ -39,6 +39,12 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
     adapter.cancelRetainedKind('purchase');
     shop.afterExit();
   });
+  const reloadAndReconcile = () => {
+    const snapshot = adapter.reload();
+    navigation.reconcileReloaded(snapshot);
+    shop.afterReload(snapshot);
+    return project(snapshot);
+  };
   return Object.freeze({
     navigation: Object.freeze({
       route: navigation.route,
@@ -58,11 +64,7 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
       leaveAttemptForShop: navigation.leaveAttemptForShop,
     }),
     read: () => project(adapter.read()),
-    reload: () => {
-      const snapshot = adapter.reload();
-      shop.afterReload(snapshot);
-      return project(snapshot);
-    },
+    reload: reloadAndReconcile,
     submit: (choice: Exclude<SemanticIntent, { readonly kind: 'purchase' }>) => {
       const result = adapter.submit(choice);
       return result.status === 'committed'
@@ -73,7 +75,10 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
         : result;
     },
     retryRetained: () => {
+      const retained = adapter.retainedKind();
       const result = adapter.retryRetained();
+      if (retained === 'purchase') shop.afterRetainedRetry(result);
+      navigation.reconcileReloaded(adapter.read());
       return result.status === 'committed'
         ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey }
         : result;
@@ -90,14 +95,11 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
         : result;
     },
     shopBuyAgain: () => shop.buyAgain(),
-    shopReload: () => {
-      const snapshot = adapter.reload();
-      shop.afterReload(snapshot);
-      return project(snapshot);
-    },
+    shopReload: reloadAndReconcile,
     shopRetryRetained: () => {
       const result = adapter.retryRetained();
       shop.afterRetainedRetry(result);
+      navigation.reconcileReloaded(adapter.read());
       return result.status === 'committed'
         ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey }
         : result;
