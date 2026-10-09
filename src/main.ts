@@ -73,7 +73,8 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
       ? { kind: 'move', coordinate: action.coordinate }
       : { kind: 'flag', coordinate: action.coordinate, flagged: action.flagged === true });
     draw(outcome.status === 'committed' ? 'status.committed' : outcome.copyKey);
-  });
+  }, () => pagePanel.querySelector<HTMLElement>('h2')?.focus());
+  presentationRoot.onAuthorityReload(() => board.invalidateAuthority());
   const drawBoard = () => {
     const current = presentationRoot.read();
     const route = presentationRoot.navigation.route();

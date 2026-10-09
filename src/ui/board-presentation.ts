@@ -12,7 +12,7 @@ const cellKey = {
 
 /** Disposable DOM hit surface. It consumes only public facts; Phaser never submits input. */
 export function createBoardPresentation(stage: HTMLElement, controls: HTMLElement,
-  submit: (action: BoardAction) => void) {
+  submit: (action: BoardAction) => void, focusFallback: () => void) {
   const grid = document.createElement('div');
   grid.className = 'board-hit-grid';
   grid.setAttribute('role', 'grid');
@@ -29,6 +29,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
   let cells: HTMLButtonElement[] = [];
   const number = document.createElement('p'); number.className = 'board-current-number';
   const phase = document.createElement('p'); phase.className = 'board-phase';
+  const positionLabel = document.createElement('p'); positionLabel.className = 'board-position';
   const selectedLabel = document.createElement('p'); selectedLabel.className = 'board-selected';
   const flag = document.createElement('button'); flag.type = 'button'; flag.dataset.action = 'board-flag';
   flag.textContent = presentationCopy('game.flag-target');
@@ -37,7 +38,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
   const flagMode = document.createElement('button'); flagMode.type = 'button'; flagMode.dataset.action = 'touch-flag';
   flagMode.textContent = presentationCopy('game.mode.flag');
   const modes = document.createElement('div'); modes.className = 'board-touch-modes'; modes.append(moveMode, flagMode);
-  controls.append(phase, number, selectedLabel, flag, modes);
+  controls.append(phase, positionLabel, number, selectedLabel, flag, modes);
 
   function targetOf(element: Element | null): BoardTarget | null {
     const cell = element?.closest<HTMLButtonElement>('[data-cell-index]');
@@ -67,6 +68,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
   grid.addEventListener('pointerdown', (event) => {
     const target = targetOf(event.target instanceof Element ? event.target : null);
     if (target === null) return;
+    gate.newPress();
     pointerType = event.pointerType; pointerTarget = target; select(target);
   });
   grid.addEventListener('mousedown', (event) => {
@@ -82,7 +84,8 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
   });
   grid.addEventListener('click', (event) => {
     const target = targetOf(event.target instanceof Element ? event.target : null);
-    if (target === null || !enabled || gate.consumeCompanionClick(target, event.detail)) return;
+    if (target === null || !enabled || gate.consumeContextClick(target) ||
+        gate.consumeCompanionClick(target, event.detail)) return;
     const fromTouch = pointerType === 'touch' && pointerTarget?.x === target.x && pointerTarget?.y === target.y;
     if (!gate.pointer(target, event.detail)) return;
     perform(fromTouch && touchMode === 'flag' ? 'flag' : 'move', target);
@@ -92,6 +95,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     const target = targetOf(event.target instanceof Element ? event.target : null);
     if (target === null) return;
     event.preventDefault();
+    if (pointerTarget?.x === target.x && pointerTarget?.y === target.y) gate.markContextMenu(target);
     if (enabled && gate.pointer(target, secondaryPressCount)) perform('flag', target);
     secondaryPressCount = 1;
   });
@@ -150,6 +154,8 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     grid.style.width = `${layout.columns * layout.cellSize}px`;
     grid.style.height = `${layout.rows * layout.cellSize}px`;
     phase.textContent = presentationCopy(`game.phase.${next.phase}`);
+    positionLabel.textContent = next.position.kind === 'waiting' ? presentationCopy('game.position.waiting') :
+      `${presentationCopy(`game.position.${next.position.kind}`)} ${next.position.y + 1}, ${next.position.x + 1}`;
     number.textContent = currentNumber.kind === 'number' ?
       `${presentationCopy('game.current-number')} ${currentNumber.value}` :
       currentNumber.kind === 'zero-feedback' ? presentationCopy('game.zero-feedback') : '';
@@ -160,15 +166,22 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
       cell.style.left = `${rect.x - layout.originX}px`; cell.style.top = `${rect.y - layout.originY}px`;
       cell.style.width = `${rect.width}px`; cell.style.height = `${rect.height}px`;
       cell.dataset.appearance = appearance;
-      cell.setAttribute('aria-label', `${presentationCopy('game.row')} ${y + 1}, ${presentationCopy('game.column')} ${x + 1}, ${presentationCopy(cellKey[appearance])}`);
+      const occupied = next.position.kind !== 'waiting' && next.position.x === x && next.position.y === y;
+      cell.dataset.character = String(occupied);
+      cell.setAttribute('aria-label', `${presentationCopy('game.row')} ${y + 1}, ${presentationCopy('game.column')} ${x + 1}, ${presentationCopy(cellKey[appearance])}${occupied ? `, ${presentationCopy('game.character-here')}` : ''}`);
       cell.disabled = !enabled;
     }
     updateSelection();
   }
   function clear() {
+    invalidateAuthority();
     attempt = null; enabled = false; selected = null; pointerTarget = null; gate.reset();
     grid.replaceChildren(); cells = []; flag.disabled = true;
-    number.textContent = ''; phase.textContent = ''; selectedLabel.textContent = '';
+    number.textContent = ''; phase.textContent = ''; positionLabel.textContent = ''; selectedLabel.textContent = '';
   }
-  return Object.freeze({ render, clear });
+  function invalidateAuthority() {
+    if (document.activeElement instanceof Node && grid.contains(document.activeElement)) focusFallback();
+    enabled = false; selected = null; pointerTarget = null; gate.reset(); updateSelection();
+  }
+  return Object.freeze({ render, clear, invalidateAuthority });
 }

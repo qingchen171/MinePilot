@@ -3,6 +3,7 @@ import { createPresentationRoot } from '../../src/presentation-root';
 import { createProductionStage4Session } from '../../src/systems/persistence/production-stage4-runtime';
 import { loadCommittedSnapshot, SNAPSHOT_STORAGE_KEYS } from '../../src/systems/persistence/crash-safe-snapshot-store';
 import { MemoryStorage } from '../helpers/memory-storage';
+import { boardBrowserSave } from '../helpers/s5-06-browser-save';
 
 const owner = { sessionId: 'board-presentation', leaseToken: 'board-presentation-token' };
 const clock = { nowMs: () => 100 };
@@ -20,6 +21,15 @@ function fixture() {
 }
 
 describe('S5-06 public board through the real guarded production session', () => {
+  it.each(['pending', 'failed', 'won', 'occupancy', 'zero', 'number'] as const)(
+    'constructs a valid committed %s browser scenario without production test hooks', (variant) => {
+      const fixture = boardBrowserSave(variant);
+      const storage = new MemoryStorage();
+      for (const [key, value] of fixture.entries) storage.data.set(key, value);
+      const root = createPresentationRoot(createProductionStage4Session(storage, owner, clock), facts);
+      expect(root.read()).toMatchObject({ status: 'loaded', view: { attempt: { board: { width: 9, height: 9 } } } });
+    },
+  );
   it('submits a real public target, commits Save v4, and reconstructs exactly on reopen', () => {
     const f = fixture();
     const cells = f.attempt.run.board.cells;

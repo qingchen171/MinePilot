@@ -22,4 +22,14 @@ describe('native board activation gate', () => {
     expect(gate.consumeCompanionClick(target, 0)).toBe(false);
     expect(gate.pointer(target, 0)).toBe(true);
   });
+
+  it('consumes a touch compatibility click from a contextmenu, but permits a new press', () => {
+    const gate = createBoardActivationGate(); const target = { x: 3, y: 4 };
+    gate.newPress(); gate.markContextMenu(target);
+    expect(gate.consumeContextClick(target)).toBe(true);
+    expect(gate.consumeContextClick(target)).toBe(false);
+    gate.markContextMenu(target);
+    gate.newPress();
+    expect(gate.consumeContextClick(target)).toBe(false);
+  });
 });
