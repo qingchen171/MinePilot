@@ -423,6 +423,44 @@ describe('S5-05 trusted navigation and replacement', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it('a committed reload cannot leave Game active after a competing legal leave', () => {
+    for (const phase of ['active', 'pending-mine-encounter', 'failed', 'won'] as const) {
+      const initial = loaded(phase === 'active' ? attempt() : phase === 'won' ? won() : encountered(phase));
+      let cached: SessionRead = initial;
+      let committed: SessionRead = initial;
+      const execute = vi.fn(() => ({ status: 'rejected' as const, reason: 'unexpected-mutation' }));
+      const root = createPresentationRoot({ read: () => cached,
+        reload: () => { cached = committed; return cached; }, execute }, tech(), shopCatalog, catalog);
+      expect(root.navigation.navigate('game').status).toBe('navigated');
+      expect(root.navigation.route()).toBe('game');
+      committed = accountOnly(6);
+      expect(root.reload()).toMatchObject({ status: 'loaded', view: { attempt: null } });
+      expect(root.navigation.route()).toBe('home');
+      expect(execute).not.toHaveBeenCalled();
+    }
+  });
+
+  it('both reload entrypoints preserve a real Game and send an unavailable Game to Recovery', () => {
+    const initial = loaded();
+    let cached: SessionRead = initial;
+    let committed: SessionRead = initial;
+    const execute = vi.fn(() => ({ status: 'rejected' as const, reason: 'unexpected-mutation' }));
+    const root = createPresentationRoot({ read: () => cached,
+      reload: () => { cached = committed; return cached; }, execute }, tech(), shopCatalog, catalog);
+    expect(root.navigation.navigate('game').status).toBe('navigated');
+    expect(root.reload()).toMatchObject({ status: 'loaded', view: { attempt: { phase: 'active' } } });
+    expect(root.navigation.route()).toBe('game');
+    committed = accountOnly(6);
+    expect(root.shopReload()).toMatchObject({ status: 'loaded', view: { attempt: null } });
+    expect(root.navigation.route()).toBe('home');
+    committed = loaded();
+    expect(root.navigation.navigate('game').status).toBe('navigated');
+    committed = { status: 'unavailable-snapshot' };
+    expect(root.reload().status).toBe('recovery');
+    expect(root.navigation.route()).toBe('recovery');
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it('does not cancel an unrelated retained operation when exiting Shop', () => {
     const fresh: SessionRead = { status: 'fresh', persistence: { kind: 'no-save' }, runtime: createInitialStage4GameState() };
     const execute = vi.fn(() => ({ status: 'rejected' as const, reason: 'storage-failure' }));

@@ -37,6 +37,8 @@ export function createNavigationControl(adapter: Adapter, catalog: LevelCatalog,
     } else if (route === 'shop' && (snapshot.facts.attempt !== null || snapshot.facts.shop.status !== 'available')) {
       leaveShop();
       route = 'home';
+    } else if (route === 'game' && snapshot.facts.attempt === null) {
+      route = 'home';
     }
   }
   function navigate(next: PageRoute): NavigationResult {
