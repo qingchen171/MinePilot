@@ -107,7 +107,10 @@ test('an unavailable save reload leaves Game for non-destructive Recovery', asyn
   await page.getByRole('button', { name: 'Levels' }).first().click();
   await page.locator('[data-level-id="level-001"]').click();
   await expect(page.getByRole('heading', { name: 'Game' })).toBeVisible();
-  await page.evaluate(() => localStorage.setItem('minepilot:persistence:head', '{corrupt'));
+  await page.evaluate(() => {
+    localStorage.setItem('minepilot:persistence:head', '{corrupt');
+    localStorage.setItem('minepilot:persistence:head-backup', '{corrupt');
+  });
   await page.evaluate(async () => {
     const modulePath: string = '/src/main.ts';
     const { presentationRoot } = await import(modulePath);
@@ -119,6 +122,7 @@ test('an unavailable save reload leaves Game for non-destructive Recovery', asyn
   await expect(page.locator('#game')).toBeHidden();
   await expect(page.getByRole('button', { name: 'Leave attempt to open Shop' })).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('minepilot:persistence:head'))).toBe('{corrupt');
+  expect(await page.evaluate(() => localStorage.getItem('minepilot:persistence:head-backup'))).toBe('{corrupt');
 });
 
 test('corrupt persisted pointer opens non-destructive Recovery and user-initiated Feedback', async ({ page }) => {
