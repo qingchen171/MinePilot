@@ -94,7 +94,7 @@ export function renderNavigationPages(nav: HTMLElement, page: HTMLElement, route
       page.append(row);
     }
   } else if (route === 'game' && view) {
-    page.append(el('p', 'game.placeholder'));
+    page.append(el('p', 'game.ready'));
     if (view.attempt) {
       const current = document.createElement('p'); current.textContent = view.attempt.levelId; page.append(current);
       page.append(button('nav.leave-for-shop', actions.leaveForShop, 'leave-for-shop'));
