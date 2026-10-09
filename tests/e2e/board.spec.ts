@@ -98,10 +98,10 @@ test('touch mode is visible and changes only touch activation, not desktop prima
   await expect(second).toHaveAttribute('data-appearance', 'flagged');
 });
 
-test('public phase, occupancy and number feedback reconstruct from valid committed v4 snapshots', async ({ page }) => {
-  for (const variant of ['pending', 'failed', 'won', 'occupancy', 'zero', 'number'] as const) {
+for (const variant of ['pending', 'failed', 'won', 'occupancy', 'zero', 'number'] as const) {
+  test(`public ${variant} feedback reconstructs from a valid committed v4 snapshot`, async ({ page }) => {
     const fixture = boardBrowserSave(variant);
-    const scenario = await page.context().newPage();
+    const scenario = page;
     await scenario.addInitScript((entries: [string, string][]) => {
       localStorage.clear();
       for (const [key, value] of entries) localStorage.setItem(key, value);
@@ -132,9 +132,8 @@ test('public phase, occupancy and number feedback reconstruct from valid committ
       await expect(scenario.locator('.board-current-number')).toHaveText(`Nearby mines: ${fixture.expectedNumber}`);
     }
     await scenario.reload();
-    await scenario.close();
-  }
-});
+  });
+}
 
 test('a committed-authority reload disables an old same-size board press and restores safe focus', async ({ page }) => {
   await openBoard(page);
