@@ -62,6 +62,69 @@ test('explicit saved leave is required before Shop, with no automatic re-entry p
   await expect(page.getByRole('button', { name: 'Continue' })).toHaveCount(0);
 });
 
+test('two tabs: a committed competing abandon removes an obsolete Game route on authority reload', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Levels' }).first().click();
+  await page.locator('[data-level-id="level-001"]').click();
+  await expect(page.getByRole('heading', { name: 'Game' })).toBeVisible();
+
+  const otherTab = await page.context().newPage();
+  await otherTab.goto('/');
+  await otherTab.getByRole('button', { name: 'Continue' }).click();
+  await otherTab.evaluate(() => {
+    const key = 'minepilot:persistence:writer-lease';
+    const raw = localStorage.getItem(key);
+    if (raw === null) throw new Error('expected first-tab writer lease');
+    const lease = JSON.parse(raw) as { expiresAtMs: number };
+    localStorage.setItem(key, JSON.stringify({ ...lease, expiresAtMs: Date.now() - 1 }));
+  });
+  await otherTab.getByRole('button', { name: 'Leave attempt to open Shop' }).click();
+  await expect(otherTab.locator('#shop')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Game' })).toBeVisible();
+
+  const persistedBefore = await page.evaluate(() => Object.keys(localStorage)
+    .filter((key) => key.startsWith('minepilot:persistence:')).sort()
+    .map((key) => [key, localStorage.getItem(key)]));
+  await page.evaluate(async () => {
+    const modulePath: string = '/src/main.ts';
+    const { presentationRoot } = await import(modulePath);
+    if (presentationRoot === null) throw new Error('presentation root unavailable');
+    presentationRoot.reload();
+  });
+  await page.getByRole('button', { name: 'Game', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+  await expect(page.locator('#game')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Leave attempt to open Shop' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Continue' })).toHaveCount(0);
+  const persistedAfter = await page.evaluate(() => Object.keys(localStorage)
+    .filter((key) => key.startsWith('minepilot:persistence:')).sort()
+    .map((key) => [key, localStorage.getItem(key)]));
+  expect(persistedAfter).toEqual(persistedBefore);
+});
+
+test('an unavailable save reload leaves Game for non-destructive Recovery', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Levels' }).first().click();
+  await page.locator('[data-level-id="level-001"]').click();
+  await expect(page.getByRole('heading', { name: 'Game' })).toBeVisible();
+  await page.evaluate(() => {
+    localStorage.setItem('minepilot:persistence:head', '{corrupt');
+    localStorage.setItem('minepilot:persistence:head-backup', '{corrupt');
+  });
+  await page.evaluate(async () => {
+    const modulePath: string = '/src/main.ts';
+    const { presentationRoot } = await import(modulePath);
+    if (presentationRoot === null) throw new Error('presentation root unavailable');
+    presentationRoot.reload();
+  });
+  await page.getByRole('button', { name: 'Game', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Recovery' })).toBeVisible();
+  await expect(page.locator('#game')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Leave attempt to open Shop' })).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('minepilot:persistence:head'))).toBe('{corrupt');
+  expect(await page.evaluate(() => localStorage.getItem('minepilot:persistence:head-backup'))).toBe('{corrupt');
+});
+
 test('corrupt persisted pointer opens non-destructive Recovery and user-initiated Feedback', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('minepilot:persistence:head', '{corrupt'));
   await page.goto('/');
