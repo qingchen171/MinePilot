@@ -10,7 +10,7 @@ import { mapStage4RuntimeToSaveV4 } from '../../src/core/persistence/stage4-runt
 import { commitSnapshot } from '../../src/systems/persistence/crash-safe-snapshot-store';
 import { MemoryStorage } from './memory-storage';
 
-type Variant = 'pending' | 'failed' | 'won' | 'occupancy' | 'zero' | 'number';
+type Variant = 'pending' | 'failed' | 'won' | 'occupancy' | 'zero' | 'number' | 'benben-available';
 
 /** Real valid v4 snapshot. Fixture construction never enters production UI or catalog. */
 export function boardBrowserSave(variant: Variant) {
@@ -48,6 +48,8 @@ export function boardBrowserSave(variant: Variant) {
     rewards = attempt.rewards.map((reward) => ({ ...reward, claimed: true }));
     account = { ...account, completedLevelIds: ['level-001'] };
     terminalDisposition = 'settled';
+  } else if (variant === 'benben-available') {
+    account = { ...account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] };
   } else {
     const rewardCells = new Set(attempt.rewards.map((reward) => `${reward.coordinate.x},${reward.coordinate.y}`));
     const index = board.cells.findIndex((cell, i) => cell.kind === 'safe' &&

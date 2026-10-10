@@ -64,3 +64,42 @@ test('account-only Shop offers the persisted first-shop tutorial without buying'
   await page.getByRole('button', { name: 'Shop' }).first().click();
   await expect(page.locator('[data-action="tutorial-first-shop"]')).toHaveCount(0);
 });
+
+test('Benben claim is a separate guarded action and the temporary card survives F5', async ({ page }) => {
+  const fixture = boardBrowserSave('benben-available');
+  await page.addInitScript((entries: [string, string][]) => {
+    localStorage.clear(); for (const [key, value] of entries) localStorage.setItem(key, value);
+  }, fixture.entries);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.locator('[data-game-action="claim-benben"]')).toBeEnabled();
+  const before = await revision(page);
+  await page.locator('[data-game-action="defer-benben"]').click();
+  expect(await revision(page)).toBe(before);
+  await page.reload();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.locator('[data-game-action="claim-benben"]').click();
+  expect(await revision(page)).toBe(before + 1);
+  await expect(page.locator('.game-detail')).toContainText('Temporary item');
+  await expect(page.locator('[data-game-action="claim-benben"]')).toHaveCount(0);
+  await page.reload();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.locator('.game-detail')).toContainText('Temporary item');
+});
+
+test('committed win offers Replay/Dismiss but not unavailable Next in the one-level catalog', async ({ page }) => {
+  const fixture = boardBrowserSave('won');
+  await page.addInitScript((entries: [string, string][]) => {
+    localStorage.clear(); for (const [key, value] of entries) localStorage.setItem(key, value);
+  }, fixture.entries);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.locator('[data-game-action="replay"]')).toBeVisible();
+  await expect(page.locator('[data-game-action="next"]')).toHaveCount(0);
+  await expect(page.locator('[data-game-action="dismiss"]')).toBeVisible();
+  await expect(page.locator('[data-game-action="detection"]')).toHaveCount(0);
+  const before = await revision(page);
+  await page.locator('[data-game-action="dismiss"]').click();
+  expect(await revision(page)).toBe(before + 1);
+  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+});

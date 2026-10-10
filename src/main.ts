@@ -119,9 +119,9 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
   };
   const afterGameOutcome = (outcome: ReturnType<typeof presentationRoot.submit> |
     NonNullable<ReturnType<typeof presentationRoot.gameRetry>>, eventMilestone: GameMilestone | null = null) => {
+    if (outcome.status === 'committed') { board.invalidateAuthority(); gamePresentation.afterCommit(); }
     visibleReceipt = outcome.status === 'committed' ? outcome.rewardReceipt ?? null : null;
     visibleMilestone = eventMilestone;
-    if (outcome.status === 'committed') { board.invalidateAuthority(); gamePresentation.afterCommit(); }
     draw(outcome.status === 'committed' ? outcome.copyKey : outcome.copyKey,
       outcome.status === 'committed' ? outcome.snapshot : null);
   };

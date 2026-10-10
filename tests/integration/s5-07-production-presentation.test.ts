@@ -3,6 +3,7 @@ import { createPresentationRoot } from '../../src/presentation-root';
 import { createProductionStage4Session } from '../../src/systems/persistence/production-stage4-runtime';
 import { loadCommittedSnapshot, SNAPSHOT_STORAGE_KEYS } from '../../src/systems/persistence/crash-safe-snapshot-store';
 import { MemoryStorage } from '../helpers/memory-storage';
+import { countAdjacentMines } from '../../src/core/neighborhood';
 
 const identity = { sessionId: 's5-07', leaseToken: 's5-07-token' };
 const clock = { nowMs: () => 100 };
@@ -78,6 +79,34 @@ describe('S5-07 public presentation over the guarded production session', () => 
     expect(f.root.read()).toEqual(before);
     expect(loadCommittedSnapshot(f.storage)).toMatchObject({ status: 'loaded', revision: 0 });
     expect(f.root.gameRetryAvailable()).toBe(false);
+  });
+
+  it('keeps no-target Detection zero-cost and commits a successful adjacent scan exactly once', () => {
+    for (const [neighborCount, shouldCommit] of [[0, false], [1, true]] as const) {
+      const f = setup();
+      const board = f.attempt.run.board;
+      const width = board.dimensions.width;
+      const index = board.cells.findIndex((cell, at) => cell.kind === 'safe' &&
+        (shouldCommit ? countAdjacentMines(board, coordinate(at, width)) > 0 :
+          countAdjacentMines(board, coordinate(at, width)) === neighborCount));
+      expect(index).toBeGreaterThanOrEqual(0);
+      const moved = f.root.submit({ kind: 'move', coordinate: coordinate(index, width) });
+      expect(moved.status).toBe('committed');
+      const before = f.root.read();
+      const priorRevision = loadCommittedSnapshot(f.storage);
+      const detection = f.root.submit({ kind: 'detection' });
+      if (shouldCommit) {
+        expect(detection).toMatchObject({ status: 'committed', snapshot: { status: 'loaded', view: {
+          account: { inventory: { detection: 1 } }, attempt: { itemUses: { detection: 1 } },
+        } } });
+        expect(createPresentationRoot(createProductionStage4Session(f.storage, identity, clock), technical).read())
+          .toEqual(f.root.read());
+      } else {
+        expect(detection).toMatchObject({ status: 'rejected', reason: 'no-hidden-mine' });
+        expect(f.root.read()).toEqual(before);
+        expect(loadCommittedSnapshot(f.storage)).toEqual(priorRevision);
+      }
+    }
   });
 
   it('persists explicit tutorial acknowledgment without claiming display alone saved it', () => {
