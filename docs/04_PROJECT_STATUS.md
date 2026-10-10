@@ -1149,7 +1149,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md 与 16_S5-06_Board_Character_Input_Presentation_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01 至 S5-05 PASS / CLOSED；PR #74 的 S5-05 Game reload 限定修复已合并。Production 保持单一 Stage 4 Runtime/full Account、Settings/Tutorial 必填与唯一 guarded Save v4 writer。本 S5-06 Design Freeze / Closeout 的 Reviewer、PR/main Linux Quality 与最终 Recovery 全绿后，唯一下一行动才是 Stage 5 / S5-06 — Board, Character & Input Presentation Implementation；门禁前不开始 Implementation、S5-07 或 Stage 6。
+请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md 与 16_S5-06_Board_Character_Input_Presentation_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01 至 S5-06 PASS / CLOSED；PR #74、#76、#77 均已合并，S5-06 键盘焦点缺陷由 #77 修复。Production 保持单一 Stage 4 Runtime/full Account、Settings/Tutorial 必填与唯一 guarded Save v4 writer。本 S5-06 Formal Closeout 的 Reviewer、PR/main Linux Quality 与最终 Recovery 全绿后，唯一下一行动是 Stage 5 / S5-07 — Item, Reward, Benben, Terminal & Tutorial Presentation Design Review；门禁前不开始 S5-07 或 Stage 6。
 ```
 
 ## 阶段看板
@@ -1161,7 +1161,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN / PASS；annotated `stage-3-frozen` 已验证 | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | FROZEN / PASS；annotated `stage-4-frozen` 已验证；S4-09 PASS/CLOSED；当时 Save v3 writer ACTIVE，现由 S5-04 的 v4 writer 接替 | Stage 3 FROZEN / PASS |
-| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-05 PASS / CLOSED；S5-06 Design Freeze candidate，经本 closeout 全部门禁后 FROZEN；production Save v4 ACTIVE | Stage 4 `stage-4-frozen` 已确认；本 closeout 完成后唯一入口 S5-06 Implementation |
+| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-06 PASS / CLOSED；production Save v4 ACTIVE | Stage 4 `stage-4-frozen` 已确认；本 closeout 完成后唯一入口 S5-07 Design Review |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
 
