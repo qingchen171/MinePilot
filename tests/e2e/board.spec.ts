@@ -205,13 +205,22 @@ test('keyboard hold and assistive click use one activation each', async ({ page 
 });
 
 test('focus change cancels a held key without moving, then Enter and Space remain available', async ({ page }) => {
-  await openBoard(page);
-  const first = page.locator('[data-cell-index="0"]');
-  const second = page.locator('[data-cell-index="1"]');
+  const fixture = boardBrowserSave('zero');
+  await page.addInitScript((entries: [string, string][]) => {
+    localStorage.clear(); for (const [key, value] of entries) localStorage.setItem(key, value);
+  }, fixture.entries);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const moveIndex = fixture.moveTarget!.y * 9 + fixture.moveTarget!.x;
+  const firstIndex = fixture.moveTarget!.x > 0 ? moveIndex - 1 : moveIndex + 1;
+  const arrow = fixture.moveTarget!.x > 0 ? 'ArrowRight' : 'ArrowLeft';
+  const first = page.locator(`[data-cell-index="${firstIndex}"]`);
+  const second = page.locator(`[data-cell-index="${moveIndex}"]`);
+  const explored = page.locator(`[data-cell-index="${fixture.selected!.y * 9 + fixture.selected!.x}"]`);
   await first.focus();
   const before = await revision(page);
   await page.keyboard.down('Enter');
-  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press(arrow);
   await expect(second).toBeFocused();
   await page.keyboard.up('Enter');
   expect(await revision(page)).toBe(before);
@@ -223,8 +232,8 @@ test('focus change cancels a held key without moving, then Enter and Space remai
   await page.evaluate(() => (document.activeElement as HTMLElement).blur());
   await page.keyboard.up(' ');
   expect(await revision(page)).toBe(before + 1);
-  await first.focus();
-  await first.press(' ');
+  await explored.focus();
+  await explored.press(' ');
   expect(await revision(page)).toBe(before + 2);
 });
 

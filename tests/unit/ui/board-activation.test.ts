@@ -28,10 +28,23 @@ describe('native board activation gate', () => {
     const a = { x: 0, y: 0 }; const b = { x: 1, y: 0 };
     expect(gate.keyDown(a, 'Enter', false)).toBe(true);
     expect(gate.keyUp(b, 'Enter')).toBe(false);
+    expect(gate.consumeCompanionClick(b, 0)).toBe(true);
     expect(gate.keyDown(b, 'Enter', false)).toBe(true);
     expect(gate.keyUp(b, 'Enter')).toBe(true);
     expect(gate.consumeCompanionClick(b, 0)).toBe(true);
     expect(gate.keyDown(b, ' ', false)).toBe(true);
+    expect(gate.keyUp(b, ' ')).toBe(true);
+  });
+
+  it('cancels a held key on focus loss without blocking a later Space press', () => {
+    const gate = createBoardActivationGate();
+    const a = { x: 0, y: 0 }; const b = { x: 1, y: 0 };
+    expect(gate.keyDown(a, ' ', false)).toBe(true);
+    gate.cancelKeyboard();
+    expect(gate.keyUp(b, ' ')).toBe(false);
+    expect(gate.consumeCompanionClick(b, 0)).toBe(true);
+    expect(gate.keyDown(b, ' ', false)).toBe(true);
+    expect(gate.keyDown(b, ' ', true)).toBe(false);
     expect(gate.keyUp(b, ' ')).toBe(true);
   });
 

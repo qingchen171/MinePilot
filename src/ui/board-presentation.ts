@@ -82,6 +82,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     const target = targetOf(event.target instanceof Element ? event.target : null);
     if (target !== null) select(target);
   });
+  grid.addEventListener('focusout', () => gate.cancelKeyboard());
   grid.addEventListener('click', (event) => {
     const target = targetOf(event.target instanceof Element ? event.target : null);
     if (target === null || !enabled || gate.consumeContextClick(target) ||
@@ -120,8 +121,8 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     event.preventDefault();
     if (gate.keyUp(target, event.key)) {
       perform('move', target);
-      setTimeout(() => gate.clearCompanion(), 0);
     }
+    setTimeout(() => gate.clearCompanion(), 0);
   });
   flag.addEventListener('keydown', (event) => { if (event.repeat) event.preventDefault(); });
   flag.addEventListener('click', (event) => {
