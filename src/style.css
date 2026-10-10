@@ -29,11 +29,20 @@ main {
 
 #game[hidden], #shop[hidden] { display: none; }
 
-#game canvas {
-  display: block;
-  max-width: min(100%, 640px);
-  height: auto;
-}
+#game { width: min(100%, 640px); }
+#game-stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; }
+#game-stage canvas { display: block; width: 100%; height: 100%; }
+.board-hit-grid { position: absolute; z-index: 2; }
+.board-hit-cell { position: absolute; margin: 0; padding: 0; border: 0; background: transparent;
+  color: transparent; cursor: pointer; }
+.board-hit-cell:focus-visible { outline: 3px solid #102f87; outline-offset: -3px; }
+.board-hit-cell[data-selected="true"] { box-shadow: inset 0 0 0 2px #205dc5; }
+.board-hit-cell:disabled { cursor: default; }
+#game-controls { display: grid; gap: .3rem; padding: .4rem 0; }
+#game-controls p { margin: 0; }
+#game-controls button { justify-self: start; }
+.board-touch-modes { display: flex; gap: .5rem; }
+.board-touch-modes button[aria-pressed="true"] { font-weight: bold; border: 2px solid #205dc5; }
 
 #shop { width: min(100%, 640px); padding: 1rem; box-sizing: border-box; }
 #shop > div { display: flex; justify-content: space-between; gap: 1rem; margin: .5rem 0; }

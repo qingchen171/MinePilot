@@ -1,9 +1,11 @@
 import Phaser from 'phaser';
-import { BASELINE_MESSAGE } from './baseline';
 import { presentationCopy } from './config/presentation-copy';
 import { SHOP_PRICES } from './config/shop-prices';
 import { validateShopCatalog } from './core/shop';
 import { createPresentationRoot } from './presentation-root';
+import { BoardScene } from './scenes/board-scene';
+import { boardLayout } from './ui/board-layout';
+import { createBoardPresentation } from './ui/board-presentation';
 import { renderShopPanel, renderShopRecoveryPanel } from './ui/shop-presentation';
 import { renderNavigationPages, type PublicPage } from './ui/navigation-pages';
 import type { PresentationCopyKey } from './config/presentation-copy';
@@ -36,32 +38,21 @@ export const presentationRoot = (() => {
 // HMR must reload before replacing the composition root, never create a second live session.
 import.meta.hot?.on('vite:beforeUpdate', () => window.location.reload());
 
-class BaselineScene extends Phaser.Scene {
-  constructor() {
-    super('BaselineScene');
-  }
-
-  create(): void {
-    this.add
-      .text(320, 180, BASELINE_MESSAGE, {
-        color: '#18324a',
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '24px',
-      })
-      .setOrigin(0.5);
-  }
-}
-
 const status = document.querySelector<HTMLElement>('#status');
 const navigationPanel = document.querySelector<HTMLElement>('#navigation');
 const pagePanel = document.querySelector<HTMLElement>('#page');
 const gamePanel = document.querySelector<HTMLElement>('#game');
+const gameStage = document.querySelector<HTMLElement>('#game-stage');
+const gameControls = document.querySelector<HTMLElement>('#game-controls');
 const shopPanel = document.querySelector<HTMLElement>('#shop');
+const boardScene = new BoardScene();
+let phaserGame: Phaser.Game | null = null;
 document.title = presentationCopy('app.title');
 if (status !== null) status.textContent = presentationCopy('status.loading');
 navigationPanel?.setAttribute('aria-label', presentationCopy('nav.main-label'));
 gamePanel?.setAttribute('aria-label', presentationCopy('game.region-label'));
-if (shopPanel !== null && navigationPanel !== null && pagePanel !== null && presentationRoot !== null) {
+if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
+    gamePanel !== null && gameStage !== null && gameControls !== null && presentationRoot !== null) {
   const resultMessage = (result: { readonly status: string; readonly reason?: string;
     readonly priorCommit?: boolean;
     readonly outcome?: { readonly status: string; readonly copyKey: PresentationCopyKey } }): PresentationCopyKey | null => {
@@ -77,10 +68,28 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null && pres
     if (result.reason === 'authority-changed') return 'nav.authority-changed';
     return 'nav.operation-unresolved';
   };
+  const board = createBoardPresentation(gameStage, gameControls, (action) => {
+    const outcome = presentationRoot.submit(action.kind === 'move'
+      ? { kind: 'move', coordinate: action.coordinate }
+      : { kind: 'flag', coordinate: action.coordinate, flagged: action.flagged === true });
+    draw(outcome.status === 'committed' ? 'status.committed' : outcome.copyKey);
+  }, () => pagePanel.querySelector<HTMLElement>('h2')?.focus());
+  presentationRoot.onAuthorityReload(() => board.invalidateAuthority());
+  const drawBoard = () => {
+    const current = presentationRoot.read();
+    const route = presentationRoot.navigation.route();
+    const attempt = current.status === 'recovery' || route !== 'game' ? null : current.view.attempt;
+    const layout = attempt === null ? null : boardLayout(gameStage.clientWidth, gameStage.clientHeight,
+      attempt.board.width, attempt.board.height);
+    if (layout !== null) phaserGame?.scale.resize(layout.width, layout.height);
+    board.render(attempt, current.status === 'recovery' ? { kind: 'hidden', value: null } :
+      current.view.currentNumberDisplay, layout);
+    boardScene.present(attempt, layout);
+  };
   const draw = (message: PresentationCopyKey | null = null) => {
     const current = presentationRoot.read();
     const route = presentationRoot.navigation.route() as PublicPage;
-    gamePanel!.hidden = route !== 'game' || current.status === 'recovery';
+    gamePanel.hidden = route !== 'game' || current.status === 'recovery';
     shopPanel.hidden = route !== 'shop' || current.status === 'recovery';
     renderNavigationPages(navigationPanel, pagePanel, route,
       current.status === 'recovery' ? null : current.view,
@@ -116,8 +125,11 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null && pres
     } else if (route === 'shop' && current.status === 'recovery') {
       renderShopRecoveryPanel(shopPanel, () => { presentationRoot.shopReload(); draw(); });
     } else shopPanel.replaceChildren();
+    drawBoard();
   };
   draw();
+  new ResizeObserver(() => drawBoard()).observe(gameStage);
+  window.addEventListener('resize', drawBoard);
 } else if (shopPanel !== null && navigationPanel !== null && pagePanel !== null) {
   shopPanel.hidden = true;
   if (gamePanel !== null) gamePanel.hidden = true;
@@ -130,20 +142,20 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null && pres
   drawUnavailable();
 }
 
-new Phaser.Game({
+phaserGame = new Phaser.Game({
   type: Phaser.AUTO,
   width: 640,
   height: 360,
   backgroundColor: '#dff3ff',
-  parent: 'game',
-  scene: BaselineScene,
+  parent: 'game-stage',
+  scene: boardScene,
   callbacks: {
     postBoot: () => {
       document.documentElement.dataset.phaserReady = 'true';
       document.documentElement.dataset.phaserVersion = Phaser.VERSION;
       if (status) {
         status.textContent = presentationRoot === null
-          ? presentationCopy('status.unavailable') : BASELINE_MESSAGE;
+          ? presentationCopy('status.unavailable') : presentationCopy('game.ready');
       }
     },
   },

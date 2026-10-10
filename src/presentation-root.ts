@@ -35,17 +35,21 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
   shopCatalog: ValidatedShopCatalog | null = null, catalog: LevelCatalog = PRODUCTION_LEVEL_CATALOG) {
   const adapter = createPresentationAdapter(session, technical, shopCatalog);
   const shop = createShopControl(adapter);
+  let beforeReload: (() => void) | null = null;
   const navigation = createNavigationControl(adapter, catalog, () => {
     adapter.cancelRetainedKind('purchase');
     shop.afterExit();
   });
   const reloadAndReconcile = () => {
+    beforeReload?.();
     const snapshot = adapter.reload();
     navigation.reconcileReloaded(snapshot);
     shop.afterReload(snapshot);
     return project(snapshot);
   };
   return Object.freeze({
+    /** One bootstrap-owned board invalidation hook; not a gameplay event bus. */
+    onAuthorityReload(callback: () => void) { beforeReload = callback; },
     navigation: Object.freeze({
       route: navigation.route,
       pendingSelection: () => {
