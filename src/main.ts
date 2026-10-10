@@ -6,9 +6,11 @@ import { createPresentationRoot } from './presentation-root';
 import { BoardScene } from './scenes/board-scene';
 import { boardLayout } from './ui/board-layout';
 import { createBoardPresentation } from './ui/board-presentation';
+import { createGamePresentation, type GameMilestone } from './ui/game-presentation';
 import { renderShopPanel, renderShopRecoveryPanel } from './ui/shop-presentation';
 import { renderNavigationPages, type PublicPage } from './ui/navigation-pages';
 import type { PresentationCopyKey } from './config/presentation-copy';
+import type { RewardReceiptProof } from './systems/presentation/reward-receipt';
 import { createLocalStorageAdapter } from './systems/persistence/key-value-storage';
 import { createProductionStage4Session } from './systems/persistence/production-stage4-runtime';
 import { createSystemClock, createWriterIdentity } from './systems/persistence/writer-lease';
@@ -68,15 +70,62 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
     if (result.reason === 'authority-changed') return 'nav.authority-changed';
     return 'nav.operation-unresolved';
   };
+  const detail = document.createElement('div');
+  detail.className = 'game-detail';
+  gameControls.append(detail);
+  let visibleReceipt: RewardReceiptProof | null = null;
+  let visibleMilestone: GameMilestone | null = null;
   const board = createBoardPresentation(gameStage, gameControls, (action) => {
+    const before = presentationRoot.read();
     const outcome = presentationRoot.submit(action.kind === 'move'
       ? { kind: 'move', coordinate: action.coordinate }
       : { kind: 'flag', coordinate: action.coordinate, flagged: action.flagged === true });
-    draw(outcome.status === 'committed' ? 'status.committed' : outcome.copyKey);
-  }, () => pagePanel.querySelector<HTMLElement>('h2')?.focus());
+    const leftNumber = action.kind === 'move' && before.status !== 'recovery' &&
+      before.view.attempt?.levelId === 'level-002' && before.view.currentNumberDisplay.kind !== 'hidden';
+    afterGameOutcome(outcome, outcome.status === 'committed' && outcome.firstLucky ? 'first-lucky' :
+      leftNumber && outcome.status === 'committed' ? 'l2-number-hides-on-leave' : null);
+  }, () => pagePanel.querySelector<HTMLElement>('h2')?.focus(), () => drawGameControls());
+  const gamePresentation = createGamePresentation(detail, {
+    airplaneTargetAvailable: () => board.selectedTarget() !== null,
+    submit(action, milestoneId) {
+      if (action === 'reload') { presentationRoot.reload(); draw(); return; }
+      if (action === 'retry-retained') {
+        const outcome = presentationRoot.gameRetry();
+        if (outcome) afterGameOutcome(outcome);
+        return;
+      }
+      if (action === 'defer-benben' || action === 'confirm-restart' || action === 'toggle-help') return;
+      if (action === 'airplane') {
+        const selected = board.selectedTarget();
+        if (selected === null || !board.selectionIsCurrent(selected.epoch)) return;
+        afterGameOutcome(presentationRoot.submit({ kind: 'airplane', coordinate: selected.coordinate }));
+        return;
+      }
+      if (action === 'acknowledge-tutorial') {
+        if (milestoneId) afterGameOutcome(presentationRoot.submit({ kind: action, milestoneId }));
+        return;
+      }
+      const outcome = presentationRoot.submit({ kind: action });
+      if (action === 'dismiss' && outcome.status === 'committed') presentationRoot.navigation.navigate('home');
+      afterGameOutcome(outcome);
+    },
+  });
   presentationRoot.onAuthorityReload(() => board.invalidateAuthority());
-  const drawBoard = () => {
+  const drawGameControls = () => {
     const current = presentationRoot.read();
+    const route = presentationRoot.navigation.route();
+    if (current.status === 'recovery' || route !== 'game') { gamePresentation.clear(); return; }
+    gamePresentation.render(current.view, visibleReceipt, presentationRoot.gameRetryAvailable(), visibleMilestone);
+  };
+  const afterGameOutcome = (outcome: ReturnType<typeof presentationRoot.submit> |
+    NonNullable<ReturnType<typeof presentationRoot.gameRetry>>, eventMilestone: GameMilestone | null = null) => {
+    visibleReceipt = outcome.status === 'committed' ? outcome.rewardReceipt ?? null : null;
+    visibleMilestone = eventMilestone;
+    if (outcome.status === 'committed') { board.invalidateAuthority(); gamePresentation.afterCommit(); }
+    draw(outcome.status === 'committed' ? outcome.copyKey : outcome.copyKey,
+      outcome.status === 'committed' ? outcome.snapshot : null);
+  };
+  const drawBoard = (current = presentationRoot.read()) => {
     const route = presentationRoot.navigation.route();
     const attempt = current.status === 'recovery' || route !== 'game' ? null : current.view.attempt;
     const layout = attempt === null ? null : boardLayout(gameStage.clientWidth, gameStage.clientHeight,
@@ -86,8 +135,9 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
       current.view.currentNumberDisplay, layout);
     boardScene.present(attempt, layout);
   };
-  const draw = (message: PresentationCopyKey | null = null) => {
-    const current = presentationRoot.read();
+  const draw = (message: PresentationCopyKey | null = null,
+    committedSnapshot: ReturnType<typeof presentationRoot.read> | null = null) => {
+    const current = committedSnapshot ?? presentationRoot.read();
     const route = presentationRoot.navigation.route() as PublicPage;
     gamePanel.hidden = route !== 'game' || current.status === 'recovery';
     shopPanel.hidden = route !== 'shop' || current.status === 'recovery';
@@ -122,14 +172,34 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
           draw(snapshot.status === 'recovery' ? 'error.recovery' : null);
         },
       }, message, presentationRoot.shopActions());
+      if (!current.view.tutorialProgress.acknowledgedMilestoneIds.includes('first-shop')) {
+        const prompt = document.createElement('p');
+        prompt.textContent = presentationCopy('game.tutorial.first-shop');
+        const acknowledge = document.createElement('button');
+        acknowledge.type = 'button'; acknowledge.dataset.action = 'tutorial-first-shop';
+        acknowledge.textContent = presentationCopy('game.tutorial.acknowledge');
+        acknowledge.addEventListener('keydown', (event) => { if (event.repeat) event.preventDefault(); });
+        acknowledge.addEventListener('click', (event) => {
+          if (event.detail > 1) return;
+          const outcome = presentationRoot.submit({ kind: 'acknowledge-tutorial', milestoneId: 'first-shop' });
+          draw(outcome.status === 'committed' ? outcome.copyKey : outcome.copyKey,
+            outcome.status === 'committed' ? outcome.snapshot : null);
+        });
+        shopPanel.append(prompt, acknowledge);
+      }
     } else if (route === 'shop' && current.status === 'recovery') {
       renderShopRecoveryPanel(shopPanel, () => { presentationRoot.shopReload(); draw(); });
     } else shopPanel.replaceChildren();
-    drawBoard();
+    drawBoard(current);
+    if (route === 'game' && current.status !== 'recovery') {
+      gamePresentation.render(current.view, visibleReceipt, presentationRoot.gameRetryAvailable(), visibleMilestone);
+      visibleReceipt = null;
+      visibleMilestone = null;
+    } else { gamePresentation.clear(); visibleReceipt = null; visibleMilestone = null; }
   };
   draw();
   new ResizeObserver(() => drawBoard()).observe(gameStage);
-  window.addEventListener('resize', drawBoard);
+  window.addEventListener('resize', () => drawBoard());
 } else if (shopPanel !== null && navigationPanel !== null && pagePanel !== null) {
   shopPanel.hidden = true;
   if (gamePanel !== null) gamePanel.hidden = true;

@@ -12,7 +12,8 @@ const cellKey = {
 
 /** Disposable DOM hit surface. It consumes only public facts; Phaser never submits input. */
 export function createBoardPresentation(stage: HTMLElement, controls: HTMLElement,
-  submit: (action: BoardAction) => void, focusFallback: () => void) {
+  submit: (action: BoardAction) => void, focusFallback: () => void,
+  onSelectionChange: () => void = () => {}) {
   const grid = document.createElement('div');
   grid.className = 'board-hit-grid';
   grid.setAttribute('role', 'grid');
@@ -26,6 +27,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
   let pointerTarget: BoardTarget | null = null;
   let secondaryPressCount = 1;
   let enabled = false;
+  let selectionEpoch = 0;
   let cells: HTMLButtonElement[] = [];
   const number = document.createElement('p'); number.className = 'board-current-number';
   const phase = document.createElement('p'); phase.className = 'board-phase';
@@ -57,7 +59,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     selectedLabel.textContent = selected === null ? presentationCopy('game.no-target') :
       `${presentationCopy('game.selected')} ${selected.y + 1}, ${selected.x + 1}`;
   }
-  function select(target: BoardTarget) { selected = target; updateSelection(); }
+  function select(target: BoardTarget) { selected = target; updateSelection(); onSelectionChange(); }
   function perform(kind: 'move' | 'flag', target: BoardTarget) {
     if (!enabled || attempt === null) return;
     const appearance = attempt.board.cells[indexOf(target)];
@@ -181,8 +183,15 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     number.textContent = ''; phase.textContent = ''; positionLabel.textContent = ''; selectedLabel.textContent = '';
   }
   function invalidateAuthority() {
+    selectionEpoch += 1;
     if (document.activeElement instanceof Node && grid.contains(document.activeElement)) focusFallback();
     enabled = false; selected = null; pointerTarget = null; gate.reset(); updateSelection();
+    onSelectionChange();
   }
-  return Object.freeze({ render, clear, invalidateAuthority });
+  function selectedTarget() {
+    if (!enabled || selected === null || attempt === null) return null;
+    return Object.freeze({ coordinate: Object.freeze({ x: selected.x, y: selected.y }), epoch: selectionEpoch });
+  }
+  function selectionIsCurrent(epoch: number): boolean { return enabled && selectionEpoch === epoch && selected !== null; }
+  return Object.freeze({ render, clear, invalidateAuthority, selectedTarget, selectionIsCurrent });
 }

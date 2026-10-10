@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialStage4GameState } from '../../../../src/core/stage4-game-state';
+import { createInitialStage4GameState, createStage4GameState } from '../../../../src/core/stage4-game-state';
 import { createPresentationAdapter } from '../../../../src/systems/presentation/adapter';
 import type { PresentationSessionPort, SessionIntent, SessionRead, SessionMutationResult } from '../../../../src/systems/presentation/session-port';
 
@@ -12,6 +12,32 @@ const technical = () => ({
 });
 
 describe('S5-02 presentation operation envelopes', () => {
+  it('projects the same committed result, never a later competing read', () => {
+    const committed = createStage4GameState({ ...runtime, account: { ...runtime.account, coins: 5 } });
+    const later = createStage4GameState({ ...runtime, account: { ...runtime.account, coins: 999 } });
+    let reads = 0;
+    const adapter = createPresentationAdapter({
+      read: () => { reads++; return reads === 1 ? fresh : { ...fresh, runtime: later }; },
+      reload: () => fresh,
+      execute: () => ({ status: 'committed', revision: 0, runtime: committed }),
+    }, technical());
+    expect(adapter.submit({ kind: 'set-setting', key: 'musicEnabled', enabled: false }))
+      .toMatchObject({ status: 'committed', snapshot: { status: 'loaded', facts: { account: { coins: 5 } } } });
+    expect(reads).toBe(1);
+  });
+
+  it('cancels only the identical retained envelope token', () => {
+    const port: PresentationSessionPort = { read: () => fresh, reload: () => fresh,
+      execute: () => ({ status: 'rejected', reason: 'storage-failure' }) };
+    const adapter = createPresentationAdapter(port, technical());
+    expect(adapter.submit({ kind: 'detection' }).status).toBe('rejected');
+    const token = adapter.retainedToken();
+    expect(token).not.toBeNull();
+    expect(adapter.cancelRetainedToken({ ...token! })).toBe(false);
+    expect(adapter.retainedToken()).toBe(token);
+    expect(adapter.cancelRetainedToken(token!)).toBe(true);
+    expect(adapter.retainedToken()).toBeNull();
+  });
   it('captures authority at dispatch, deeply freezes facts and retains exactly the same intent for proven precommit retry', () => {
     const intents: SessionIntent[] = [];
     let calls = 0;
