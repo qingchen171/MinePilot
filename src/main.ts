@@ -119,6 +119,7 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
   });
   presentationRoot.onAuthorityReload(() => {
     board.invalidateAuthority();
+    gamePresentation.clear();
     visibleReceipt = null;
     visibleMilestone = null;
   });
@@ -134,8 +135,13 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
     if (outcome.status === 'committed') { board.afterCommittedMutation(); gamePresentation.afterCommit(); }
     gameReloadRequired = outcome.status === 'rejected' ? outcome.policy.reloadRequired && !outcome.policy.retainEnvelope :
       outcome.status === 'unavailable' && outcome.reason === 'reload-required';
+    if (gameReloadRequired) { board.invalidateAuthority(); gamePresentation.clear(); }
     visibleReceipt = outcome.status === 'committed' ? outcome.rewardReceipt ?? null : null;
-    visibleMilestone = eventMilestone;
+    visibleMilestone = outcome.status === 'committed' && outcome.snapshot.status !== 'recovery' &&
+      outcome.snapshot.view.attempt?.levelId === 'level-004' &&
+      outcome.rewardReceipt?.status === 'proven' && outcome.rewardReceipt.entries.some((entry) =>
+        entry.oneTime && entry.payload.kind === 'coins')
+      ? 'l4-one-time-coin-reward' : eventMilestone;
     draw(outcome.status === 'committed' ? outcome.copyKey : outcome.copyKey,
       outcome.status === 'committed' ? outcome.snapshot : null);
   };
@@ -171,7 +177,9 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
         reload() { presentationRoot.reload(); draw(); },
       }, message);
     if (route === 'shop' && current.status !== 'recovery') {
-      renderShopPanel(shopPanel, current.view, presentationRoot.shopState(), {
+      const tutorialBlocked = presentationRoot.shopTutorialRetryAvailable() ||
+        presentationRoot.shopTutorialNeedsReload();
+      renderShopPanel(shopPanel, current.view, tutorialBlocked ? 'submitting' : presentationRoot.shopState(), {
         purchase(item) {
           const outcome = presentationRoot.shopPurchase(item);
           if (outcome !== null) draw(outcome.status === 'committed' ? 'shop.receipt' : outcome.copyKey);
@@ -190,13 +198,21 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
         const prompt = document.createElement('p');
         prompt.textContent = presentationCopy('game.tutorial.first-shop');
         const acknowledge = document.createElement('button');
-        acknowledge.type = 'button'; acknowledge.dataset.action = 'tutorial-first-shop';
-        acknowledge.textContent = presentationCopy('game.tutorial.acknowledge');
+        const retryTutorial = presentationRoot.shopTutorialRetryAvailable();
+        const reloadTutorial = presentationRoot.shopTutorialNeedsReload();
+        acknowledge.type = 'button';
+        acknowledge.dataset.action = retryTutorial ? 'tutorial-first-shop-retry' :
+          reloadTutorial ? 'tutorial-first-shop-reload' : 'tutorial-first-shop';
+        acknowledge.textContent = presentationCopy(retryTutorial ? 'action.retry' :
+          reloadTutorial ? 'action.reload' : 'game.tutorial.acknowledge');
         acknowledge.addEventListener('keydown', (event) => { if (event.repeat) event.preventDefault(); });
         acknowledge.addEventListener('click', (event) => {
           if (event.detail > 1) return;
           shopTutorialCompanionPending = true;
-          const outcome = presentationRoot.submit({ kind: 'acknowledge-tutorial', milestoneId: 'first-shop' });
+          if (reloadTutorial) { presentationRoot.shopReload(); draw(); return; }
+          const outcome = retryTutorial ? presentationRoot.shopTutorialRetry() :
+            presentationRoot.submit({ kind: 'acknowledge-tutorial', milestoneId: 'first-shop' });
+          if (outcome === null) return;
           draw(outcome.status === 'committed' ? outcome.copyKey : outcome.copyKey,
             outcome.status === 'committed' ? outcome.snapshot : null);
         });

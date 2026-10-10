@@ -36,19 +36,28 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
   const adapter = createPresentationAdapter(session, technical, shopCatalog, catalog);
   const shop = createShopControl(adapter);
   let gameRetainedToken: ReturnType<typeof adapter.retainedToken> = null;
+  let shopTutorialRetainedToken: ReturnType<typeof adapter.retainedToken> = null;
+  let shopTutorialReloadRequired = false;
   const gameKinds = new Set<SessionIntent['kind']>(['move', 'flag', 'detection', 'airplane', 'revive',
     'claim-benben', 'failure', 'retry', 'replay', 'next', 'dismiss', 'restart', 'acknowledge-tutorial']);
   const clearGameRetry = () => {
     if (gameRetainedToken !== null) adapter.cancelRetainedToken(gameRetainedToken);
     gameRetainedToken = null;
   };
+  const clearShopTutorialRetry = () => {
+    if (shopTutorialRetainedToken !== null) adapter.cancelRetainedToken(shopTutorialRetainedToken);
+    shopTutorialRetainedToken = null;
+    shopTutorialReloadRequired = false;
+  };
   let beforeReload: (() => void) | null = null;
   const navigation = createNavigationControl(adapter, catalog, () => {
+    clearShopTutorialRetry();
     adapter.cancelRetainedKind('purchase');
     shop.afterExit();
   });
   const reloadAndReconcile = () => {
     clearGameRetry();
+    clearShopTutorialRetry();
     beforeReload?.();
     const snapshot = adapter.reload();
     navigation.reconcileReloaded(snapshot);
@@ -83,7 +92,14 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
     reload: reloadAndReconcile,
     submit: (choice: Exclude<SemanticIntent, { readonly kind: 'purchase' }>) => {
       const result = adapter.submit(choice);
-      if (gameKinds.has(choice.kind)) gameRetainedToken = result.status === 'rejected' && result.policy.retainEnvelope
+      const shopTutorial = choice.kind === 'acknowledge-tutorial' && navigation.route() === 'shop';
+      if (shopTutorial) {
+        shopTutorialRetainedToken = result.status === 'rejected' && result.policy.retainEnvelope
+          ? adapter.retainedToken() : null;
+        shopTutorialReloadRequired = result.status === 'rejected'
+          ? result.policy.reloadRequired && !result.policy.retainEnvelope
+          : result.status === 'unavailable' && result.reason === 'reload-required';
+      } else if (gameKinds.has(choice.kind)) gameRetainedToken = result.status === 'rejected' && result.policy.retainEnvelope
         ? adapter.retainedToken() : null;
       return result.status === 'committed'
         ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey,
@@ -115,6 +131,22 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
           rewardReceipt: result.rewardReceipt, firstLucky: result.firstLucky } : result;
     },
     gameExit: clearGameRetry,
+    shopTutorialRetryAvailable: () => shopTutorialRetainedToken !== null &&
+      adapter.retainedToken() === shopTutorialRetainedToken,
+    shopTutorialNeedsReload: () => shopTutorialReloadRequired,
+    shopTutorialRetry: () => {
+      if (shopTutorialRetainedToken === null || adapter.retainedToken() !== shopTutorialRetainedToken) return null;
+      const result = adapter.retryRetained();
+      shopTutorialRetainedToken = result.status === 'rejected' && result.policy.retainEnvelope
+        ? adapter.retainedToken() : null;
+      shopTutorialReloadRequired = result.status === 'rejected'
+        ? result.policy.reloadRequired && !result.policy.retainEnvelope
+        : result.status === 'unavailable' && result.reason === 'reload-required';
+      navigation.reconcileReloaded(adapter.read());
+      return result.status === 'committed'
+        ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey,
+          rewardReceipt: result.rewardReceipt, firstLucky: result.firstLucky } : result;
+    },
     cancelRetained: () => adapter.cancelRetained(),
     shopState: () => shop.state(),
     shopLast: () => shop.last(),

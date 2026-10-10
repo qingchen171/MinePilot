@@ -6,7 +6,7 @@ import { sanitizeStage4Runtime } from '../../../../src/systems/presentation/publ
 import { projectPublicFacts } from '../../../../src/ui/presentation-projection';
 import { TUTORIAL_MILESTONE_IDS } from '../../../../src/core/settings-tutorial';
 import { PRESENTATION_COPY } from '../../../../src/config/presentation-copy';
-import { GAME_TUTORIAL_MILESTONES } from '../../../../src/ui/game-presentation';
+import { GAME_TUTORIAL_MILESTONES, gameTutorialContexts } from '../../../../src/ui/game-presentation';
 
 function view(variant: Parameters<typeof boardBrowserSave>[0]) {
   const storage = new MemoryStorage();
@@ -49,5 +49,22 @@ describe('S5-07 public allowlist and advisory controls', () => {
     expect(view('benben-available').publicView.attempt?.benben).toMatchObject({
       entitlement: 'available', claimOffered: true, temporaryCard: null,
     });
+  });
+  it('limits prompts and Help to public context, with L4 requiring this operation receipt', () => {
+    const l1Pending = view('pending').publicView;
+    const l1 = gameTutorialContexts(l1Pending, null);
+    expect(l1.prompt).not.toContain('l5-failure-retry-first-step-safety');
+    expect(l1.help).not.toContain('l5-failure-retry-first-step-safety');
+    expect(l1.help).not.toContain('l4-one-time-coin-reward');
+    expect(l1.help).not.toContain('first-shop');
+    const base = view('waiting').publicView;
+    if (base.attempt === null) throw new Error('fixture');
+    const oneTime = { ...base, attempt: { ...base.attempt, levelId: 'level-004',
+      claimedRewards: [{ coordinate: { x: 0, y: 0 }, payload: { kind: 'coins' as const, amount: 1 }, oneTime: true }] } };
+    expect(gameTutorialContexts(oneTime, null).prompt).not.toContain('l4-one-time-coin-reward');
+    expect(gameTutorialContexts(oneTime, null).help).toContain('l4-one-time-coin-reward');
+    expect(gameTutorialContexts(oneTime, 'l4-one-time-coin-reward').prompt).toContain('l4-one-time-coin-reward');
+    const l5 = { ...base, attempt: { ...base.attempt, levelId: 'level-005', phase: 'failed' as const } };
+    expect(gameTutorialContexts(l5, null).prompt).toContain('l5-failure-retry-first-step-safety');
   });
 });

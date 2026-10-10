@@ -31,4 +31,22 @@ describe('S5-07 exact retained-operation ownership', () => {
     expect(root.shopActions().retry).toBe(true);
     expect(root.gameRetryAvailable()).toBe(false);
   });
+  it('owns first-shop tutorial retry on the Shop prompt and cancels only that token on exit', () => {
+    const checked = validateShopCatalog(SHOP_PRICES);
+    if (checked.status !== 'valid') throw new Error('catalog');
+    const root = createPresentationRoot(port, technical, checked.catalog);
+    expect(root.navigation.navigate('shop').status).toBe('navigated');
+    expect(root.submit({ kind: 'acknowledge-tutorial', milestoneId: 'first-shop' }))
+      .toMatchObject({ status: 'rejected', policy: { retainEnvelope: true } });
+    expect(root.shopTutorialRetryAvailable()).toBe(true);
+    expect(root.gameRetryAvailable()).toBe(false);
+    root.gameExit();
+    expect(root.shopTutorialRetryAvailable()).toBe(true);
+    expect(root.shopTutorialRetry()).toMatchObject({ status: 'rejected', policy: { retainEnvelope: true } });
+    expect(root.navigation.navigate('home').status).toBe('navigated');
+    expect(root.shopTutorialRetryAvailable()).toBe(false);
+    expect(root.navigation.navigate('shop').status).toBe('navigated');
+    expect(root.shopPurchase('lucky')).toMatchObject({ status: 'rejected', policy: { retainEnvelope: true } });
+    expect(root.shopActions().retry).toBe(true);
+  });
 });

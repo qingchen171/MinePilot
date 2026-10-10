@@ -23,6 +23,38 @@ export const GAME_TUTORIAL_MILESTONES = [
 ] as const;
 export type GameMilestone = typeof GAME_TUTORIAL_MILESTONES[number];
 
+/** Public contexts for progressive prompts; Help never enumerates future milestones. */
+export function gameTutorialContexts(view: PresentationViewModel,
+  eventMilestone: GameMilestone | null): { readonly prompt: readonly GameMilestone[]; readonly help: readonly GameMilestone[] } {
+  const attempt = view.attempt;
+  if (attempt === null) return { prompt: [], help: [] };
+  const prompt: GameMilestone[] = [];
+  const help: GameMilestone[] = [];
+  const add = (id: GameMilestone, auto: boolean) => {
+    if (!help.includes(id)) help.push(id);
+    if (auto && !prompt.includes(id)) prompt.push(id);
+  };
+  if (attempt.levelId === 'level-001') add('l1-movement-current-number', true);
+  if (attempt.levelId === 'level-002') add('l2-number-hides-on-leave', eventMilestone === 'l2-number-hides-on-leave');
+  if (attempt.levelId === 'level-003') add('l3-flag-misclick-protection', true);
+  if (attempt.levelId === 'level-004' && attempt.claimedRewards.some((reward) =>
+    reward.oneTime && reward.payload.kind === 'coins')) {
+    add('l4-one-time-coin-reward', eventMilestone === 'l4-one-time-coin-reward');
+  }
+  if (attempt.levelId === 'level-005' && (attempt.phase === 'pending-mine-encounter' || attempt.phase === 'failed'))
+    add('l5-failure-retry-first-step-safety', true);
+  if (attempt.board.cells.includes('obstacle')) add('first-obstacle', true);
+  if (attempt.phase === 'active') add('first-items', true);
+  if (attempt.position.kind === 'revealed-mine-occupancy' && attempt.itemUses.revive === 0)
+    add('first-lucky', eventMilestone === 'first-lucky');
+  if (eventMilestone !== null && help.includes(eventMilestone)) {
+    const index = prompt.indexOf(eventMilestone);
+    if (index >= 0) prompt.splice(index, 1);
+    prompt.unshift(eventMilestone);
+  }
+  return { prompt, help };
+}
+
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, key: PresentationCopyKey): HTMLElementTagNameMap[K] {
   const value = document.createElement(tag);
   value.textContent = presentationCopy(key);
@@ -108,7 +140,7 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
     const attempt = view?.attempt;
     if (!attempt) { pendingKey = null; restartConfirmation = false; return; }
     const append = (key: PresentationCopyKey, action: Action, enabled = true, milestone?: string) =>
-      host.append(button(key, action, enabled, milestone));
+      host.append(button(key, action, enabled && (!reloadRequired || action === 'reload'), milestone));
     host.append(node('h3', 'game.items'));
     for (const item of ['detection', 'airplane', 'revive'] as const) {
       const offer = attempt.items[item];
@@ -158,17 +190,8 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
       for (const entry of attempt.claimedRewards) host.append(rewardLine(entry));
     }
     const acknowledged = new Set(view!.tutorialProgress.acknowledgedMilestoneIds);
-    const candidates: GameMilestone[] = [];
-    if (attempt.levelId === 'level-001') candidates.push('l1-movement-current-number');
-    if (attempt.levelId === 'level-003') candidates.push('l3-flag-misclick-protection');
-    if (attempt.phase === 'pending-mine-encounter' || attempt.phase === 'failed')
-      candidates.push('l5-failure-retry-first-step-safety');
-    if (attempt.board.cells.includes('obstacle')) candidates.push('first-obstacle');
-    if (attempt.phase === 'active') candidates.push('first-items');
-    if (attempt.claimedRewards.some((reward) => reward.oneTime && reward.payload.kind === 'coins'))
-      candidates.push('l4-one-time-coin-reward');
-    if (eventMilestone) candidates.unshift(eventMilestone);
-    const unacknowledged = candidates.filter((id) => !acknowledged.has(id));
+    const contexts = gameTutorialContexts(view!, eventMilestone);
+    const unacknowledged = contexts.prompt.filter((id) => !acknowledged.has(id));
     if (unacknowledged.length) {
       host.append(node('h4', 'game.tutorial.title'));
       const chosen = eventMilestone && unacknowledged.includes(eventMilestone) ? eventMilestone :
@@ -178,7 +201,7 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
       if (view!.tutorialAcknowledgmentAllowed) append('game.tutorial.acknowledge', 'acknowledge-tutorial', true, chosen);
     }
     append('game.tutorial.title', 'toggle-help');
-    if (helpOpen) for (const id of GAME_TUTORIAL_MILESTONES) {
+    if (helpOpen) for (const id of contexts.help) {
       if (!acknowledged.has(id)) host.append(node('p', `game.tutorial.${id}`));
     }
     if (focused) {
@@ -198,6 +221,6 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
   }
   return Object.freeze({ render, clear: () => {
     host.replaceChildren(); pendingKey = null; keyboardCompanion = null;
-    restartConfirmation = false; benbenDeferred = false; helpOpen = false; lastRender = null;
+    restartConfirmation = false; benbenDeferred = false; helpOpen = false; lastMilestone = null; lastRender = null;
   }, afterCommit: () => { restartConfirmation = false; benbenDeferred = false; } });
 }
