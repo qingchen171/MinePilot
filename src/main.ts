@@ -75,6 +75,7 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
   gameControls.append(detail);
   let visibleReceipt: RewardReceiptProof | null = null;
   let visibleMilestone: GameMilestone | null = null;
+  let gameReloadRequired = false;
   const board = createBoardPresentation(gameStage, gameControls, (action) => {
     const before = presentationRoot.read();
     const outcome = presentationRoot.submit(action.kind === 'move'
@@ -88,7 +89,7 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
   const gamePresentation = createGamePresentation(detail, {
     airplaneTargetAvailable: () => board.selectedTarget() !== null,
     submit(action, milestoneId) {
-      if (action === 'reload') { presentationRoot.reload(); draw(); return; }
+      if (action === 'reload') { presentationRoot.reload(); gameReloadRequired = false; draw(); return; }
       if (action === 'retry-retained') {
         const outcome = presentationRoot.gameRetry();
         if (outcome) afterGameOutcome(outcome);
@@ -115,11 +116,14 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
     const current = presentationRoot.read();
     const route = presentationRoot.navigation.route();
     if (current.status === 'recovery' || route !== 'game') { gamePresentation.clear(); return; }
-    gamePresentation.render(current.view, visibleReceipt, presentationRoot.gameRetryAvailable(), visibleMilestone);
+    gamePresentation.render(current.view, visibleReceipt, presentationRoot.gameRetryAvailable(),
+      gameReloadRequired, visibleMilestone);
   };
   const afterGameOutcome = (outcome: ReturnType<typeof presentationRoot.submit> |
     NonNullable<ReturnType<typeof presentationRoot.gameRetry>>, eventMilestone: GameMilestone | null = null) => {
-    if (outcome.status === 'committed') { board.invalidateAuthority(); gamePresentation.afterCommit(); }
+    if (outcome.status === 'committed') { board.afterCommittedMutation(); gamePresentation.afterCommit(); }
+    gameReloadRequired = outcome.status === 'rejected' ? outcome.policy.reloadRequired && !outcome.policy.retainEnvelope :
+      outcome.status === 'unavailable' && outcome.reason === 'reload-required';
     visibleReceipt = outcome.status === 'committed' ? outcome.rewardReceipt ?? null : null;
     visibleMilestone = eventMilestone;
     draw(outcome.status === 'committed' ? outcome.copyKey : outcome.copyKey,
@@ -192,10 +196,11 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
     } else shopPanel.replaceChildren();
     drawBoard(current);
     if (route === 'game' && current.status !== 'recovery') {
-      gamePresentation.render(current.view, visibleReceipt, presentationRoot.gameRetryAvailable(), visibleMilestone);
+      gamePresentation.render(current.view, visibleReceipt, presentationRoot.gameRetryAvailable(),
+        gameReloadRequired, visibleMilestone);
       visibleReceipt = null;
       visibleMilestone = null;
-    } else { gamePresentation.clear(); visibleReceipt = null; visibleMilestone = null; }
+    } else { gamePresentation.clear(); visibleReceipt = null; visibleMilestone = null; gameReloadRequired = false; }
   };
   draw();
   new ResizeObserver(() => drawBoard()).observe(gameStage);

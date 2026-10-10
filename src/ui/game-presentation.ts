@@ -40,7 +40,7 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
   let helpOpen = false;
   let lastMilestone: GameMilestone | null = null;
   let lastRender: { view: PresentationViewModel | null; receipt: Receipt | null;
-    retainedRetry: boolean; eventMilestone: GameMilestone | null } | null = null;
+    retainedRetry: boolean; reloadRequired: boolean; eventMilestone: GameMilestone | null } | null = null;
 
   function button(key: PresentationCopyKey, action: Action, enabled = true, milestoneId?: string): HTMLButtonElement {
     const value = node('button', key);
@@ -60,7 +60,8 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
         if (action === 'confirm-restart') restartConfirmation = true;
         if (action === 'defer-benben') benbenDeferred = true;
         if (action === 'toggle-help') helpOpen = !helpOpen;
-        if (lastRender) render(lastRender.view, lastRender.receipt, lastRender.retainedRetry, lastRender.eventMilestone);
+        if (lastRender) render(lastRender.view, lastRender.receipt, lastRender.retainedRetry,
+          lastRender.reloadRequired, lastRender.eventMilestone);
         return;
       }
       if (action === 'reload') { actions.submit('reload'); return; }
@@ -105,8 +106,9 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
   });
 
   function render(view: PresentationViewModel | null, receipt: Receipt | null, retainedRetry: boolean,
+    reloadRequired: boolean,
     eventMilestone: GameMilestone | null = null) {
-    lastRender = { view, receipt, retainedRetry, eventMilestone };
+    lastRender = { view, receipt, retainedRetry, reloadRequired, eventMilestone };
     const focused = document.activeElement instanceof HTMLElement ? document.activeElement.dataset.gameAction : null;
     host.replaceChildren();
     const attempt = view?.attempt;
@@ -150,7 +152,9 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
         restartConfirmation ? 'restart' : 'confirm-restart');
     } else restartConfirmation = false;
     if (retainedRetry) append('game.retry-retained', 'retry-retained');
+    if (reloadRequired) append('action.reload', 'reload');
     if (receipt?.status === 'insufficient-proof') host.append(node('p', 'game.rewards.diagnostic'));
+    if (eventMilestone === 'first-lucky') host.append(node('p', 'game.lucky.saved'));
     if (receipt?.status === 'proven' && receipt.entries.length > 0) {
       host.append(node('h4', 'game.rewards.receipt'));
       for (const entry of receipt.entries) host.append(rewardLine(entry));
@@ -183,7 +187,11 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
     if (helpOpen) for (const id of milestones) {
       if (!acknowledged.has(id)) host.append(node('p', `game.tutorial.${id}`));
     }
-    if (focused) host.querySelector<HTMLElement>(`[data-game-action="${focused}"]`)?.focus();
+    if (focused) {
+      const retained = host.querySelector<HTMLButtonElement>(`[data-game-action="${focused}"]`);
+      (retained !== null && !retained.disabled ? retained :
+        host.querySelector<HTMLButtonElement>('button:not(:disabled)'))?.focus();
+    }
   }
   function rewardLine(entry: RewardEntry) {
     const line = document.createElement('p');

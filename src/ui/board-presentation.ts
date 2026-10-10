@@ -84,7 +84,15 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     const target = targetOf(event.target instanceof Element ? event.target : null);
     if (target !== null) select(target);
   });
-  grid.addEventListener('focusout', () => gate.cancelKeyboard());
+  const clearSelectionOutsideGameControls = (next: EventTarget | null) => {
+    if (next === null) return; // Detached controls during committed reprojection are not a new focus destination.
+    if (next instanceof Node && (grid.contains(next) || controls.contains(next))) return;
+    selected = null; updateSelection(); onSelectionChange();
+  };
+  grid.addEventListener('focusout', (event) => {
+    gate.cancelKeyboard(); clearSelectionOutsideGameControls(event.relatedTarget);
+  });
+  controls.addEventListener('focusout', (event) => clearSelectionOutsideGameControls(event.relatedTarget));
   grid.addEventListener('click', (event) => {
     const target = targetOf(event.target instanceof Element ? event.target : null);
     if (target === null || !enabled || gate.consumeContextClick(target) ||
@@ -188,10 +196,20 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     enabled = false; selected = null; pointerTarget = null; gate.reset(); updateSelection();
     onSelectionChange();
   }
+  function afterCommittedMutation() {
+    // A new authority invalidates the Airplane target, but the native press gate must
+    // survive the remainder of this same physical click/double-click sequence.
+    selectionEpoch += 1;
+    selected = null;
+    pointerTarget = null;
+    updateSelection();
+    onSelectionChange();
+  }
   function selectedTarget() {
     if (!enabled || selected === null || attempt === null) return null;
     return Object.freeze({ coordinate: Object.freeze({ x: selected.x, y: selected.y }), epoch: selectionEpoch });
   }
   function selectionIsCurrent(epoch: number): boolean { return enabled && selectionEpoch === epoch && selected !== null; }
-  return Object.freeze({ render, clear, invalidateAuthority, selectedTarget, selectionIsCurrent });
+  return Object.freeze({ render, clear, invalidateAuthority, afterCommittedMutation,
+    selectedTarget, selectionIsCurrent });
 }

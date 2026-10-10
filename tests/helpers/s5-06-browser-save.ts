@@ -10,7 +10,8 @@ import { mapStage4RuntimeToSaveV4 } from '../../src/core/persistence/stage4-runt
 import { commitSnapshot } from '../../src/systems/persistence/crash-safe-snapshot-store';
 import { MemoryStorage } from './memory-storage';
 
-type Variant = 'pending' | 'failed' | 'won' | 'occupancy' | 'zero' | 'number' | 'benben-available';
+type Variant = 'pending' | 'failed' | 'won' | 'occupancy' | 'zero' | 'number' |
+  'benben-available' | 'detection-rich' | 'waiting';
 
 /** Real valid v4 snapshot. Fixture construction never enters production UI or catalog. */
 export function boardBrowserSave(variant: Variant) {
@@ -22,6 +23,8 @@ export function boardBrowserSave(variant: Variant) {
   const width = board.dimensions.width;
   const mineIndex = board.cells.findIndex((cell) => cell.kind === 'mine');
   const mine = { x: mineIndex % width, y: Math.floor(mineIndex / width) };
+  const secondMineIndex = board.cells.findIndex((cell, index) => cell.kind === 'mine' && index !== mineIndex);
+  const anotherMine = secondMineIndex < 0 ? null : { x: secondMineIndex % width, y: Math.floor(secondMineIndex / width) };
   let selected: Coordinate | null = null;
   let expectedNumber: number | null = null;
   let run = attempt.run;
@@ -48,6 +51,8 @@ export function boardBrowserSave(variant: Variant) {
     rewards = attempt.rewards.map((reward) => ({ ...reward, claimed: true }));
     account = { ...account, completedLevelIds: ['level-001'] };
     terminalDisposition = 'settled';
+  } else if (variant === 'waiting') {
+    // Preserve the real fresh waiting Attempt and its hidden Board for browser input evidence.
   } else if (variant === 'benben-available') {
     account = { ...account, benbenByLevel: [{ levelId: 'level-001', status: 'available', failureStreak: 0 }] };
   } else {
@@ -55,7 +60,8 @@ export function boardBrowserSave(variant: Variant) {
     const index = board.cells.findIndex((cell, i) => cell.kind === 'safe' &&
       !rewardCells.has(`${i % width},${Math.floor(i / width)}`) &&
       (variant === 'zero' ? countAdjacentMines(board, { x: i % width, y: Math.floor(i / width) }) === 0 :
-        countAdjacentMines(board, { x: i % width, y: Math.floor(i / width) }) > 0));
+        variant === 'detection-rich' ? countAdjacentMines(board, { x: i % width, y: Math.floor(i / width) }) >= 2 :
+          countAdjacentMines(board, { x: i % width, y: Math.floor(i / width) }) > 0));
     if (index < 0) throw new Error('number fixture');
     selected = { x: index % width, y: Math.floor(index / width) };
     expectedNumber = countAdjacentMines(board, selected);
@@ -74,5 +80,5 @@ export function boardBrowserSave(variant: Variant) {
   if (mapped.status !== 'mapped') throw new Error(`v4 ${variant} fixture`);
   const storage = new MemoryStorage();
   if (commitSnapshot(storage, JSON.stringify(mapped.document), 4).status !== 'committed') throw new Error('snapshot fixture');
-  return { entries: [...storage.data], selected, expectedNumber, mine, moveTarget };
+  return { entries: [...storage.data], selected, expectedNumber, mine, anotherMine, moveTarget };
 }

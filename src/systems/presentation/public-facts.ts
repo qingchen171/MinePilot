@@ -98,7 +98,10 @@ export function sanitizeStage4Runtime(runtime: Stage4GameState,
   const entitlement = account.benbenByLevel.find((entry) => entry.levelId === currentAttempt.levelId)?.status ?? 'unavailable';
   const card = currentAttempt.temporaryBenbenCard;
   const access = getLevelAccess(catalog, currentAttempt.levelId, account.completedLevelIds);
-  const catalogHasCurrent = access.status === 'found';
+  const currentCanStart = access.status === 'found' && access.unlocked;
+  const nextAccess = access.status === 'found' && access.nextLevelId !== null
+    ? getLevelAccess(catalog, access.nextLevelId, account.completedLevelIds) : null;
+  const nextCanStart = nextAccess?.status === 'found' && nextAccess.unlocked;
   const claimedRewards: PublicClaimedReward[] = currentAttempt.rewards.filter((reward) => reward.claimed).map((reward) =>
     Object.freeze({ coordinate: Object.freeze({ x: reward.coordinate.x, y: reward.coordinate.y }),
       payload: reward.payload.kind === 'coins'
@@ -149,11 +152,11 @@ export function sanitizeStage4Runtime(runtime: Stage4GameState,
       }),
       terminal: Object.freeze({
         failure: phase === 'pending-mine-encounter',
-        retry: phase === 'failed' && catalogHasCurrent,
-        replay: phase === 'won' && catalogHasCurrent && account.completedLevelIds.includes(currentAttempt.levelId),
-        next: phase === 'won' && access.status === 'found' && access.nextLevelId !== null,
+        retry: phase === 'failed' && currentCanStart,
+        replay: phase === 'won' && currentCanStart && account.completedLevelIds.includes(currentAttempt.levelId),
+        next: phase === 'won' && nextCanStart,
         dismiss: phase === 'failed' || phase === 'won',
-        restart: phase === 'active' || phase === 'pending-mine-encounter',
+        restart: (phase === 'active' || phase === 'pending-mine-encounter') && currentCanStart,
       }),
       claimedRewards: Object.freeze(claimedRewards),
     }),
