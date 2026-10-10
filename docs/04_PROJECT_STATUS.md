@@ -1,9 +1,9 @@
 # PROJECT_STATUS
 
 **项目：MinePilot / Minesweeper Product**  
-**状态更新时间：2026-10-10**
+**状态更新时间：2026-10-11**
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01 至 S5-05 PASS / CLOSED，S5-06 Design Freeze / Closeout candidate。Production 保持单一 Stage 4 Runtime/Account authority 与唯一 guarded Save v4 writer。**
+**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01 至 S5-06 PASS / CLOSED。Production 保持单一 Stage 4 Runtime/Account authority 与唯一 guarded Save v4 writer。**
 
 ## 当前事实
 
@@ -197,13 +197,20 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 5 / S5-06 — Board, Character & Input Presentation Implementation**
+**Stage 5 / S5-07 — Item, Reward, Benben, Terminal & Tutorial Presentation Design Review**
 
-此唯一 Next Action **仅在本 S5-06 Design Freeze / Closeout 的独立 Reviewer、protected PR、对应 main Linux Quality 与最终 Recovery Test 全部 PASS 后生效**；任一门禁未完成时有效任务仍为 S5-06 Design Freeze / Closeout，不得开始 Implementation。当前 `CURRENT_SAVE_VERSION = 4`，唯一 production writer 为 guarded v4。下方历史设计段中的旧 Next Action/production 状态不覆盖本段；本 closeout 不执行 S5-06 Implementation、S5-07 或 Stage 6。
+此唯一 Next Action 仅在本 S5-06 Formal Closeout 的独立 Reviewer、protected PR、对应 main Linux Quality 与最终 Recovery Test 全部 PASS 后生效；任一门禁未完成时有效任务仍为 S5-06 Formal Closeout，不得开始 S5-07。当前 `CURRENT_SAVE_VERSION = 4`，唯一 production writer 为 guarded v4。下方历史设计段中的旧 Next Action/production 状态不覆盖本段；本 closeout 不执行 S5-07 或 Stage 6。
 
-### Stage 5 / S5-06 — Board, Character & Input Presentation Design — FROZEN after closeout gates
+### Stage 5 / S5-06 — Board, Character & Input Presentation Implementation — PASS / CLOSED
 
-- Elio 已接受 S5-06 Design Review、Attack Review 与 corrected design；四项 Attack finding 的完整可恢复修正和未来实现验收矩阵见 `docs/16_S5-06_Board_Character_Input_Presentation_Design_Contract.md`。本 docs-only closeout 的门禁未全绿前，状态只为 **Design Freeze candidate**；全绿后才正式 FROZEN / READY FOR IMPLEMENTATION。
+- 实现 PR #76 已合并 main `be191aaf1fa19a8a39ddf7b6130feca9cf389678`；限定键盘 blocker 修复 PR #77 已合并 main `72d7419e2c9a73058e03bb3ab414f636ba70bc89`。PR #77 的先行回归测试 commit `08d87a782b2108a8cfd7d3cc24a28b08d2cddd4d` 在 Linux Quality `38078609744` 确认失败；修复 commit `cd078b901ac1b96389bcc1a126958b83c913749f` 消除焦点切换后遗留 keyDown、错目标 keyUp 与伴生 click 的重复/阻塞风险，新 Enter/Space 可立即激活。PR #77 diff 仅涉及 board activation/DOM presentation 与相应 unit/browser tests。
+- Contract §7 的实现证据：`src/systems/presentation/public-facts.ts` 仅输出脱敏 row-major Board appearance、已提交位置与可信当前格数字；`src/main.ts` 在单一 production session/presentation root 下接线 DOM 唯一输入面与共享 `boardLayout`，Phaser `BoardScene` 仅绘制。桌面主键 Move、次键 Flag、显式 Flag 目标、键盘与触摸独立模式；同步提交后的同目标多击、键盘重复/合成 click 去重，另一目标可立即操作。pending/failed/won 无棋盘输入；occupancy、零格反馈、F5/Scene 重建、stale/uncertain/存储失败均只展示已提交公共事实；PR #74 的 Game-route reload 协调持续由浏览器回归覆盖。
+- 直接测试与 Linux 门禁：最终 PR #77/main 的 Architecture、TypeScript、build、948 Unit、247 Integration、30 Playwright 全部 PASS；PR #76 branch/PR/main Quality `38006955963` / `38006959817` / `38007245022` Success；PR #77 branch/PR/main Quality `38078761312` / `38079107220` / `38079388004` Success。实现与限定修复均经独立只读 Reviewer PASS；最终验收还包含真实浏览器焦点丢失后重新 Enter/Space、两标签路由恢复和守卫式 Save v4 reopen。Windows 原样 `npm run quality` 的 Architecture、TypeScript、Unit、Integration、build PASS，Playwright 启动 `127.0.0.1:5173` 报 `EACCES`，不可称本地 full PASS；权威 Linux Quality 为 Success。
+- 保持 Stage 1–4 frozen gameplay、单一 Runtime/adapter、Save v4 schema/version/reader/guarded writer、production catalog 与 S5-02/S5-05 操作结果和导航合同不变。本 Formal Closeout 仅更新本状态文档，不修改 production/tests/config/Save。已知限制仍是 localStorage 无 atomic CAS、仅一个 production Level、浏览器原生事件差异、Windows Playwright 端口环境与 Phaser >500 KB bundle warning；不宣称这些已解决。本次 docs-only closeout 的 Reviewer、PR/main CI 与最终 Recovery 以实际 Git/CI 记录为准，不预写未来运行编号或自引用 commit。
+
+### Stage 5 / S5-06 — Board, Character & Input Presentation Design — FROZEN (historical design entry)
+
+- Elio 已接受 S5-06 Design Review、Attack Review 与 corrected design；四项 Attack finding 的完整可恢复修正和实现验收矩阵见 `docs/16_S5-06_Board_Character_Input_Presentation_Design_Contract.md`。历史 Design Freeze 已完成；本段当时的 Implementation 入口由上方实际 PASS / CLOSED 状态取代。
 - 桌面棋盘主点击永远 Move、次键永远 Flag；可见 Flag 按钮仅操作明确显示的目标，不改变鼠标语义。一次原生激活至多一次提交：同目标多击、contextmenu/pointer/click 重叠及键盘重复不能产生第二个同步提交；不同目标的下一次激活可立即处理，不用全局时间锁。触摸模式单独明确显示，不声明 Stage 6 移动端认证。
 - DOM 是唯一棋盘输入面；DOM 与 Phaser 共用一个棋盘展示矩形、原点、cell size 和行优先坐标。Scene/DOM 只消费脱敏、可丢弃的已提交 ViewModel；未知 Safe/Mine 的视觉、ARIA、hover 和交互不可区分。当前格数字仅来自可信 query，0 为安全反馈，revealed-mine occupancy 不显示数字；动画不触发任何玩法/Save。
 - S5-05 Game reload 缺陷已在独立限定修复 PR #74 解决，合并 main `4a6f5702c8a0201f67a340d24ec9aec54f1ef4c2`。Game + account-only 的 committed reload 转 Home，unavailable/corrupt 转 Recovery；原 Attempt 仍在则 Game 有效，路由协调零 mutation。Protocol §7.1 的原因、影响、schema/migration=none、回归和 rollback 见新合同 §6；这是已验证依赖，不是 S5-06 新实现。PR #74 branch Linux `38001381123`、PR Linux `38001813254`、main Linux `38002036037` 均 Success，独立只读 Reviewer PASS；Windows 本地 Playwright 因端口 `EACCES` 未完成，不能写作本地完整 PASS。
@@ -1142,7 +1149,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md 与 16_S5-06_Board_Character_Input_Presentation_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01 至 S5-05 PASS / CLOSED；PR #74 的 S5-05 Game reload 限定修复已合并。Production 保持单一 Stage 4 Runtime/full Account、Settings/Tutorial 必填与唯一 guarded Save v4 writer。本 S5-06 Design Freeze / Closeout 的 Reviewer、PR/main Linux Quality 与最终 Recovery 全绿后，唯一下一行动才是 Stage 5 / S5-06 — Board, Character & Input Presentation Implementation；门禁前不开始 Implementation、S5-07 或 Stage 6。
+请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md 与 16_S5-06_Board_Character_Input_Presentation_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01 至 S5-06 PASS / CLOSED；PR #74、#76、#77 均已合并，S5-06 键盘焦点缺陷由 #77 修复。Production 保持单一 Stage 4 Runtime/full Account、Settings/Tutorial 必填与唯一 guarded Save v4 writer。本 S5-06 Formal Closeout 的 Reviewer、PR/main Linux Quality 与最终 Recovery 全绿后，唯一下一行动是 Stage 5 / S5-07 — Item, Reward, Benben, Terminal & Tutorial Presentation Design Review；门禁前不开始 S5-07 或 Stage 6。
 ```
 
 ## 阶段看板
@@ -1154,7 +1161,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN / PASS；annotated `stage-3-frozen` 已验证 | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | FROZEN / PASS；annotated `stage-4-frozen` 已验证；S4-09 PASS/CLOSED；当时 Save v3 writer ACTIVE，现由 S5-04 的 v4 writer 接替 | Stage 3 FROZEN / PASS |
-| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-05 PASS / CLOSED；S5-06 Design Freeze candidate，经本 closeout 全部门禁后 FROZEN；production Save v4 ACTIVE | Stage 4 `stage-4-frozen` 已确认；本 closeout 完成后唯一入口 S5-06 Implementation |
+| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-06 PASS / CLOSED；production Save v4 ACTIVE | Stage 4 `stage-4-frozen` 已确认；本 closeout 完成后唯一入口 S5-07 Design Review |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
 
