@@ -117,7 +117,11 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
       afterGameOutcome(outcome);
     },
   });
-  presentationRoot.onAuthorityReload(() => board.invalidateAuthority());
+  presentationRoot.onAuthorityReload(() => {
+    board.invalidateAuthority();
+    visibleReceipt = null;
+    visibleMilestone = null;
+  });
   const drawGameControls = () => {
     const current = presentationRoot.read();
     const route = presentationRoot.navigation.route();
