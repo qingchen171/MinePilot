@@ -74,6 +74,33 @@ test('account-only Shop offers the persisted first-shop tutorial without buying'
   await expect(page.locator('[data-action="tutorial-first-shop"]')).toHaveCount(0);
 });
 
+test('first-shop tutorial owns its retained Retry, which is cancelled on Shop exit without a purchase', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Shop' }).first().click();
+  await page.evaluate(() => {
+    const original = Storage.prototype.getItem;
+    let once = true;
+    Storage.prototype.getItem = function(key) {
+      if (once && key === 'minepilot:persistence:writer-lease') {
+        once = false; throw new Error('injected pre-commit lease read failure');
+      }
+      return original.call(this, key);
+    };
+  });
+  await page.locator('[data-action="tutorial-first-shop"]').click();
+  await expect(page.locator('[data-action="tutorial-first-shop-retry"]')).toBeVisible();
+  await page.getByRole('button', { name: 'Home' }).first().click();
+  await page.getByRole('button', { name: 'Shop' }).first().click();
+  await expect(page.locator('[data-action="tutorial-first-shop-retry"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="tutorial-first-shop-reload"]')).toBeVisible();
+  await page.locator('[data-action="tutorial-first-shop-reload"]').click();
+  await page.locator('[data-action="tutorial-first-shop"]').click();
+  expect(await revision(page)).toBe(0);
+  await page.reload();
+  await page.getByRole('button', { name: 'Shop' }).first().click();
+  await expect(page.locator('[data-action="tutorial-first-shop"]')).toHaveCount(0);
+});
+
 test('Benben claim is a separate guarded action and the temporary card survives F5', async ({ page }) => {
   const fixture = boardBrowserSave('benben-available');
   await installFixture(page, fixture.entries);
@@ -92,6 +119,28 @@ test('Benben claim is a separate guarded action and the temporary card survives 
   await page.reload();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.locator('.game-detail')).toContainText('Temporary item');
+});
+
+test('temporary Detection is consumed before Account inventory and expires on committed Restart', async ({ page }) => {
+  const fixture = boardBrowserSave('temporary-detection');
+  await installFixture(page, fixture.entries);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.locator('.game-detail')).toContainText('Temporary card');
+  const before = await revision(page);
+  await page.locator('[data-game-action="detection"]').click();
+  expect(await revision(page)).toBe(before + 1);
+  await expect(page.locator('.game-detail')).toContainText('Temporary item used');
+  await expect(page.locator('.game-detail')).toContainText('Uses remaining: 1');
+  await expect(page.locator('.game-detail')).toContainText('Inventory');
+  await page.reload();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.locator('.game-detail')).toContainText('Temporary item used');
+  await page.locator('[data-game-action="confirm-restart"]').click();
+  await page.locator('[data-game-action="restart"]').click();
+  expect(await revision(page)).toBe(before + 2);
+  await expect(page.locator('.game-detail')).not.toContainText('Temporary item used');
+  await expect(page.locator('.game-detail')).toContainText('Uses remaining: 2');
 });
 
 test('committed win offers Replay/Dismiss but not unavailable Next in the one-level catalog', async ({ page }) => {
@@ -122,6 +171,22 @@ test('Detection native double-click commits once, then a distinct keyboard activ
   await page.locator('[data-game-action="detection"]').press('Enter');
   expect(await revision(page)).toBe(before + 2);
   await expect(page.locator('.game-detail')).toContainText('Uses remaining: 0');
+});
+
+test('held Detection key repeats and companion click commit once, then a new key sequence remains legal', async ({ page }) => {
+  const fixture = boardBrowserSave('detection-rich');
+  await installFixture(page, fixture.entries);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const before = await revision(page);
+  await page.locator('[data-game-action="detection"]').focus();
+  await page.keyboard.down('Enter');
+  await page.keyboard.down('Enter');
+  await page.keyboard.up('Enter');
+  expect(await revision(page)).toBe(before + 1);
+  await page.locator('[data-game-action="detection"]').focus();
+  await page.locator('[data-game-action="detection"]').press('Space');
+  expect(await revision(page)).toBe(before + 2);
 });
 
 test('real first Mine auto-Lucky then later pending Revive survives browser reload', async ({ page }) => {
@@ -166,6 +231,25 @@ test('one committed Reward receipt appears once; F5 restores claimed assets with
   await expect(page.getByRole('heading', { name: 'Claimed rewards' })).toBeVisible();
 });
 
+test('strict preloaded v4 one-time L4 Reward is claimed once by the real Game session, not generated content', async ({ page }) => {
+  const fixture = boardBrowserSave('one-time-l4');
+  expect(fixture.rewardTarget).not.toBeNull();
+  await installFixture(page, fixture.entries);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const index = fixture.rewardTarget!.y * 9 + fixture.rewardTarget!.x;
+  const before = await revision(page);
+  await page.locator(`[data-cell-index="${index}"]`).click();
+  expect(await revision(page)).toBe(before + 1);
+  await expect(page.getByRole('heading', { name: 'Reward saved' })).toBeVisible();
+  await expect(page.locator('.game-detail')).toContainText('This coin reward can be claimed only once.');
+  await page.reload();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'Reward saved' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Claimed rewards' })).toBeVisible();
+  await expect(page.locator('.game-detail')).toContainText('This coin reward can be claimed only once.');
+});
+
 test('Game control keyboard focus loss cancels a held activation without blocking the next key', async ({ page }) => {
   const fixture = boardBrowserSave('detection-rich');
   await installFixture(page, fixture.entries);
@@ -199,4 +283,51 @@ test('competing writer does not publish stale Game Item state and explicit reloa
   await page.locator('[data-game-action="reload"]').click();
   await expect(page.locator('.game-detail')).toContainText('Uses remaining: 1');
   await competitor.close();
+});
+
+test('a stale Airplane target is invalidated by a competing writer and cannot replay after reload', async ({ page }) => {
+  const fixture = boardBrowserSave('waiting');
+  await installFixture(page, fixture.entries);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.locator('[data-cell-index="0"]').focus();
+  await expect(page.locator('[data-game-action="airplane"]')).toBeEnabled();
+  const competitor = await page.context().newPage();
+  await competitor.goto('/');
+  await competitor.getByRole('button', { name: 'Continue' }).click();
+  await competitor.locator('[data-cell-index="1"]').click({ button: 'right' });
+  const afterCompetitor = await revision(page);
+  await page.locator('[data-game-action="airplane"]').click();
+  expect(await revision(page)).toBe(afterCompetitor);
+  await expect(page.locator('[data-game-action="airplane"]')).toBeDisabled();
+  await page.locator('[data-game-action="reload"]').click();
+  await expect(page.locator('[data-game-action="airplane"]')).toBeDisabled();
+  await page.locator('[data-cell-index="0"]').focus();
+  await expect(page.locator('[data-game-action="airplane"]')).toBeEnabled();
+  await competitor.close();
+});
+
+test('uncertain Item head write never displays a committed reveal or retries on repeated activation', async ({ page }) => {
+  const fixture = boardBrowserSave('detection-rich');
+  await installFixture(page, fixture.entries);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const before = await revision(page);
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    let failed = false;
+    Storage.prototype.setItem = function(key, value) {
+      if (!failed && key === 'minepilot:persistence:head') {
+        failed = true; throw new Error('injected uncertain head write');
+      }
+      return original.call(this, key, value);
+    };
+  });
+  await page.locator('[data-game-action="detection"]').click();
+  expect(await revision(page)).toBe(before);
+  await expect(page.locator('.game-detail')).toContainText('Reload game');
+  await expect(page.locator('.game-detail')).not.toContainText('Reward saved');
+  await expect(page.locator('[data-game-action="detection"]')).toBeDisabled();
+  await page.locator('[data-game-action="detection"]').click({ force: true });
+  expect(await revision(page)).toBe(before);
 });

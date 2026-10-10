@@ -15,6 +15,7 @@ import { createPresentationRoot } from '../../src/presentation-root';
 import type { PresentationSessionPort } from '../../src/systems/presentation/session-port';
 import { MemoryStorage } from '../helpers/memory-storage';
 import { gameTutorialContexts } from '../../src/ui/game-presentation';
+import { boardBrowserSave } from '../helpers/s5-06-browser-save';
 
 const identity = { sessionId: 'controlled-s5-07', leaseToken: 'controlled-token' };
 const clock = { nowMs: () => 100 };
@@ -102,6 +103,26 @@ function preloadedOneTimeV4() {
 }
 
 describe('S5-07 controlled catalog through guarded v4 execution and public projection', () => {
+  it('loads the exact strictly validated browser compatibility fixtures before page execution', () => {
+    for (const variant of ['one-time-l4', 'temporary-detection'] as const) {
+      const fixture = boardBrowserSave(variant);
+      const storage = new MemoryStorage();
+      for (const [key, value] of fixture.entries) storage.data.set(key, value);
+      const read = loadProductionPersistedSave(storage);
+      expect(read.status).toBe('loaded');
+      if (read.status !== 'loaded') continue;
+      expect(read.persistence.sourceSaveVersion).toBe(4);
+      expect(read.runtime.currentAttempt?.levelId).toBe(variant === 'one-time-l4' ? 'level-004' : 'level-001');
+      if (variant === 'one-time-l4') {
+        expect(read.runtime.currentAttempt?.rewards).toMatchObject([{ claimed: false,
+          oneTimeClaimId: 'browser-l4-once', payload: { kind: 'coins', amount: 1 } }]);
+        expect(read.runtime.account.oneTimeClaimIds).toEqual([]);
+      } else {
+        expect(read.runtime.currentAttempt?.temporaryBenbenCard).toEqual({ item: 'detection', consumed: false });
+        expect(read.runtime.account.benbenByLevel).toMatchObject([{ status: 'used' }]);
+      }
+    }
+  });
   it('reports two separately proven Rewards from one Airplane commit, with no F5 receipt replay', () => {
     const f = setup(2);
     expect(f.root.navigation.levels()?.map((entry) => entry.levelId))
