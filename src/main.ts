@@ -205,7 +205,6 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
     if (route === 'game' && current.status !== 'recovery') {
       gamePresentation.render(current.view, visibleReceipt, presentationRoot.gameRetryAvailable(),
         gameReloadRequired, visibleMilestone);
-      visibleReceipt = null;
       visibleMilestone = null;
     } else { gamePresentation.clear(); visibleReceipt = null; visibleMilestone = null; gameReloadRequired = false; }
   };

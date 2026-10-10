@@ -4,6 +4,7 @@ import { createProductionStage4Session } from '../../src/systems/persistence/pro
 import { loadCommittedSnapshot, SNAPSHOT_STORAGE_KEYS } from '../../src/systems/persistence/crash-safe-snapshot-store';
 import { MemoryStorage } from '../helpers/memory-storage';
 import { countAdjacentMines } from '../../src/core/neighborhood';
+import { boardBrowserSave } from '../helpers/s5-06-browser-save';
 
 const identity = { sessionId: 's5-07', leaseToken: 's5-07-token' };
 const clock = { nowMs: () => 100 };
@@ -22,6 +23,15 @@ function setup() {
 }
 
 describe('S5-07 public presentation over the guarded production session', () => {
+  it('proves a real production L1 Reward receipt from the browser waiting fixture', () => {
+    const fixture = boardBrowserSave('waiting');
+    expect(fixture.rewardTarget).not.toBeNull();
+    const storage = new MemoryStorage();
+    for (const [key, value] of fixture.entries) storage.data.set(key, value);
+    const root = createPresentationRoot(createProductionStage4Session(storage, identity, clock), technical);
+    const outcome = root.submit({ kind: 'move', coordinate: fixture.rewardTarget! });
+    expect(outcome).toMatchObject({ status: 'committed', rewardReceipt: { status: 'proven', entries: [{}] } });
+  });
   it('uses the selected-coordinate semantic Airplane, commits one resource/usage, and reopens public facts', () => {
     const f = setup();
     const before = f.root.read();

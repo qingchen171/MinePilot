@@ -145,7 +145,7 @@ test('real first Mine auto-Lucky then later pending Revive survives browser relo
   await page.reload();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.locator('.board-position')).toContainText('revealed mine');
-  await expect(page.locator('.game-detail')).toContainText('Uses remaining: 0');
+  await expect(page.locator('[data-game-action="revive"]')).toHaveCount(0);
 });
 
 test('one committed Reward receipt appears once; F5 restores claimed assets without replaying the receipt', async ({ page }) => {
