@@ -204,6 +204,30 @@ test('keyboard hold and assistive click use one activation each', async ({ page 
   expect(await revision(page)).toBe(before + 2);
 });
 
+test('focus change cancels a held key without moving, then Enter and Space remain available', async ({ page }) => {
+  await openBoard(page);
+  const first = page.locator('[data-cell-index="0"]');
+  const second = page.locator('[data-cell-index="1"]');
+  await first.focus();
+  const before = await revision(page);
+  await page.keyboard.down('Enter');
+  await page.keyboard.press('ArrowRight');
+  await expect(second).toBeFocused();
+  await page.keyboard.up('Enter');
+  expect(await revision(page)).toBe(before);
+  await second.press('Enter');
+  expect(await revision(page)).toBe(before + 1);
+
+  await second.focus();
+  await page.keyboard.down(' ');
+  await page.evaluate(() => (document.activeElement as HTMLElement).blur());
+  await page.keyboard.up(' ');
+  expect(await revision(page)).toBe(before + 1);
+  await first.focus();
+  await first.press(' ');
+  expect(await revision(page)).toBe(before + 2);
+});
+
 test('zoom, DPR, route reconstruction and scroll keep one public board geometry', async ({ page }) => {
   await openBoard(page);
   await page.getByRole('button', { name: 'Settings' }).click();

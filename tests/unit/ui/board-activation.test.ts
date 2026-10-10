@@ -23,6 +23,18 @@ describe('native board activation gate', () => {
     expect(gate.pointer(target, 0)).toBe(true);
   });
 
+  it('discards a key sequence released on another target and accepts a fresh activation', () => {
+    const gate = createBoardActivationGate();
+    const a = { x: 0, y: 0 }; const b = { x: 1, y: 0 };
+    expect(gate.keyDown(a, 'Enter', false)).toBe(true);
+    expect(gate.keyUp(b, 'Enter')).toBe(false);
+    expect(gate.keyDown(b, 'Enter', false)).toBe(true);
+    expect(gate.keyUp(b, 'Enter')).toBe(true);
+    expect(gate.consumeCompanionClick(b, 0)).toBe(true);
+    expect(gate.keyDown(b, ' ', false)).toBe(true);
+    expect(gate.keyUp(b, ' ')).toBe(true);
+  });
+
   it('consumes a touch compatibility click from a contextmenu, but permits a new press', () => {
     const gate = createBoardActivationGate(); const target = { x: 3, y: 4 };
     gate.newPress(); gate.markContextMenu(target);
