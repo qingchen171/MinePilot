@@ -28,6 +28,8 @@ describe('S5-02 public facts and pure projection', () => {
     expect(Object.keys(facts.attempt ?? {})).toEqual(['levelId', 'phase', 'hasTakenStep', 'position', 'board', 'currentMineCount',
       'itemUses', 'items', 'benben', 'terminal', 'claimedRewards']);
     const exposed = JSON.stringify(facts);
+    expect(facts.attempt?.claimedRewards).toEqual([]);
+    expect(exposed).not.toContain('"payload"');
     for (const secret of ['private-run-id', 'private-rng', 'private-generation', '123456789', 'rewards', 'oneTimeClaimId', 'generationProvenance']) {
       expect(exposed).not.toContain(secret);
     }

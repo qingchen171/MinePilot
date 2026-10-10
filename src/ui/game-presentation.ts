@@ -16,12 +16,12 @@ export interface GamePresentationActions {
   submit(action: Action, milestoneId?: string): void;
   airplaneTargetAvailable(): boolean;
 }
-const milestones = [
+export const GAME_TUTORIAL_MILESTONES = [
   'l1-movement-current-number', 'l2-number-hides-on-leave', 'l3-flag-misclick-protection',
   'l4-one-time-coin-reward', 'l5-failure-retry-first-step-safety', 'first-lucky',
   'first-obstacle', 'first-items', 'first-shop',
 ] as const;
-export type GameMilestone = typeof milestones[number];
+export type GameMilestone = typeof GAME_TUTORIAL_MILESTONES[number];
 
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, key: PresentationCopyKey): HTMLElementTagNameMap[K] {
   const value = document.createElement(tag);
@@ -33,7 +33,6 @@ function node<K extends keyof HTMLElementTagNameMap>(tag: K, key: PresentationCo
 export function createGamePresentation(host: HTMLElement, actions: GamePresentationActions) {
   let pendingKey: { key: string; action: string } | null = null;
   let keyboardCompanion: string | null = null;
-  let previousPointerAction: string | null = null;
   let busy = false;
   let restartConfirmation = false;
   let benbenDeferred = false;
@@ -68,17 +67,12 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
       actions.submit(action, buttonElement.dataset.milestoneId);
     } finally { busy = false; }
   }
-  host.addEventListener('pointerdown', (event) => {
-    const target = actionOf(event.target);
-    if (target) previousPointerAction = target.dataset.gameAction ?? null;
-  });
   host.addEventListener('click', (event) => {
     const target = actionOf(event.target);
     if (!target) return;
     const action = target.dataset.gameAction!;
     if (keyboardCompanion === action) { keyboardCompanion = null; event.preventDefault(); return; }
-    if (event.detail > 1 && previousPointerAction === action) { event.preventDefault(); return; }
-    previousPointerAction = action;
+    if (event.detail > 1) { event.preventDefault(); return; }
     activate(target);
   });
   host.addEventListener('dblclick', (event) => event.preventDefault());
@@ -184,7 +178,7 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
       if (view!.tutorialAcknowledgmentAllowed) append('game.tutorial.acknowledge', 'acknowledge-tutorial', true, chosen);
     }
     append('game.tutorial.title', 'toggle-help');
-    if (helpOpen) for (const id of milestones) {
+    if (helpOpen) for (const id of GAME_TUTORIAL_MILESTONES) {
       if (!acknowledged.has(id)) host.append(node('p', `game.tutorial.${id}`));
     }
     if (focused) {

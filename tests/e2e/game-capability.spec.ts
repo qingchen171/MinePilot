@@ -34,8 +34,6 @@ test('actual Game: tutorial ack is explicit, Airplane uses selected DOM target, 
   await airplane.click();
   expect(await revision(page)).toBe(before + 1);
   await expect(page.locator('[data-game-action="airplane"]')).toBeDisabled();
-  await page.reload();
-  await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.locator('.game-detail')).toContainText('Uses remaining: 0');
   const ack = page.locator('[data-game-action="acknowledge-tutorial"]');
   await expect(ack).toBeVisible();
@@ -44,6 +42,7 @@ test('actual Game: tutorial ack is explicit, Airplane uses selected DOM target, 
   expect(await revision(page)).toBe(beforeAck + 1);
   await page.reload();
   await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.locator('.game-detail')).toContainText('Uses remaining: 0');
   await expect(page.locator('[data-game-action="acknowledge-tutorial"]')).not.toHaveAttribute('data-milestone-id', 'l1-movement-current-number');
 });
 
@@ -139,9 +138,6 @@ test('real first Mine auto-Lucky then later pending Revive survives browser relo
   await expect(page.locator('.board-position')).toContainText('revealed mine');
   await expect(page.locator('.game-detail')).toContainText('Lucky saved this step');
   await expect(page.locator('[data-game-action="revive"]')).toHaveCount(0);
-  await page.reload();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.locator('.board-position')).toContainText('revealed mine');
   await page.locator(`[data-cell-index="${secondIndex}"]`).click();
   await expect(page.locator('[data-game-action="revive"]')).toBeEnabled();
   await page.locator('[data-game-action="revive"]').click();
@@ -149,6 +145,25 @@ test('real first Mine auto-Lucky then later pending Revive survives browser relo
   await page.reload();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.locator('.board-position')).toContainText('revealed mine');
+  await expect(page.locator('.game-detail')).toContainText('Uses remaining: 0');
+});
+
+test('one committed Reward receipt appears once; F5 restores claimed assets without replaying the receipt', async ({ page }) => {
+  const fixture = boardBrowserSave('waiting');
+  expect(fixture.rewardTarget).not.toBeNull();
+  await installFixture(page, fixture.entries);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const index = fixture.rewardTarget!.y * 9 + fixture.rewardTarget!.x;
+  const before = await revision(page);
+  await page.locator(`[data-cell-index="${index}"]`).click();
+  expect(await revision(page)).toBe(before + 1);
+  await expect(page.getByRole('heading', { name: 'Reward saved' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Claimed rewards' })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'Reward saved' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Claimed rewards' })).toBeVisible();
 });
 
 test('Game control keyboard focus loss cancels a held activation without blocking the next key', async ({ page }) => {

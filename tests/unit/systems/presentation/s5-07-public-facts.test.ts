@@ -6,6 +6,7 @@ import { sanitizeStage4Runtime } from '../../../../src/systems/presentation/publ
 import { projectPublicFacts } from '../../../../src/ui/presentation-projection';
 import { TUTORIAL_MILESTONE_IDS } from '../../../../src/core/settings-tutorial';
 import { PRESENTATION_COPY } from '../../../../src/config/presentation-copy';
+import { GAME_TUTORIAL_MILESTONES } from '../../../../src/ui/game-presentation';
 
 function view(variant: Parameters<typeof boardBrowserSave>[0]) {
   const storage = new MemoryStorage();
@@ -18,6 +19,7 @@ function view(variant: Parameters<typeof boardBrowserSave>[0]) {
 describe('S5-07 public allowlist and advisory controls', () => {
   it('provides a centralized semantic resource for each exact persisted tutorial ID', () => {
     expect(TUTORIAL_MILESTONE_IDS).toHaveLength(9);
+    expect(GAME_TUTORIAL_MILESTONES).toEqual(TUTORIAL_MILESTONE_IDS);
     for (const id of TUTORIAL_MILESTONE_IDS) {
       expect(PRESENTATION_COPY[`game.tutorial.${id}`]).toBeTruthy();
     }

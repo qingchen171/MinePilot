@@ -71,6 +71,10 @@ describe('S5-07 controlled catalog through guarded v4 execution and public proje
     expect(result.status).toBe('committed');
     if (result.status !== 'committed' || result.snapshot.status === 'recovery') return;
     expect(result.rewardReceipt).toMatchObject({ status: 'proven', entries: [{ oneTime: false }, { oneTime: false }] });
+    if (result.rewardReceipt?.status === 'proven') {
+      const coordinates = result.rewardReceipt.entries.map((entry) => entry.coordinate.y * 3 + entry.coordinate.x);
+      expect(coordinates).toEqual([...coordinates].sort((a, b) => a - b));
+    }
     expect(result.snapshot.view.account.inventory.airplane).toBe(0);
     expect(result.snapshot.view.account.coins).toBe(2);
     expect(result.snapshot.view.attempt?.claimedRewards).toHaveLength(2);

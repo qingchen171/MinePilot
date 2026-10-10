@@ -55,6 +55,12 @@ navigationPanel?.setAttribute('aria-label', presentationCopy('nav.main-label'));
 gamePanel?.setAttribute('aria-label', presentationCopy('game.region-label'));
 if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
     gamePanel !== null && gameStage !== null && gameControls !== null && presentationRoot !== null) {
+  let shopTutorialCompanionPending = false;
+  shopPanel.addEventListener('click', (event) => {
+    if (shopTutorialCompanionPending && event.detail > 1) {
+      event.preventDefault(); event.stopImmediatePropagation(); shopTutorialCompanionPending = false;
+    } else if (event.detail <= 1) shopTutorialCompanionPending = false;
+  }, true);
   const resultMessage = (result: { readonly status: string; readonly reason?: string;
     readonly priorCommit?: boolean;
     readonly outcome?: { readonly status: string; readonly copyKey: PresentationCopyKey } }): PresentationCopyKey | null => {
@@ -185,6 +191,7 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
         acknowledge.addEventListener('keydown', (event) => { if (event.repeat) event.preventDefault(); });
         acknowledge.addEventListener('click', (event) => {
           if (event.detail > 1) return;
+          shopTutorialCompanionPending = true;
           const outcome = presentationRoot.submit({ kind: 'acknowledge-tutorial', milestoneId: 'first-shop' });
           draw(outcome.status === 'committed' ? outcome.copyKey : outcome.copyKey,
             outcome.status === 'committed' ? outcome.snapshot : null);

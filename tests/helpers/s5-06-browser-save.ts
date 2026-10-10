@@ -25,6 +25,7 @@ export function boardBrowserSave(variant: Variant) {
   const mine = { x: mineIndex % width, y: Math.floor(mineIndex / width) };
   const secondMineIndex = board.cells.findIndex((cell, index) => cell.kind === 'mine' && index !== mineIndex);
   const anotherMine = secondMineIndex < 0 ? null : { x: secondMineIndex % width, y: Math.floor(secondMineIndex / width) };
+  const rewardTarget = attempt.rewards[0]?.coordinate ?? null;
   let selected: Coordinate | null = null;
   let expectedNumber: number | null = null;
   let run = attempt.run;
@@ -80,5 +81,5 @@ export function boardBrowserSave(variant: Variant) {
   if (mapped.status !== 'mapped') throw new Error(`v4 ${variant} fixture`);
   const storage = new MemoryStorage();
   if (commitSnapshot(storage, JSON.stringify(mapped.document), 4).status !== 'committed') throw new Error('snapshot fixture');
-  return { entries: [...storage.data], selected, expectedNumber, mine, anotherMine, moveTarget };
+  return { entries: [...storage.data], selected, expectedNumber, mine, anotherMine, rewardTarget, moveTarget };
 }
