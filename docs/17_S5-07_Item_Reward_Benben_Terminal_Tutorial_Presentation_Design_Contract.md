@@ -1,6 +1,6 @@
 # S5-07 Item, Reward, Benben, Terminal & Tutorial Presentation Design Contract
 
-**Status: accepted Design Review, Attack Review and corrected design; Design Freeze candidate.** This document becomes FROZEN / READY FOR IMPLEMENTATION only after the docs-only independent Reviewer, protected PR, branch/PR/main Linux Quality and final Recovery Test succeed. It does not implement S5-07. The Specification, Protocol, S0-06, Stage 1–4 frozen contracts, and S5-01–S5-06 contracts retain precedence. `PROJECT_STATUS` gives the effective single Next Action.
+**Status: FROZEN / READY FOR IMPLEMENTATION.** The accepted Design Review, Attack Review and corrected design passed independent read-only Reviewer, protected PR #79, branch/PR/main Linux Quality and Recovery Test. This contract does not implement S5-07. The Specification, Protocol, S0-06, Stage 1–4 frozen contracts, and S5-01–S5-06 contracts retain precedence. `PROJECT_STATUS` gives the single Next Action.
 
 ## 1. Authority, ownership and public facts
 
@@ -99,4 +99,4 @@ S5-07 is one capability. Internal implementation slices may separate public proj
 
 Known limits remain: localStorage has no atomic CAS/absolute mutex; production currently has one Level, ordinary Rewards and no obstacles; a one-shot receipt can be missed if F5 occurs immediately after commit, while committed assets/claimed facts remain recoverable; browser native-event variations require the browser gate; Phaser >500 KB remains an observation. An unacknowledged event-only tutorial explanation can be revisited read-only without replaying its triggering command.
 
-A fresh AI using AGENTS, Specification, Protocol, `PROJECT_STATUS`, this contract, S5-01–S5-06 contracts, source/tests and Git history must recover Stage 0–4 FROZEN, Stage 5 IN PROGRESS, the six corrected Attack boundaries, nine exact tutorial IDs, single guarded Save v4 authority, absent production L2–L5/one-time content, implementation acceptance tests, and exactly one next action. Until this docs-only closeout's independent review, protected PR, branch/PR/main Linux Quality and final Recovery Test all succeed, effective work remains S5-07 Design Freeze / Closeout. After success, `PROJECT_STATUS` may authorize only S5-07 Implementation; this contract does not start it.
+A fresh AI using AGENTS, Specification, Protocol, `PROJECT_STATUS`, this contract, S5-01–S5-06 contracts, source/tests and Git history must recover Stage 0–4 FROZEN, Stage 5 IN PROGRESS, the six corrected Attack boundaries, nine exact tutorial IDs, single guarded Save v4 authority, absent production L2–L5/one-time content, implementation acceptance tests, and exactly one next action: S5-07 Implementation. This contract does not start it.
