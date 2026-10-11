@@ -1,8 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { createServer, type ViteDevServer } from 'vite';
 import { createLevelCatalog, PRODUCTION_LEVEL_CATALOG } from '../../src/core/level-catalog';
+import { createBoard, createCellState } from '../../src/core/board';
+import { countAdjacentMines, getNeighborCoordinates } from '../../src/core/neighborhood';
 import { createCompleteAttempt } from '../../src/core/stage4-attempt-factory';
 import { createInitialStage4GameState, createStage4GameState } from '../../src/core/stage4-game-state';
+import { createOnBoardPosition, createRunState } from '../../src/core/run';
 import { mapStage4RuntimeToSaveV4 } from '../../src/core/persistence/stage4-runtime-mapping-v4';
 import { validateSaveDocumentV4 } from '../../src/core/persistence/save-v4';
 import { commitSnapshot } from '../../src/systems/persistence/crash-safe-snapshot-store';
@@ -46,6 +49,8 @@ function savedEntries(levelId: string | null) {
     inventory: { ...initial.account.inventory, lucky: 0 } };
   let currentAttempt = null;
   let mineIndex = -1;
+  let moveIndex = -1;
+  let originIndex = -1;
   if (levelId !== null) {
     const level = catalog.levels.find((entry) => entry.levelId === levelId);
     if (!level) throw new Error('controlled level missing');
@@ -54,6 +59,29 @@ function savedEntries(levelId: string | null) {
     if (created.status !== 'created') throw new Error('controlled attempt creation failed');
     currentAttempt = created.attempt;
     mineIndex = currentAttempt.run.board.cells.findIndex((cell) => cell.kind === 'mine');
+    if (levelId === 'level-002') {
+      const board = currentAttempt.run.board;
+      const width = board.dimensions.width;
+      const rewardCoordinates = new Set(currentAttempt.rewards.map((reward) =>
+        `${reward.coordinate.x},${reward.coordinate.y}`));
+      for (let index = 0; index < board.cells.length && originIndex < 0; index += 1) {
+        const coordinate = { x: index % width, y: Math.floor(index / width) };
+        if (board.cells[index]?.kind !== 'safe' || rewardCoordinates.has(`${coordinate.x},${coordinate.y}`) ||
+            countAdjacentMines(board, coordinate) === 0) continue;
+        const neighbor = getNeighborCoordinates(board, coordinate).find((candidate) => {
+          const candidateIndex = candidate.y * width + candidate.x;
+          return board.cells[candidateIndex]?.kind === 'safe';
+        });
+        if (neighbor) { originIndex = index; moveIndex = neighbor.y * width + neighbor.x; }
+      }
+      if (originIndex < 0 || moveIndex < 0) throw new Error('L2 numbered Safe transition unavailable');
+      const explored = createBoard(board.dimensions, board.cells.map((cell, index) => index === originIndex
+        ? createCellState({ terrain: 'playable', containsMine: false, explored: true, mineRevealed: false, flagged: false })
+        : cell));
+      const coordinate = { x: originIndex % width, y: Math.floor(originIndex / width) };
+      currentAttempt = { ...currentAttempt,
+        run: createRunState(explored, createOnBoardPosition(coordinate), { hasTakenStep: true }) };
+    }
   }
   const runtime = createStage4GameState({ ...initial, account, currentAttempt });
   const mapped = mapStage4RuntimeToSaveV4(runtime, 0);
@@ -63,7 +91,7 @@ function savedEntries(levelId: string | null) {
   const storage = new MemoryStorage();
   if (commitSnapshot(storage, JSON.stringify(validated.document), 0).status !== 'committed')
     throw new Error('controlled snapshot commit failed');
-  return { entries: [...storage.data.entries()], mineIndex };
+  return { entries: [...storage.data.entries()], mineIndex, moveIndex, originIndex };
 }
 
 async function install(page: import('@playwright/test').Page, entries: [string, string][]) {
@@ -98,9 +126,19 @@ test('controlled L2/L3 catalog is shared by selection and guarded browser execut
   await expect(page.locator('[data-cell-index="1"]')).toHaveAttribute('data-appearance', 'flagged');
 });
 
-test('controlled L2 provides contextual Help without exposing hidden cells', async ({ page }) => {
-  await install(page, savedEntries('level-002').entries);
+test('controlled L2 committed move-away prompts once, F5 keeps Help without replay or hidden-cell leakage', async ({ page }) => {
+  const saved = savedEntries('level-002');
+  await install(page, saved.entries);
   await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.locator('.board-current-number')).toContainText(/Nearby mines: [1-8]/);
+  await page.locator(`[data-cell-index="${saved.moveIndex}"]`).click();
+  await expect(page.locator('.game-detail')).toContainText('The number belongs to your current cell');
+  await expect(page.locator(`[data-cell-index="${saved.originIndex}"]`)).toHaveAttribute('data-appearance', 'explored');
+  await expect(page.locator(`[data-cell-index="${saved.originIndex}"]`))
+    .not.toHaveAttribute('aria-label', /Nearby mines:/);
+  await page.reload();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.locator('.game-detail')).not.toContainText('The number belongs to your current cell');
   await page.locator('[data-game-action="toggle-help"]').click();
   await expect(page.locator('.game-detail')).toContainText('The number belongs to your current cell');
   const unknown = page.locator('[data-appearance="unknown"]');
