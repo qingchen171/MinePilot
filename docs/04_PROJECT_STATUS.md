@@ -3,7 +3,7 @@
 **项目：MinePilot / Minesweeper Product**  
 **状态更新时间：2026-10-11**
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01 至 S5-06 PASS / CLOSED，S5-07 Design FROZEN / READY FOR IMPLEMENTATION。Production 保持单一 Stage 4 Runtime/Account authority 与唯一 guarded Save v4 writer。**
+**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01 至 S5-07 PASS / CLOSED。Production 保持单一 Stage 4 Runtime/Account authority 与唯一 guarded Save v4 writer。**
 
 ## 当前事实
 
@@ -197,16 +197,24 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 5 / S5-07 — Item, Reward, Benben, Terminal & Tutorial Presentation Implementation**
+**Stage 5 / S5-08 — Animation, Audio & Copy Polish Design Review**
 
-S5-07 Design Freeze 的独立只读 Reviewer、protected PR #79、branch/PR/main Linux Quality 与 Recovery Test 已 PASS；本次仅同步正式冻结状态。当前 `CURRENT_SAVE_VERSION = 4`，唯一 production writer 为 guarded v4。下方历史设计段中的旧 Next Action/production 状态不覆盖本段；本 closeout 不执行 S5-07 Implementation、S5-08 或 Stage 6。
+S5-07 Implementation 已由 PR #82 合入并完成正式 closeout；当前 `CURRENT_SAVE_VERSION = 4`，唯一 production writer 为 guarded v4。下方历史设计段中的旧 Next Action/production 状态不覆盖本段。S5-08 仅授权 Design Review，不在本 closeout 执行。
 
-### Stage 5 / S5-07 — Item, Reward, Benben, Terminal & Tutorial Presentation Design — FROZEN / READY FOR IMPLEMENTATION
+### Stage 5 / S5-07 — Item, Reward, Benben, Terminal & Tutorial Presentation Implementation — PASS / CLOSED
 
-- Elio 已接受 S5-07 Design Review、Attack Review 与 corrected design；六项 Attack finding 的单一、可恢复设计及实现验收矩阵见 `docs/17_S5-07_Item_Reward_Benben_Terminal_Tutorial_Presentation_Design_Contract.md`。设计文档由 PR #79 合入 `0eb6d7a5fcd2925fc3b76242a5ed72296767db10`，独立只读 Reviewer PASS；branch/PR/main Linux Quality `38087640597` / `38087916561` / `38088193399` 均 Success，首轮 Recovery Test PASS。本段不宣称实现已存在。
+- 接受的实现：PR #82，最终 reviewed implementation head `a25b0ea00f4e4f9f75af731d401c05a72f240d4c`，合并 main baseline `e6b45fe8a2d5a30107a93d7fc3d4214dce270082`；diff 限于 9 个 presentation/config/bootstrap 文件和 11 个相关测试文件。独立只读 full-diff Reviewer PASS；此前对 Game 精确保留 Retry、stale/uncertain 棋盘禁用和受控 L2 浏览器证据的阻断均在最终 diff 中修复并复审通过。
+- Contract §7 验收：脱敏 public allowlist、未知 Safe/Mine 等价及无秘密字段/别名；同一已提交操作与可信前态证明的一次性 Reward 回执，F5 不重发；原生控件去重、精确 retained-envelope 归属、Airplane 选中目标与既有 Move/Flag 语义；四 Item、Benben entitlement/临时卡、pending/failed/won、九个精确 tutorial ID 及显式确认；historical restriction、失败/并发/uncertain/Recovery 均由 unit、真实 guarded production-session integration 和 browser 回归覆盖。既有 Shop、navigation、S5-06 与 Save v4 回归继续通过。
+- Reward 证据来源按 PR #81 与设计合同 §6–7 的 Protocol §7.1 澄清严格区分：普通 Reward、同次 Airplane 多 Reward 使用 catalog-generated 情景；L4 one-time Reward 使用严格验证、预载的合成 Save v4 兼容 fixture，再经真实 production session Move、guarded commit/reopen 验证单次 Account claim/资产与回执。后一证据**不**证明当前 generator 可生成 one-time Reward；未修改 Reward generator 或 Save validator。
+- 质量与治理：最终实现 branch/PR/main Linux `Quality` runs `38098371784` / `38098706490` / `38099015647` 均 Success；本地 architecture/typecheck、960 Unit、259 Integration、build PASS，原样 Windows `npm run quality` 在 Playwright dev-server `127.0.0.1:5173` 因 `EACCES` 停止，不能称本地完整 PASS；先前 alternate-port Chromium 50/50 PASS，最终 L2 定向浏览器 3/3 PASS，权威 Linux 浏览器门禁均成功。Recovery 可从正式文档、PR #81/#82、测试和 Git 历史恢复实现与边界；本次 docs-only closeout 的 Reviewer、PR/main CI 与最终 Recovery 以实际 Git/CI 记录为准，不预写未来证据或自引用 SHA。
+- 冻结边界保持：Stage 0–4 FROZEN、单 Runtime/session、Save v4 schema/version 与 guarded writer、production catalog、Stage 1–4 gameplay/economy/persistence 不变；本次 closeout 仅修改本状态文档，不改 production/tests/config。已知限制：生产仅 `level-001`、普通 Reward、无障碍；一次性短命回执可因立即 F5 错过，但已提交资产/claim 可恢复；localStorage 无 atomic CAS；Windows 默认 Playwright 端口 `EACCES` 与 Phaser >500 KB warning 未解决。回滚为对本次状态文档 closeout commit 的受审查 revert，不回退或破坏 Save。
+
+### Stage 5 / S5-07 — Item, Reward, Benben, Terminal & Tutorial Presentation Design — FROZEN (historical design entry)
+
+- Elio 已接受 S5-07 Design Review、Attack Review 与 corrected design；六项 Attack finding 的单一、可恢复设计及实现验收矩阵见 `docs/17_S5-07_Item_Reward_Benben_Terminal_Tutorial_Presentation_Design_Contract.md`。设计文档由 PR #79 合入 `0eb6d7a5fcd2925fc3b76242a5ed72296767db10`，独立只读 Reviewer PASS；branch/PR/main Linux Quality `38087640597` / `38087916561` / `38088193399` 均 Success，首轮 Recovery Test PASS。本段为实现前设计记录，实际实现状态见上方。
 - 冻结边界：可信层逐字段脱敏公开 Item/Benben/terminal/tutorial 能力，不泄漏隐藏 Mine/Reward，不将历史 `legacy-excluded` 解释为整局不可写；Reward 回执只由同一操作的真实 committed result 与可信 before-state 证明、一次性交付；S5-07 原生控件每次激活只提交一次，精确 token 归属 retained Retry；Airplane 只读复用 S5-06 DOM 棋盘的明确选中目标；九个 S5-04 tutorial ID 均有可观察触发与显式持久化确认。所有 gameplay、Reward、Benben 与 terminal legality 仍由 Stage 1–4 production commands 最终决定。
 - Protocol §7.1：原因是 S5-07 表现能力所需的最小公开事实、operation-bound feedback/retained ownership 与棋盘目标交接；受影响冻结边界仅 S5-02 projection/result/retained-operation 及 S5-06 selected-target presentation 接口。兼容性保持 S0-06、单 session、精确 reason/retry/uncertain、桌面 Move/Flag、S5-03 Shop 与 S5-05 replacement；Save v4 schema/version/migration、Stage 1–4 gameplay、production catalog 与 persistence writer 均不变。回归计划、无别名/隐私/浏览器/失败注入证据和 scoped Git revert 回滚见新合同 §6–7。
-- 当前 production catalog 仅 `level-001`、普通 Reward、无障碍；L2–L5、one-time Reward 与 obstacle 教学须使用同一受控测试 catalog，不增加正式关卡或生产测试后门。一笔 commit 的短命 Reward 回执可在立即 F5 时错过，已领取事实/资产仍由 Save v4 恢复。localStorage 无 atomic CAS、Phaser bundle warning 与浏览器原生事件差异等既有限制保留。本设计无新的 Elio 产品决策。
+- 当前 production catalog 仅 `level-001`、普通 Reward、无障碍；L2–L5 与 obstacle 教学使用受控测试 catalog，one-time Reward/L4 仅以严格验证、预载 Save v4 证明兼容性（见上方 PR #81 澄清），不增加正式关卡或生产测试后门。一笔 commit 的短命 Reward 回执可在立即 F5 时错过，已领取事实/资产仍由 Save v4 恢复。localStorage 无 atomic CAS、Phaser bundle warning 与浏览器原生事件差异等既有限制保留。本设计无新的 Elio 产品决策。
 - 本次仅新增 S5-07 设计合同并同步本状态文档；production/tests/config/Save implementation changes = 0。local Windows `npm run quality` 的架构、TypeScript、948 unit、247 integration 与 build PASS，Playwright dev server `127.0.0.1:5173` 报 `EACCES`，不能称本地完整 PASS；权威 Linux branch/PR/main Quality 全部 Success。实际 final baseline 由 Git HEAD/remote main 核实，不在文档虚构自引用 commit。Stage 5 保持 IN PROGRESS。
 
 ### Stage 5 / S5-06 — Board, Character & Input Presentation Implementation — PASS / CLOSED
@@ -1157,7 +1165,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md 与 17_S5-07_Item_Reward_Benben_Terminal_Tutorial_Presentation_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01 至 S5-06 PASS / CLOSED；S5-07 Design FROZEN / READY FOR IMPLEMENTATION。Production 保持单一 Stage 4 Runtime/full Account、Settings/Tutorial 必填与唯一 guarded Save v4 writer。唯一下一行动是 Stage 5 / S5-07 — Item, Reward, Benben, Terminal & Tutorial Presentation Implementation；不得开始 S5-08 或 Stage 6。
+请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md 与 17_S5-07_Item_Reward_Benben_Terminal_Tutorial_Presentation_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01 至 S5-07 PASS / CLOSED。Production 保持单一 Stage 4 Runtime/full Account、Settings/Tutorial 必填与唯一 guarded Save v4 writer。S5-07 PR #82 已合入，§7 验收、独立 Reviewer、Linux Quality 与 Recovery 证据见状态记录和 Git/CI。唯一下一行动是 Stage 5 / S5-08 — Animation, Audio & Copy Polish Design Review；不得自动开始 Implementation 或 Stage 6。
 ```
 
 ## 阶段看板
@@ -1169,7 +1177,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN / PASS；annotated `stage-3-frozen` 已验证 | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | FROZEN / PASS；annotated `stage-4-frozen` 已验证；S4-09 PASS/CLOSED；当时 Save v3 writer ACTIVE，现由 S5-04 的 v4 writer 接替 | Stage 3 FROZEN / PASS |
-| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-06 PASS / CLOSED；S5-07 Design FROZEN；production Save v4 ACTIVE | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-07 Implementation |
+| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-07 PASS / CLOSED；production Save v4 ACTIVE | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-08 Design Review |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
 
