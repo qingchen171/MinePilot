@@ -148,7 +148,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
   showMode();
 
   function render(next: Attempt | null, currentNumber: PresentationViewModel['currentNumberDisplay'],
-    layout: BoardLayout | null) {
+    layout: BoardLayout | null, interactionAllowed = true) {
     if (next === null || layout === null) { clear(); return; }
     if (attempt?.board.width !== next.board.width || attempt?.board.height !== next.board.height) {
       grid.replaceChildren(); cells = [];
@@ -160,7 +160,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
       selected = null; gate.reset();
     }
     attempt = next;
-    enabled = next.phase === 'active';
+    enabled = interactionAllowed && next.phase === 'active';
     grid.style.left = `${layout.originX}px`; grid.style.top = `${layout.originY}px`;
     grid.style.width = `${layout.columns * layout.cellSize}px`;
     grid.style.height = `${layout.rows * layout.cellSize}px`;

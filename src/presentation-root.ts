@@ -99,8 +99,11 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
         shopTutorialReloadRequired = result.status === 'rejected'
           ? result.policy.reloadRequired && !result.policy.retainEnvelope
           : result.status === 'unavailable' && result.reason === 'reload-required';
-      } else if (gameKinds.has(choice.kind)) gameRetainedToken = result.status === 'rejected' && result.policy.retainEnvelope
-        ? adapter.retainedToken() : null;
+      } else if (gameKinds.has(choice.kind) &&
+          !(result.status === 'unavailable' && result.reason === 'operation-unresolved')) {
+        gameRetainedToken = result.status === 'rejected' && result.policy.retainEnvelope
+          ? adapter.retainedToken() : null;
+      }
       return result.status === 'committed'
         ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey,
           rewardReceipt: result.rewardReceipt, firstLucky: result.firstLucky }

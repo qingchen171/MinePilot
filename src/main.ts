@@ -152,7 +152,7 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
       attempt.board.width, attempt.board.height);
     if (layout !== null) phaserGame?.scale.resize(layout.width, layout.height);
     board.render(attempt, current.status === 'recovery' ? { kind: 'hidden', value: null } :
-      current.view.currentNumberDisplay, layout);
+      current.view.currentNumberDisplay, layout, !gameReloadRequired);
     boardScene.present(attempt, layout);
   };
   const draw = (message: PresentationCopyKey | null = null,

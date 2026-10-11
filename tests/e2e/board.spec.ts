@@ -301,7 +301,8 @@ test('uncertain new-head failure never replays or paints a fictional destination
   await expect(page.locator('.board-hit-cell[data-character="true"]')).toHaveAttribute('data-cell-index', originalIndex!);
   expect(await revision(page)).toBe(before);
   await expect(page.locator('#page [role="status"]')).toContainText('uncertain');
-  await move.click();
+  await expect(move).toBeDisabled();
+  await move.click({ force: true });
   expect(await revision(page)).toBe(before);
 });
 

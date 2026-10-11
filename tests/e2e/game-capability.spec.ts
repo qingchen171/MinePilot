@@ -285,9 +285,37 @@ test('competing writer does not publish stale Game Item state and explicit reloa
   await page.locator('[data-game-action="detection"]').click();
   expect(await revision(page)).toBe(before + 1);
   await expect(page.locator('[data-game-action="reload"]')).toBeVisible();
+  await expect(page.locator('[data-cell-index="0"]')).toBeDisabled();
   await page.locator('[data-game-action="reload"]').click();
   await expect(page.locator('.game-detail')).toContainText('Uses remaining: 1');
   await competitor.close();
+});
+
+test('a different Game control cannot hide the exact Retry after proven pre-commit storage failure', async ({ page }) => {
+  const fixture = boardBrowserSave('detection-rich');
+  await installFixture(page, fixture.entries);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const before = await revision(page);
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    let failed = false;
+    Storage.prototype.setItem = function(key, value) {
+      if (!failed && key === 'minepilot:persistence:writer-lease') {
+        failed = true; throw new Error('injected pre-commit lease failure');
+      }
+      return original.call(this, key, value);
+    };
+  });
+  await page.locator('[data-game-action="detection"]').click();
+  expect(await revision(page)).toBe(before);
+  await expect(page.locator('[data-game-action="retry-retained"]')).toBeVisible();
+  await page.locator('[data-game-action="acknowledge-tutorial"]').click();
+  expect(await revision(page)).toBe(before);
+  await expect(page.locator('[data-game-action="retry-retained"]')).toBeVisible();
+  await page.locator('[data-game-action="retry-retained"]').click();
+  expect(await revision(page)).toBe(before + 1);
+  await expect(page.locator('[data-game-action="retry-retained"]')).toHaveCount(0);
 });
 
 test('a stale Airplane target is invalidated by a competing writer and cannot replay after reload', async ({ page }) => {
@@ -333,6 +361,7 @@ test('uncertain Item head write never displays a committed reveal or retries on 
   await expect(page.locator('.game-detail')).toContainText('Reload game');
   await expect(page.locator('.game-detail')).not.toContainText('Reward saved');
   await expect(page.locator('[data-game-action="detection"]')).toBeDisabled();
+  await expect(page.locator('[data-cell-index="0"]')).toBeDisabled();
   await page.locator('[data-game-action="detection"]').click({ force: true });
   expect(await revision(page)).toBe(before);
 });

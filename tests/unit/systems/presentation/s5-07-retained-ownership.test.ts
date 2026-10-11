@@ -22,6 +22,16 @@ describe('S5-07 exact retained-operation ownership', () => {
     expect(root.submit({ kind: 'detection' })).toMatchObject({ status: 'rejected', policy: { retainEnvelope: true } });
   });
 
+  it('keeps the exact Game Retry when another action is blocked by the retained envelope', () => {
+    const root = createPresentationRoot(port, technical);
+    expect(root.submit({ kind: 'detection' })).toMatchObject({ status: 'rejected', policy: { retainEnvelope: true } });
+    expect(root.gameRetryAvailable()).toBe(true);
+    expect(root.submit({ kind: 'airplane', coordinate: { x: 0, y: 0 } }))
+      .toMatchObject({ status: 'unavailable', reason: 'operation-unresolved' });
+    expect(root.gameRetryAvailable()).toBe(true);
+    expect(root.gameRetry()).toMatchObject({ status: 'rejected', policy: { retainEnvelope: true } });
+  });
+
   it('never cancels an unrelated Shop-owned envelope when Game cleanup runs', () => {
     const checked = validateShopCatalog(SHOP_PRICES);
     if (checked.status !== 'valid') throw new Error('catalog');
