@@ -12,7 +12,8 @@ const cellKey = {
 
 /** Disposable DOM hit surface. It consumes only public facts; Phaser never submits input. */
 export function createBoardPresentation(stage: HTMLElement, controls: HTMLElement,
-  submit: (action: BoardAction) => void, focusFallback: () => void) {
+  submit: (action: BoardAction) => void, focusFallback: () => void,
+  onSelectionChange: () => void = () => {}) {
   const grid = document.createElement('div');
   grid.className = 'board-hit-grid';
   grid.setAttribute('role', 'grid');
@@ -26,6 +27,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
   let pointerTarget: BoardTarget | null = null;
   let secondaryPressCount = 1;
   let enabled = false;
+  let selectionEpoch = 0;
   let cells: HTMLButtonElement[] = [];
   const number = document.createElement('p'); number.className = 'board-current-number';
   const phase = document.createElement('p'); phase.className = 'board-phase';
@@ -57,7 +59,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     selectedLabel.textContent = selected === null ? presentationCopy('game.no-target') :
       `${presentationCopy('game.selected')} ${selected.y + 1}, ${selected.x + 1}`;
   }
-  function select(target: BoardTarget) { selected = target; updateSelection(); }
+  function select(target: BoardTarget) { selected = target; updateSelection(); onSelectionChange(); }
   function perform(kind: 'move' | 'flag', target: BoardTarget) {
     if (!enabled || attempt === null) return;
     const appearance = attempt.board.cells[indexOf(target)];
@@ -82,7 +84,15 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     const target = targetOf(event.target instanceof Element ? event.target : null);
     if (target !== null) select(target);
   });
-  grid.addEventListener('focusout', () => gate.cancelKeyboard());
+  const clearSelectionOutsideGameControls = (next: EventTarget | null) => {
+    if (next === null) return; // Detached controls during committed reprojection are not a new focus destination.
+    if (next instanceof Node && (grid.contains(next) || controls.contains(next))) return;
+    selected = null; updateSelection(); onSelectionChange();
+  };
+  grid.addEventListener('focusout', (event) => {
+    gate.cancelKeyboard(); clearSelectionOutsideGameControls(event.relatedTarget);
+  });
+  controls.addEventListener('focusout', (event) => clearSelectionOutsideGameControls(event.relatedTarget));
   grid.addEventListener('click', (event) => {
     const target = targetOf(event.target instanceof Element ? event.target : null);
     if (target === null || !enabled || gate.consumeContextClick(target) ||
@@ -138,7 +148,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
   showMode();
 
   function render(next: Attempt | null, currentNumber: PresentationViewModel['currentNumberDisplay'],
-    layout: BoardLayout | null) {
+    layout: BoardLayout | null, interactionAllowed = true) {
     if (next === null || layout === null) { clear(); return; }
     if (attempt?.board.width !== next.board.width || attempt?.board.height !== next.board.height) {
       grid.replaceChildren(); cells = [];
@@ -150,7 +160,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
       selected = null; gate.reset();
     }
     attempt = next;
-    enabled = next.phase === 'active';
+    enabled = interactionAllowed && next.phase === 'active';
     grid.style.left = `${layout.originX}px`; grid.style.top = `${layout.originY}px`;
     grid.style.width = `${layout.columns * layout.cellSize}px`;
     grid.style.height = `${layout.rows * layout.cellSize}px`;
@@ -181,8 +191,25 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     number.textContent = ''; phase.textContent = ''; positionLabel.textContent = ''; selectedLabel.textContent = '';
   }
   function invalidateAuthority() {
+    selectionEpoch += 1;
     if (document.activeElement instanceof Node && grid.contains(document.activeElement)) focusFallback();
     enabled = false; selected = null; pointerTarget = null; gate.reset(); updateSelection();
+    onSelectionChange();
   }
-  return Object.freeze({ render, clear, invalidateAuthority });
+  function afterCommittedMutation() {
+    // A new authority invalidates the Airplane target, but the native press gate must
+    // survive the remainder of this same physical click/double-click sequence.
+    selectionEpoch += 1;
+    selected = null;
+    pointerTarget = null;
+    updateSelection();
+    onSelectionChange();
+  }
+  function selectedTarget() {
+    if (!enabled || selected === null || attempt === null) return null;
+    return Object.freeze({ coordinate: Object.freeze({ x: selected.x, y: selected.y }), epoch: selectionEpoch });
+  }
+  function selectionIsCurrent(epoch: number): boolean { return enabled && selectionEpoch === epoch && selected !== null; }
+  return Object.freeze({ render, clear, invalidateAuthority, afterCommittedMutation,
+    selectedTarget, selectionIsCurrent });
 }

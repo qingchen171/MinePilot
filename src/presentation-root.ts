@@ -33,14 +33,31 @@ function project(snapshot: ReturnType<ReturnType<typeof createPresentationAdapte
 /** Composition only: the trusted adapter sanitizes, then ui projects detached public facts. */
 export function createPresentationRoot(session: PresentationSessionPort, technical: TechnicalFactsSource,
   shopCatalog: ValidatedShopCatalog | null = null, catalog: LevelCatalog = PRODUCTION_LEVEL_CATALOG) {
-  const adapter = createPresentationAdapter(session, technical, shopCatalog);
+  const adapter = createPresentationAdapter(session, technical, shopCatalog, catalog);
   const shop = createShopControl(adapter);
+  let gameRetainedToken: ReturnType<typeof adapter.retainedToken> = null;
+  let shopTutorialRetainedToken: ReturnType<typeof adapter.retainedToken> = null;
+  let shopTutorialReloadRequired = false;
+  const gameKinds = new Set<SessionIntent['kind']>(['move', 'flag', 'detection', 'airplane', 'revive',
+    'claim-benben', 'failure', 'retry', 'replay', 'next', 'dismiss', 'restart', 'acknowledge-tutorial']);
+  const clearGameRetry = () => {
+    if (gameRetainedToken !== null) adapter.cancelRetainedToken(gameRetainedToken);
+    gameRetainedToken = null;
+  };
+  const clearShopTutorialRetry = () => {
+    if (shopTutorialRetainedToken !== null) adapter.cancelRetainedToken(shopTutorialRetainedToken);
+    shopTutorialRetainedToken = null;
+    shopTutorialReloadRequired = false;
+  };
   let beforeReload: (() => void) | null = null;
   const navigation = createNavigationControl(adapter, catalog, () => {
+    clearShopTutorialRetry();
     adapter.cancelRetainedKind('purchase');
     shop.afterExit();
   });
   const reloadAndReconcile = () => {
+    clearGameRetry();
+    clearShopTutorialRetry();
     beforeReload?.();
     const snapshot = adapter.reload();
     navigation.reconcileReloaded(snapshot);
@@ -56,7 +73,11 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
         const pending = navigation.pendingSelection();
         return pending === null ? null : Object.freeze({ target: pending.target, phase: pending.phase });
       },
-      navigate: navigation.navigate,
+      navigate: (next: Parameters<typeof navigation.navigate>[0]) => {
+        const result = navigation.navigate(next);
+        if (navigation.route() !== 'game') clearGameRetry();
+        return result;
+      },
       levels: () => {
         const entries = navigation.levelList();
         return entries === null ? null : projectLevelListView(entries);
@@ -71,8 +92,21 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
     reload: reloadAndReconcile,
     submit: (choice: Exclude<SemanticIntent, { readonly kind: 'purchase' }>) => {
       const result = adapter.submit(choice);
+      const shopTutorial = choice.kind === 'acknowledge-tutorial' && navigation.route() === 'shop';
+      if (shopTutorial) {
+        shopTutorialRetainedToken = result.status === 'rejected' && result.policy.retainEnvelope
+          ? adapter.retainedToken() : null;
+        shopTutorialReloadRequired = result.status === 'rejected'
+          ? result.policy.reloadRequired && !result.policy.retainEnvelope
+          : result.status === 'unavailable' && result.reason === 'reload-required';
+      } else if (gameKinds.has(choice.kind) &&
+          !(result.status === 'unavailable' && result.reason === 'operation-unresolved')) {
+        gameRetainedToken = result.status === 'rejected' && result.policy.retainEnvelope
+          ? adapter.retainedToken() : null;
+      }
       return result.status === 'committed'
-        ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey }
+        ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey,
+          rewardReceipt: result.rewardReceipt, firstLucky: result.firstLucky }
         : result.status === 'rejected' &&
           (result.reason === 'settings-unchanged' || result.reason === 'tutorial-already-acknowledged')
           ? { ...result, snapshot: project(adapter.read()) }
@@ -81,11 +115,40 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
     retryRetained: () => {
       const retained = adapter.retainedKind();
       const result = adapter.retryRetained();
+      gameRetainedToken = null;
       if (retained === 'purchase') shop.afterRetainedRetry(result);
       navigation.reconcileReloaded(adapter.read());
       return result.status === 'committed'
-        ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey }
+        ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey,
+          rewardReceipt: result.rewardReceipt, firstLucky: result.firstLucky }
         : result;
+    },
+    gameRetryAvailable: () => gameRetainedToken !== null && adapter.retainedToken() === gameRetainedToken,
+    gameRetry: () => {
+      if (gameRetainedToken === null || adapter.retainedToken() !== gameRetainedToken) return null;
+      const result = adapter.retryRetained();
+      gameRetainedToken = result.status === 'rejected' && result.policy.retainEnvelope
+        ? adapter.retainedToken() : null;
+      return result.status === 'committed'
+        ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey,
+          rewardReceipt: result.rewardReceipt, firstLucky: result.firstLucky } : result;
+    },
+    gameExit: clearGameRetry,
+    shopTutorialRetryAvailable: () => shopTutorialRetainedToken !== null &&
+      adapter.retainedToken() === shopTutorialRetainedToken,
+    shopTutorialNeedsReload: () => shopTutorialReloadRequired,
+    shopTutorialRetry: () => {
+      if (shopTutorialRetainedToken === null || adapter.retainedToken() !== shopTutorialRetainedToken) return null;
+      const result = adapter.retryRetained();
+      shopTutorialRetainedToken = result.status === 'rejected' && result.policy.retainEnvelope
+        ? adapter.retainedToken() : null;
+      shopTutorialReloadRequired = result.status === 'rejected'
+        ? result.policy.reloadRequired && !result.policy.retainEnvelope
+        : result.status === 'unavailable' && result.reason === 'reload-required';
+      navigation.reconcileReloaded(adapter.read());
+      return result.status === 'committed'
+        ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey,
+          rewardReceipt: result.rewardReceipt, firstLucky: result.firstLucky } : result;
     },
     cancelRetained: () => adapter.cancelRetained(),
     shopState: () => shop.state(),
@@ -95,7 +158,8 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
     shopPurchase: (item: Parameters<typeof shop.purchase>[0]) => {
       const result = shop.purchase(item);
       return result?.status === 'committed'
-        ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey }
+        ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey,
+          rewardReceipt: result.rewardReceipt, firstLucky: result.firstLucky }
         : result;
     },
     shopBuyAgain: () => shop.buyAgain(),
@@ -105,7 +169,8 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
       shop.afterRetainedRetry(result);
       navigation.reconcileReloaded(adapter.read());
       return result.status === 'committed'
-        ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey }
+        ? { status: 'committed' as const, snapshot: project(result.snapshot), copyKey: result.copyKey,
+          rewardReceipt: result.rewardReceipt, firstLucky: result.firstLucky }
         : result;
     },
   });
