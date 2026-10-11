@@ -92,8 +92,7 @@ test('first-shop tutorial owns its retained Retry, which is cancelled on Shop ex
   await page.getByRole('button', { name: 'Home' }).first().click();
   await page.getByRole('button', { name: 'Shop' }).first().click();
   await expect(page.locator('[data-action="tutorial-first-shop-retry"]')).toHaveCount(0);
-  await expect(page.locator('[data-action="tutorial-first-shop-reload"]')).toBeVisible();
-  await page.locator('[data-action="tutorial-first-shop-reload"]').click();
+  await expect(page.locator('[data-action="tutorial-first-shop"]')).toBeVisible();
   await page.locator('[data-action="tutorial-first-shop"]').click();
   expect(await revision(page)).toBe(0);
   await page.reload();
@@ -136,6 +135,11 @@ test('temporary Detection is consumed before Account inventory and expires on co
   await page.reload();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.locator('.game-detail')).toContainText('Temporary item used');
+  await page.evaluate(() => {
+    const key = 'minepilot:persistence:writer-lease';
+    const lease = JSON.parse(localStorage.getItem(key) ?? 'null') as { expiresAtMs: number };
+    localStorage.setItem(key, JSON.stringify({ ...lease, expiresAtMs: Date.now() - 1 }));
+  });
   await page.locator('[data-game-action="confirm-restart"]').click();
   await page.locator('[data-game-action="restart"]').click();
   expect(await revision(page)).toBe(before + 2);
@@ -247,6 +251,7 @@ test('strict preloaded v4 one-time L4 Reward is claimed once by the real Game se
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'Reward saved' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Claimed rewards' })).toBeVisible();
+  await page.locator('[data-game-action="toggle-help"]').click();
   await expect(page.locator('.game-detail')).toContainText('This coin reward can be claimed only once.');
 });
 

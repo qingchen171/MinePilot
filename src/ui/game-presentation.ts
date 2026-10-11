@@ -192,10 +192,14 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
     const acknowledged = new Set(view!.tutorialProgress.acknowledgedMilestoneIds);
     const contexts = gameTutorialContexts(view!, eventMilestone);
     const unacknowledged = contexts.prompt.filter((id) => !acknowledged.has(id));
-    if (unacknowledged.length) {
+    // Preserve this operation's unacknowledged event prompt across disposable DOM redraws,
+    // but never reconstruct it from persisted facts after route exit or reload.
+    const retainedPrompt = lastMilestone !== null && contexts.help.includes(lastMilestone) &&
+      !acknowledged.has(lastMilestone) ? lastMilestone : null;
+    if (unacknowledged.length || retainedPrompt !== null) {
       host.append(node('h4', 'game.tutorial.title'));
       const chosen = eventMilestone && unacknowledged.includes(eventMilestone) ? eventMilestone :
-        lastMilestone && unacknowledged.includes(lastMilestone) ? lastMilestone : unacknowledged[0]!;
+        retainedPrompt ?? unacknowledged[0]!;
       lastMilestone = chosen;
       host.append(node('p', `game.tutorial.${chosen}`));
       if (view!.tutorialAcknowledgmentAllowed) append('game.tutorial.acknowledge', 'acknowledge-tutorial', true, chosen);
