@@ -29,6 +29,13 @@ test('real browser Home, level selection, Game return, Settings, Feedback and re
   await expect(page.locator('[data-level-id="level-001"]')).toBeEnabled();
   await page.locator('[data-level-id="level-001"]').click();
   await expect(page.getByRole('heading', { name: 'Game' })).toBeVisible();
+  const readPublic = () => page.evaluate(async () => {
+    const modulePath: string = '/src/main.ts';
+    const { presentationRoot } = await import(modulePath);
+    return presentationRoot?.read();
+  });
+  const started = await readPublic();
+  const startRevision = await page.evaluate(() => JSON.parse(localStorage.getItem('minepilot:persistence:head') ?? 'null').revision as number);
   await page.getByRole('button', { name: 'Shop', exact: true }).click();
   await expect(page.locator('#page [role="status"]')).toContainText('Shop is available only when no attempt');
   await expect(page.getByRole('heading', { name: 'Game' })).toBeVisible();
@@ -39,12 +46,22 @@ test('real browser Home, level selection, Game return, Settings, Feedback and re
   await expect(music).toBeChecked();
   await music.uncheck();
   await expect(music).not.toBeChecked();
+  const afterSetting = await readPublic();
+  expect(afterSetting?.status).toBe('loaded');
+  if (started?.status !== 'loaded' || afterSetting?.status !== 'loaded') throw new Error('public authority');
+  expect(afterSetting.view.attempt).toEqual(started.view.attempt);
+  expect(afterSetting.view.account).toEqual(started.view.account);
+  expect(afterSetting.view.tutorialProgress).toEqual(started.view.tutorialProgress);
+  expect(afterSetting.view.settings).toEqual({ ...started.view.settings, musicEnabled: false });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('minepilot:persistence:head') ?? 'null').revision))
+    .toBe(startRevision + 1);
   await page.getByRole('button', { name: 'Feedback' }).click();
   await expect(page.getByRole('link', { name: 'Send feedback by email' })).toHaveAttribute('href', 'mailto:qingchen6757@gmail.com');
   await page.getByRole('button', { name: 'Home' }).click();
   await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
+  expect(await readPublic()).toEqual(afterSetting);
   await page.getByRole('button', { name: 'Settings' }).click();
   await expect(page.locator('[data-setting="musicEnabled"]')).not.toBeChecked();
 });

@@ -14,13 +14,24 @@ import { commitSnapshot } from '../../src/systems/persistence/crash-safe-snapsho
 import { MemoryStorage } from './memory-storage';
 
 type Variant = 'pending' | 'failed' | 'won' | 'occupancy' | 'zero' | 'number' |
-  'benben-available' | 'detection-rich' | 'temporary-detection' | 'waiting' | 'one-time-l4';
+  'benben-available' | 'detection-rich' | 'temporary-detection' | 'waiting' | 'coin-reward' | 'one-time-l4';
 
 /** Real valid v4 snapshot. Fixture construction never enters production UI or catalog. */
 export function boardBrowserSave(variant: Variant) {
-  const made = createCompleteAttempt({ level: PRODUCTION_LEVEL_CATALOG.levels[0]!, runId: `browser-${variant}`,
+  // The coin case is a catalog-generated Reward in a deterministic preloaded L1 snapshot,
+  // not a changed production reward table or a fresh-install promise.
+  let made = createCompleteAttempt({ level: PRODUCTION_LEVEL_CATALOG.levels[0]!, runId: `browser-${variant}`,
     generationProvenance: { seed: 123456789, rngVersion: 'mulberry32-v1', generationVersion: 'mine-placement-v1' } });
+  if (variant === 'coin-reward') {
+    for (let seed = 1; seed <= 100 &&
+        (made.status !== 'created' || !made.attempt.rewards.some((reward) => reward.payload.kind === 'coins')); seed++) {
+      made = createCompleteAttempt({ level: PRODUCTION_LEVEL_CATALOG.levels[0]!, runId: `browser-${variant}`,
+        generationProvenance: { seed, rngVersion: 'mulberry32-v1', generationVersion: 'mine-placement-v1' } });
+    }
+  }
   if (made.status !== 'created') throw new Error('attempt fixture');
+  if (variant === 'coin-reward' && !made.attempt.rewards.some((reward) => reward.payload.kind === 'coins'))
+    throw new Error('catalog-generated coin fixture');
   const attempt = made.attempt;
   const board = attempt.run.board;
   const width = board.dimensions.width;
@@ -28,7 +39,8 @@ export function boardBrowserSave(variant: Variant) {
   const mine = { x: mineIndex % width, y: Math.floor(mineIndex / width) };
   const secondMineIndex = board.cells.findIndex((cell, index) => cell.kind === 'mine' && index !== mineIndex);
   const anotherMine = secondMineIndex < 0 ? null : { x: secondMineIndex % width, y: Math.floor(secondMineIndex / width) };
-  const rewardTarget = attempt.rewards[0]?.coordinate ?? null;
+  const rewardTarget = (variant === 'coin-reward'
+    ? attempt.rewards.find((reward) => reward.payload.kind === 'coins') : attempt.rewards[0])?.coordinate ?? null;
   let selected: Coordinate | null = null;
   let expectedNumber: number | null = null;
   let run = attempt.run;
@@ -55,7 +67,7 @@ export function boardBrowserSave(variant: Variant) {
     rewards = attempt.rewards.map((reward) => ({ ...reward, claimed: true }));
     account = { ...account, completedLevelIds: ['level-001'] };
     terminalDisposition = 'settled';
-  } else if (variant === 'waiting') {
+  } else if (variant === 'waiting' || variant === 'coin-reward') {
     // Preserve the real fresh waiting Attempt and its hidden Board for browser input evidence.
   } else if (variant === 'one-time-l4') {
     if (rewards.length < 1) throw new Error('one-time compatibility fixture needs a Safe Reward coordinate');
