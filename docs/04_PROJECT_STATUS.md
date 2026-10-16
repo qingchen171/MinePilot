@@ -1171,7 +1171,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md 与 17_S5-07_Item_Reward_Benben_Terminal_Tutorial_Presentation_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01 至 S5-07 PASS / CLOSED。Production 保持单一 Stage 4 Runtime/full Account、Settings/Tutorial 必填与唯一 guarded Save v4 writer。S5-07 PR #82 已合入，§7 验收、独立 Reviewer、Linux Quality 与 Recovery 证据见状态记录和 Git/CI。唯一下一行动是 Stage 5 / S5-08 — Animation, Audio & Copy Polish Design Review；不得自动开始 Implementation 或 Stage 6。
+请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md 与 18_S5-08_Animation_Audio_Copy_Polish_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01 至 S5-07 PASS / CLOSED，S5-08 Design FROZEN / READY FOR IMPLEMENTATION。Production 保持单一 Stage 4 Runtime/full Account、Settings/Tutorial 必填与唯一 guarded Save v4 writer。S5-08 Design Freeze 的 Reviewer、PR #84、Linux Quality、Recovery 与 §7.1 证据见上方状态记录和 Git/CI。唯一下一行动是 Stage 5 / S5-08 — Animation, Audio & Copy Polish Implementation；不得自动开始 S5-09 或 Stage 6。
 ```
 
 ## 阶段看板
@@ -1183,7 +1183,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN / PASS；annotated `stage-3-frozen` 已验证 | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | FROZEN / PASS；annotated `stage-4-frozen` 已验证；S4-09 PASS/CLOSED；当时 Save v3 writer ACTIVE，现由 S5-04 的 v4 writer 接替 | Stage 3 FROZEN / PASS |
-| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-07 PASS / CLOSED；production Save v4 ACTIVE | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-08 Design Review |
+| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-07 PASS / CLOSED；S5-08 Design FROZEN；production Save v4 ACTIVE | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-08 Implementation |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
 
