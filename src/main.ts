@@ -308,11 +308,13 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
   if (first.status !== 'recovery') audio.adoptSettings(first.view.settings);
   else audio.setRecovery(true);
   const invalidateLayout = () => { invalidateEffects(); drawBoard(); };
-  new ResizeObserver(invalidateLayout).observe(gameStage);
-  window.addEventListener('resize', invalidateLayout);
-  window.addEventListener('pointerdown', () => audio.gesture(), { capture: true });
-  window.addEventListener('keydown', () => audio.gesture(), { capture: true });
-  document.addEventListener('visibilitychange', () => audio.setVisible(!document.hidden));
+  const pageListeners = new AbortController();
+  const resizeObserver = new ResizeObserver(invalidateLayout);
+  resizeObserver.observe(gameStage);
+  window.addEventListener('resize', invalidateLayout, { signal: pageListeners.signal });
+  window.addEventListener('pointerdown', () => audio.gesture(), { capture: true, signal: pageListeners.signal });
+  window.addEventListener('keydown', () => audio.gesture(), { capture: true, signal: pageListeners.signal });
+  document.addEventListener('visibilitychange', () => audio.setVisible(!document.hidden), { signal: pageListeners.signal });
   const dirty = () => {
     presentationRoot.markAuthorityDirty(); invalidateEffects(); audio.setAuthorityClean(false);
     board.invalidateAuthority(); visibleReceipt = null; visibleMilestone = null;
@@ -320,12 +322,18 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
   };
   window.addEventListener('storage', (event) => {
     if (event.key === null || event.key.startsWith('minepilot:persistence:')) dirty();
-  });
+  }, { signal: pageListeners.signal });
   let lostWindowFocus = false;
-  window.addEventListener('blur', () => { lostWindowFocus = true; });
-  window.addEventListener('focus', () => { if (lostWindowFocus) { lostWindowFocus = false; dirty(); } });
-  window.addEventListener('pagehide', () => { invalidateEffects(); effectEpoch.dispose(); audio.dispose(); });
-  window.addEventListener('pageshow', (event) => { if (event.persisted) window.location.reload(); });
+  window.addEventListener('blur', () => { lostWindowFocus = true; }, { signal: pageListeners.signal });
+  window.addEventListener('focus', () => { if (lostWindowFocus) { lostWindowFocus = false; dirty(); } },
+    { signal: pageListeners.signal });
+  window.addEventListener('pagehide', () => {
+    invalidateEffects(); effectEpoch.dispose(); audio.dispose();
+    resizeObserver.disconnect(); pageListeners.abort();
+    // A BFCache restore must rebuild the disposed page rather than reuse its old session.
+    window.addEventListener('pageshow', (event) => { if (event.persisted) window.location.reload(); },
+      { once: true });
+  }, { signal: pageListeners.signal });
 } else if (shopPanel !== null && navigationPanel !== null && pagePanel !== null) {
   shopPanel.hidden = true;
   if (gamePanel !== null) gamePanel.hidden = true;

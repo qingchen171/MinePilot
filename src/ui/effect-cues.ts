@@ -43,6 +43,7 @@ export function projectEffectCue(input: PublicEffectInput): EffectCue {
   if (input.rewardReceipt.status === 'proven' && input.rewardReceipt.entries.length > 0 &&
       (input.kind === 'move' || input.kind === 'airplane') && sameAttempt) kind = 'reward';
   else if (input.firstLucky && input.kind === 'move' && sameAttempt) kind = 'lucky';
+  else if (sameAttempt && before.phase !== 'won' && after.phase === 'won') kind = 'victory';
   else if (input.kind === 'move' && sameAttempt && !samePosition(before.position, after.position)) kind = 'move';
   else if (input.kind === 'move' && sameAttempt && before.phase === 'active' &&
       after.phase === 'pending-mine-encounter') kind = 'pending';
@@ -56,7 +57,6 @@ export function projectEffectCue(input: PublicEffectInput): EffectCue {
     after.benben.entitlement === 'used' && after.benben.temporaryCard !== null) kind = 'benben';
   else if (input.kind === 'failure' && sameAttempt && before.phase === 'pending-mine-encounter' &&
     after.phase === 'failed') kind = 'failure';
-  else if (sameAttempt && before.phase !== 'won' && after.phase === 'won') kind = 'victory';
   else if (['detection', 'airplane', 'revive'].includes(input.kind) && sameAttempt) kind = 'item';
   return Object.freeze({ operationId: input.operationId, kind, coordinate, from,
     rewardCount: input.rewardReceipt.status === 'proven' ? input.rewardReceipt.entries.length : 0 });
