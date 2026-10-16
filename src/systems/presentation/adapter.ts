@@ -8,9 +8,11 @@ import { sanitizeStage4Runtime } from './public-facts';
 import { classifyProductionReason, type ResultPolicy } from './result-policy';
 import { GENERATION_VERSION, RNG_VERSION } from './technical-facts';
 import { proveCommittedRewardReceipt, type RewardReceiptProof } from './reward-receipt';
+import { committedEffectHandoff, type CommittedEffectHandoff } from './effect-handoff';
 import type { PresentationSessionPort, SemanticIntent, SessionIntent, SessionRead, TechnicalFactsSource } from './session-port';
 
 export interface OperationEnvelope {
+  readonly operationId: string;
   readonly intent: SessionIntent;
   readonly expectedRevision: number | null;
   readonly expectedRunId: string | null;
@@ -22,7 +24,8 @@ export type PublicSnapshot =
 
 export type PresentationOutcome =
   | { readonly status: 'committed'; readonly snapshot: PublicSnapshot; readonly copyKey: PresentationCopyKey;
-      readonly rewardReceipt?: RewardReceiptProof; readonly firstLucky?: boolean }
+      readonly rewardReceipt?: RewardReceiptProof; readonly firstLucky?: boolean;
+      readonly effectHandoff?: CommittedEffectHandoff }
   | { readonly status: 'rejected'; readonly reason: string; readonly policy: ResultPolicy; readonly copyKey: PresentationCopyKey }
   | { readonly status: 'unavailable'; readonly reason: 'entropy-unavailable' | 'operation-unresolved' | 'reload-required'; readonly copyKey: PresentationCopyKey };
 
@@ -63,7 +66,7 @@ function freezeIntent(intent: SessionIntent): SessionIntent {
 }
 
 function makeEnvelope(choice: SemanticIntent, load: Extract<SessionRead, { readonly runtime: unknown }>,
-  technical: TechnicalFactsSource): OperationEnvelope {
+  technical: TechnicalFactsSource, operationId: string): OperationEnvelope {
   const { revision, runId } = authority(load);
   const expected = { expectedRevision: revision, expectedRunId: runId };
   let intent: SessionIntent;
@@ -90,7 +93,7 @@ function makeEnvelope(choice: SemanticIntent, load: Extract<SessionRead, { reado
   } else {
     intent = { kind: choice.kind, ...expected };
   }
-  return Object.freeze({ intent: freezeIntent(intent), expectedRevision: revision, expectedRunId: runId });
+  return Object.freeze({ operationId, intent: freezeIntent(intent), expectedRevision: revision, expectedRunId: runId });
 }
 
 function provedFirstLucky(pre: Extract<SessionRead, { readonly runtime: unknown }>['runtime'],
@@ -121,6 +124,8 @@ export function createPresentationAdapter(session: PresentationSessionPort, tech
   let unresolved: OperationEnvelope | null = null;
   let executing = false;
   let reloadRequired = false;
+  let nextOperationId = 0;
+  const issuedEffects = new WeakSet<object>();
 
   function execute(envelope: OperationEnvelope, pre: Extract<SessionRead, { readonly runtime: unknown }>): PresentationOutcome {
     executing = true;
@@ -131,9 +136,21 @@ export function createPresentationAdapter(session: PresentationSessionPort, tech
         const rewardReceipt = proveCommittedRewardReceipt(pre.runtime, result.runtime, envelope.intent.kind,
           envelope.expectedRunId, envelope.expectedRevision, result.revision);
         const firstLucky = provedFirstLucky(pre.runtime, result.runtime, envelope);
+        const preAuthority = authority(pre);
+        const expectedNextRevision = envelope.expectedRevision === null ? 0 : envelope.expectedRevision + 1;
+        const proven = preAuthority.revision === envelope.expectedRevision &&
+          preAuthority.runId === envelope.expectedRunId && Number.isSafeInteger(expectedNextRevision) &&
+          result.revision === expectedNextRevision;
+        const before = proven ? sanitizeStage4Runtime(pre.runtime, shopCatalog, catalog) : null;
+        const after = sanitizeStage4Runtime(result.runtime, shopCatalog, catalog);
+        const target = 'coordinate' in envelope.intent ? envelope.intent.coordinate : null;
+        const effectHandoff = before === null ? undefined : committedEffectHandoff(envelope.operationId,
+          envelope.intent.kind, target, before, after, rewardReceipt, firstLucky);
+        if (effectHandoff) issuedEffects.add(effectHandoff);
         return { status: 'committed', snapshot: {
-          status: 'loaded', facts: sanitizeStage4Runtime(result.runtime, shopCatalog, catalog),
-        }, copyKey: 'status.committed', rewardReceipt, firstLucky };
+          status: 'loaded', facts: after,
+        }, copyKey: 'status.committed', rewardReceipt, firstLucky,
+        effectHandoff };
       }
       const policy = classifyProductionReason(result.reason);
       unresolved = policy.retainEnvelope ? envelope : null;
@@ -150,6 +167,11 @@ export function createPresentationAdapter(session: PresentationSessionPort, tech
   }
 
   return Object.freeze({
+    consumeEffectHandoff(handoff: CommittedEffectHandoff): boolean {
+      if (!issuedEffects.has(handoff)) return false;
+      issuedEffects.delete(handoff);
+      return true;
+    },
     read(): PublicSnapshot { return publicSnapshot(session.read(), shopCatalog, catalog); },
     /** Trusted application coordination only; never handed to ui or a Scene. */
     readAuthority() {
@@ -167,7 +189,7 @@ export function createPresentationAdapter(session: PresentationSessionPort, tech
         return rejected(load.status);
       }
       let envelope: OperationEnvelope;
-      try { envelope = makeEnvelope(choice, load, technical); }
+      try { envelope = makeEnvelope(choice, load, technical, `operation-${++nextOperationId}`); }
       catch { return unavailable('entropy-unavailable'); }
       return execute(envelope, load);
     },

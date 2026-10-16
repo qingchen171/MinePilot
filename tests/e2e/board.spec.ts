@@ -19,8 +19,8 @@ test('real board: public hidden cells, explicit Flag, right-click, primary Move 
   const second = page.locator('[data-cell-index="1"]');
   await expect(first).toHaveAttribute('data-appearance', 'unknown');
   await expect(second).toHaveAttribute('data-appearance', 'unknown');
-  await expect(first).toHaveAttribute('aria-label', 'Row 1, Column 1, Unknown cell');
-  await expect(second).toHaveAttribute('aria-label', 'Row 1, Column 2, Unknown cell');
+  await expect(first).toHaveAttribute('aria-label', 'Row 1, column 1: Unknown cell.');
+  await expect(second).toHaveAttribute('aria-label', 'Row 1, column 2: Unknown cell.');
   await expect(page.locator('[data-action="board-flag"]')).toBeDisabled();
   await first.focus();
   await expect(page.locator('[data-action="board-flag"]')).toBeEnabled();
@@ -129,7 +129,7 @@ for (const variant of ['pending', 'failed', 'won', 'occupancy', 'zero', 'number'
       await expect(scenario.locator('.board-current-number')).not.toContainText('0');
     }
     if (variant === 'number') {
-      await expect(scenario.locator('.board-current-number')).toHaveText(`Nearby mines: ${fixture.expectedNumber}`);
+      await expect(scenario.locator('.board-current-number')).toHaveText(`Nearby mines: ${fixture.expectedNumber}.`);
     }
     await scenario.reload();
   });
@@ -257,7 +257,7 @@ test('zoom, DPR, route reconstruction and scroll keep one public board geometry'
   expect(await page.evaluate(() => devicePixelRatio)).toBe(2);
 });
 
-test('competing writer loss never draws an uncommitted destination', async ({ page }) => {
+test('competing writer signal disables stale movement without drawing an uncommitted destination', async ({ page }) => {
   const fixture = boardBrowserSave('zero');
   await page.addInitScript((entries: [string, string][]) => {
     localStorage.clear(); for (const [key, value] of entries) localStorage.setItem(key, value);
@@ -271,9 +271,10 @@ test('competing writer loss never draws an uncommitted destination', async ({ pa
   await other.goto('/');
   await other.getByRole('button', { name: 'Continue' }).click();
   await other.locator('.board-hit-cell[data-appearance="unknown"]').first().click({ button: 'right' });
-  await move.click();
+  await expect(move).toBeDisabled();
   await expect(page.locator('.board-hit-cell[data-character="true"]')).toHaveAttribute('data-cell-index', originalIndex!);
-  await expect(page.locator('#page [role="status"]')).toContainText('Reload');
+  await expect(page.locator('#status')).toContainText('Reload');
+  await expect(page.locator('[data-game-action="reload"]')).toBeVisible();
   await other.close();
 });
 

@@ -228,6 +228,7 @@ test('one committed Reward receipt appears once; F5 restores claimed assets with
   await page.locator(`[data-cell-index="${index}"]`).click();
   expect(await revision(page)).toBe(before + 1);
   await expect(page.getByRole('heading', { name: 'Reward saved' })).toBeVisible();
+  await expect(page.locator('#status')).toContainText('Reward saved: 1 claimed reward.');
   await expect(page.getByRole('heading', { name: 'Claimed rewards' })).toBeVisible();
   await page.reload();
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -282,7 +283,7 @@ test('competing writer does not publish stale Game Item state and explicit reloa
   const before = await revision(page);
   await competitor.locator('[data-game-action="detection"]').click();
   expect(await revision(page)).toBe(before + 1);
-  await page.locator('[data-game-action="detection"]').click();
+  await expect(page.locator('[data-game-action="detection"]')).toBeDisabled();
   expect(await revision(page)).toBe(before + 1);
   await expect(page.locator('[data-game-action="reload"]')).toBeVisible();
   await expect(page.locator('[data-cell-index="0"]')).toBeDisabled();
@@ -330,7 +331,7 @@ test('a stale Airplane target is invalidated by a competing writer and cannot re
   await competitor.getByRole('button', { name: 'Continue' }).click();
   await competitor.locator('[data-cell-index="1"]').click({ button: 'right' });
   const afterCompetitor = await revision(page);
-  await page.locator('[data-game-action="airplane"]').click();
+  await expect(page.locator('[data-game-action="airplane"]')).toBeDisabled();
   expect(await revision(page)).toBe(afterCompetitor);
   await expect(page.locator('[data-game-action="airplane"]')).toBeDisabled();
   await page.locator('[data-game-action="reload"]').click();

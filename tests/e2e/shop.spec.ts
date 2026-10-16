@@ -25,10 +25,10 @@ test('Shop presents trusted prices, one purchase per activation and explicit buy
   await page.getByRole('button', { name: 'Shop' }).click();
   const shop = page.locator('#shop');
   await expect(shop.getByRole('heading', { name: 'Shop' })).toBeVisible();
-  await expect(shop).toContainText('Lucky — 1 coins');
-  await expect(shop).toContainText('Detection — 2 coins');
-  await expect(shop).toContainText('Revive — 4 coins');
-  await expect(shop).toContainText('Airplane — 8 coins');
+  await expect(shop).toContainText('Lucky: 1 coin.');
+  await expect(shop).toContainText('Detection: 2 coins.');
+  await expect(shop).toContainText('Revive: 4 coins.');
+  await expect(shop).toContainText('Airplane: 8 coins.');
   // Two events on the original control model a double-click/key repeat across a synchronous commit.
   await shop.locator('button[data-shop-item="lucky"]').evaluate((button) => {
     button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -60,7 +60,7 @@ test('Shop presents trusted prices, one purchase per activation and explicit buy
   await page.reload();
   await page.getByRole('button', { name: 'Shop' }).click();
   await expect(shop).toContainText('Coins: 18');
-  await expect(shop).toContainText('Lucky — 1 coins · Owned: 3');
+  await expect(shop).toContainText('Lucky: 1 coin. Owned: 3.');
 });
 
 test('Shop exit cancels a retained purchase Retry without silently re-authorizing it', async ({ page }) => {

@@ -1,4 +1,5 @@
 import { presentationCopy, type PresentationCopyKey } from '../config/presentation-copy';
+import { semanticCopy } from './semantic-copy';
 import type { PresentationViewModel } from './presentation-projection';
 
 type Action = 'detection' | 'airplane' | 'revive' | 'failure' | 'retry' | 'replay' | 'next' |
@@ -71,7 +72,8 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
   let helpOpen = false;
   let lastMilestone: GameMilestone | null = null;
   let lastRender: { view: PresentationViewModel | null; receipt: Receipt | null;
-    retainedRetry: boolean; reloadRequired: boolean; eventMilestone: GameMilestone | null } | null = null;
+    retainedRetry: boolean; reloadRequired: boolean; eventMilestone: GameMilestone | null;
+    authorityDirty: boolean } | null = null;
 
   function button(key: PresentationCopyKey, action: Action, enabled = true, milestoneId?: string): HTMLButtonElement {
     const value = node('button', key);
@@ -92,7 +94,7 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
         if (action === 'defer-benben') benbenDeferred = true;
         if (action === 'toggle-help') helpOpen = !helpOpen;
         if (lastRender) render(lastRender.view, lastRender.receipt, lastRender.retainedRetry,
-          lastRender.reloadRequired, lastRender.eventMilestone);
+          lastRender.reloadRequired, lastRender.eventMilestone, lastRender.authorityDirty);
         return;
       }
       if (action === 'reload') { actions.submit('reload'); return; }
@@ -133,22 +135,23 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
 
   function render(view: PresentationViewModel | null, receipt: Receipt | null, retainedRetry: boolean,
     reloadRequired: boolean,
-    eventMilestone: GameMilestone | null = null) {
-    lastRender = { view, receipt, retainedRetry, reloadRequired, eventMilestone };
+    eventMilestone: GameMilestone | null = null, authorityDirty = false) {
+    lastRender = { view, receipt, retainedRetry, reloadRequired, eventMilestone, authorityDirty };
     const focused = document.activeElement instanceof HTMLElement ? document.activeElement.dataset.gameAction : null;
     host.replaceChildren();
     const attempt = view?.attempt;
     if (!attempt) { pendingKey = null; restartConfirmation = false; return; }
     const append = (key: PresentationCopyKey, action: Action, enabled = true, milestone?: string) =>
-      host.append(button(key, action, enabled && (!reloadRequired || action === 'reload'), milestone));
+      host.append(button(key, action, enabled && (!reloadRequired || action === 'reload') &&
+        (!authorityDirty || action === 'reload' || action === 'retry-retained'), milestone));
     host.append(node('h3', 'game.items'));
     for (const item of ['detection', 'airplane', 'revive'] as const) {
       const offer = attempt.items[item];
       if (item === 'revive' && attempt.phase !== 'pending-mine-encounter') continue;
       if (item !== 'revive' && attempt.phase !== 'active') continue;
       const label = node('p', `shop.item.${item}`);
-      label.textContent += ` — ${presentationCopy(`game.item.resource.${offer.resource}`)}; ` +
-        `${presentationCopy('game.item.uses')}: ${offer.usesRemaining}`;
+      label.textContent = semanticCopy('game.item-status', { item, resource: offer.resource,
+        uses: offer.usesRemaining });
       host.append(label);
       append(`game.item.${item}`, item, offer.offered && (item !== 'airplane' || actions.airplaneTargetAvailable()));
     }
@@ -165,7 +168,8 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
     if (attempt.benben.temporaryCard) {
       const label = node('p', attempt.benben.temporaryCard.consumed
         ? 'game.benben.card.consumed' : 'game.benben.card');
-      label.textContent += `: ${presentationCopy(`shop.item.${attempt.benben.temporaryCard.item}`)}`;
+      label.textContent = semanticCopy(attempt.benben.temporaryCard.consumed
+        ? 'game.temporary-card-used' : 'game.temporary-card', { item: attempt.benben.temporaryCard.item });
       host.append(label);
     }
     if (attempt.terminal.retry) append('game.retry', 'retry');
@@ -178,7 +182,7 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
         restartConfirmation ? 'restart' : 'confirm-restart');
     } else restartConfirmation = false;
     if (retainedRetry) append('game.retry-retained', 'retry-retained');
-    if (reloadRequired) append('action.reload', 'reload');
+    if (reloadRequired || authorityDirty) append('action.reload', 'reload');
     if (receipt?.status === 'insufficient-proof') host.append(node('p', 'game.rewards.diagnostic'));
     if (eventMilestone === 'first-lucky') host.append(node('p', 'game.lucky.saved'));
     if (receipt?.status === 'proven' && receipt.entries.length > 0) {
@@ -216,11 +220,17 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
   }
   function rewardLine(entry: RewardEntry) {
     const line = document.createElement('p');
-    line.textContent = `${presentationCopy('game.row')} ${entry.coordinate.y + 1}, ` +
-      `${presentationCopy('game.column')} ${entry.coordinate.x + 1}: ` + (entry.payload.kind === 'coins'
-      ? `${entry.payload.amount} ${presentationCopy('game.rewards.coins')}`
-      : `${entry.payload.quantity} ${presentationCopy(`shop.item.${entry.payload.item}`)} ${presentationCopy('game.rewards.item')}`);
-    if (entry.oneTime) line.textContent += ` — ${presentationCopy('game.rewards.one-time')}`;
+    line.textContent = entry.payload.kind === 'coins'
+      ? semanticCopy(entry.payload.amount === 1
+        ? entry.oneTime ? 'reward.coins-single-one-time' : 'reward.coins-single'
+        : entry.oneTime ? 'reward.coins-plural-one-time' : 'reward.coins-plural',
+        { row: entry.coordinate.y + 1, column: entry.coordinate.x + 1,
+          amount: entry.payload.amount })
+      : semanticCopy(entry.payload.quantity === 1
+        ? entry.oneTime ? 'reward.item-single-one-time' : 'reward.item-single'
+        : entry.oneTime ? 'reward.item-plural-one-time' : 'reward.item-plural',
+        { row: entry.coordinate.y + 1, column: entry.coordinate.x + 1,
+          amount: entry.payload.quantity, item: entry.payload.item });
     return line;
   }
   return Object.freeze({ render, clear: () => {

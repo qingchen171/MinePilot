@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { BoardLayout } from '../ui/board-layout';
 import type { PresentationViewModel } from '../ui/presentation-projection';
+import type { EffectCue } from '../ui/effect-cues';
 
 type Attempt = NonNullable<PresentationViewModel['attempt']>;
 const FILL = { unknown: 0xabc3d6, flagged: 0xabc3d6, explored: 0xe8f2e7,
@@ -11,18 +12,56 @@ export class BoardScene extends Phaser.Scene {
   private graphics: Phaser.GameObjects.Graphics | null = null;
   private attempt: Attempt | null = null;
   private layout: BoardLayout | null = null;
+  private decoration: Phaser.GameObjects.Graphics | null = null;
+  private decorationTween: Phaser.Tweens.Tween | null = null;
+  private decorationEpoch = 0;
 
   constructor() { super('BoardScene'); }
 
   create(): void {
     this.graphics = this.add.graphics();
+    this.decoration = this.add.graphics();
     this.input.enabled = false;
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cancelEffect());
     this.paint();
   }
 
   present(attempt: Attempt | null, layout: BoardLayout | null): void {
     this.attempt = attempt; this.layout = layout;
     this.paint();
+  }
+
+  /** Disposable decoration, never a second character position or board authority. */
+  playEffect(cue: EffectCue, epoch: number, stillValid: (epoch: number) => boolean): void {
+    this.cancelEffect();
+    if (!this.decoration || !this.layout || !this.attempt || !stillValid(epoch)) return;
+    this.decorationEpoch = epoch;
+    const { originX, originY, cellSize, columns, rows } = this.layout;
+    const coordinate = cue.coordinate;
+    const x = coordinate ? originX + (coordinate.x + .5) * cellSize : originX + columns * cellSize / 2;
+    const y = coordinate ? originY + (coordinate.y + .5) * cellSize : originY + rows * cellSize / 2;
+    const colors: Record<EffectCue['kind'], number> = {
+      move: 0x3b9bcc, flag: 0xd04848, detection: 0x588db8, airplane: 0x6d70d4,
+      revive: 0x60b880, lucky: 0xffcf63, benben: 0x8abf87, reward: 0xf4bd45,
+      pending: 0xd47064, failure: 0x9a6670, victory: 0xf4bd45, item: 0x6d70d4, saved: 0x698aa0,
+    };
+    this.decoration.lineStyle(Math.max(2, cellSize * .08), colors[cue.kind], .9);
+    if (cue.kind === 'move' && cue.from !== null && cue.coordinate !== null) {
+      const fromX = originX + (cue.from.x + .5) * cellSize;
+      const fromY = originY + (cue.from.y + .5) * cellSize;
+      this.decoration.lineBetween(fromX, fromY, x, y);
+    }
+    this.decoration.strokeCircle(x, y, Math.max(8, cellSize * .3));
+    this.decoration.setAlpha(1);
+    this.decorationTween = this.tweens.add({ targets: this.decoration, alpha: 0, duration: 250,
+      onComplete: () => { if (this.decorationEpoch === epoch && stillValid(epoch)) this.cancelEffect(); } });
+  }
+
+  cancelEffect(): void {
+    this.decorationTween?.stop();
+    this.decorationTween = null;
+    this.decoration?.clear();
+    this.decorationEpoch = 0;
   }
 
   private paint(): void {

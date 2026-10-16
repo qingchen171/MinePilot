@@ -1,0 +1,5 @@
+# S5-08 Asset Provenance
+
+S5-08 adds **no third-party or paid asset**. The decorative Board rings are drawn at runtime by MinePilot-owned Phaser code in `src/scenes/board-scene.ts`; the sound placeholders are generated at runtime by MinePilot-owned Web Audio oscillator code in `src/audio/page-audio.ts`. They contain no sampled recording, imported image, font, music track, or external data. Author: MinePilot implementation. Transformation: generated geometric shapes and sine/triangle tones. Cost: 0. External license or attribution obligation: none for these newly authored placeholders.
+
+These are functional placeholders, not a claim of final artistic or musical acceptance. Any later external art/audio must record source, author, license text/link, distribution and transformation permissions, attribution, and cost before inclusion. Any expenditure requires Elio's prior approval; this task authorizes no spending. Reverting these presentation-only placeholders must leave committed Runtime and Save v4 untouched.
