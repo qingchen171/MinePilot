@@ -1,4 +1,5 @@
 import { presentationCopy, type PresentationCopyKey } from '../config/presentation-copy';
+import { semanticCopy } from './semantic-copy';
 import type { LevelListProjectionInput } from './level-list-projection';
 import type { PresentationViewModel } from './presentation-projection';
 
@@ -67,7 +68,7 @@ export function renderNavigationPages(nav: HTMLElement, page: HTMLElement, route
   } else if (route === 'home' && view) {
     page.append(el('h3', 'home.account'));
     const coins = document.createElement('p');
-    coins.textContent = `${presentationCopy('shop.balance')}: ${view.account.coins}`;
+    coins.textContent = semanticCopy('shop.balance-sentence', { coins: view.account.coins });
     page.append(coins);
     page.append(el('p', view.attempt ? 'home.attempt' : 'home.no-attempt'));
     if (view.attempt) page.append(button('nav.continue', () => actions.navigate('game'), 'continue'));
@@ -75,7 +76,8 @@ export function renderNavigationPages(nav: HTMLElement, page: HTMLElement, route
   } else if (route === 'levels' && view) {
     if (confirmation?.phase === 'confirm') {
       page.append(el('p', 'nav.confirm-replace'));
-      const target = document.createElement('p'); target.textContent = confirmation.target; page.append(target);
+      const target = document.createElement('p'); target.textContent = semanticCopy('level.confirm-target',
+        { levelId: confirmation.target }); page.append(target);
       page.append(button('nav.confirm', actions.confirmReplacement, 'confirm-replacement'));
       page.append(button('nav.cancel', actions.cancelReplacement, 'cancel-replacement'));
     } else if (confirmation?.phase === 'first-retry' || confirmation?.phase === 'second-retry') {
@@ -85,8 +87,7 @@ export function renderNavigationPages(nav: HTMLElement, page: HTMLElement, route
       const row = document.createElement('div');
       const control = document.createElement('button');
       control.type = 'button'; control.dataset.levelId = entry.levelId;
-      control.textContent = `${entry.levelId} — ${presentationCopy(entry.access === 'locked' ? 'nav.locked' :
-        entry.access === 'completed' ? 'nav.completed' : 'nav.available')}`;
+      control.textContent = semanticCopy('level.entry', { levelId: entry.levelId, access: entry.access });
       control.disabled = entry.access === 'locked';
       control.addEventListener('click', () => actions.selectLevel(entry.levelId));
       row.append(control);
@@ -96,7 +97,8 @@ export function renderNavigationPages(nav: HTMLElement, page: HTMLElement, route
   } else if (route === 'game' && view) {
     page.append(el('p', 'game.ready'));
     if (view.attempt) {
-      const current = document.createElement('p'); current.textContent = view.attempt.levelId; page.append(current);
+      const current = document.createElement('p'); current.textContent = semanticCopy('level.current',
+        { levelId: view.attempt.levelId }); page.append(current);
       page.append(button('nav.leave-for-shop', actions.leaveForShop, 'leave-for-shop'));
     } else page.append(button('nav.levels', () => actions.navigate('levels'), 'route-levels'));
   } else if (route === 'settings' && view) {

@@ -1,15 +1,11 @@
 import { presentationCopy } from '../config/presentation-copy';
+import { semanticCopy } from './semantic-copy';
 import { createBoardActivationGate, type BoardTarget } from './board-activation';
 import { boardCellRect, type BoardLayout } from './board-layout';
 import type { PresentationViewModel } from './presentation-projection';
 
 type Attempt = NonNullable<PresentationViewModel['attempt']>;
 export type BoardAction = { readonly kind: 'move' | 'flag'; readonly coordinate: BoardTarget; readonly flagged?: boolean };
-const cellKey = {
-  unknown: 'game.cell.unknown', flagged: 'game.cell.flagged', explored: 'game.cell.explored',
-  obstacle: 'game.cell.obstacle', 'revealed-mine': 'game.cell.revealed-mine',
-} as const;
-
 /** Disposable DOM hit surface. It consumes only public facts; Phaser never submits input. */
 export function createBoardPresentation(stage: HTMLElement, controls: HTMLElement,
   submit: (action: BoardAction) => void, focusFallback: () => void,
@@ -57,7 +53,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     }
     flag.disabled = !enabled || selected === null;
     selectedLabel.textContent = selected === null ? presentationCopy('game.no-target') :
-      `${presentationCopy('game.selected')} ${selected.y + 1}, ${selected.x + 1}`;
+      semanticCopy('board.selected', { row: selected.y + 1, column: selected.x + 1 });
   }
   function select(target: BoardTarget) { selected = target; updateSelection(); onSelectionChange(); }
   function perform(kind: 'move' | 'flag', target: BoardTarget) {
@@ -166,9 +162,10 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     grid.style.height = `${layout.rows * layout.cellSize}px`;
     phase.textContent = presentationCopy(`game.phase.${next.phase}`);
     positionLabel.textContent = next.position.kind === 'waiting' ? presentationCopy('game.position.waiting') :
-      `${presentationCopy(`game.position.${next.position.kind}`)} ${next.position.y + 1}, ${next.position.x + 1}`;
+      semanticCopy(next.position.kind === 'on-board' ? 'board.position' : 'board.mine-position',
+        { row: next.position.y + 1, column: next.position.x + 1 });
     number.textContent = currentNumber.kind === 'number' ?
-      `${presentationCopy('game.current-number')} ${currentNumber.value}` :
+      semanticCopy('board.current-number', { count: currentNumber.value! }) :
       currentNumber.kind === 'zero-feedback' ? presentationCopy('game.zero-feedback') : '';
     for (const [index, cell] of cells.entries()) {
       const x = index % next.board.width; const y = Math.floor(index / next.board.width);
@@ -179,7 +176,8 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
       cell.dataset.appearance = appearance;
       const occupied = next.position.kind !== 'waiting' && next.position.x === x && next.position.y === y;
       cell.dataset.character = String(occupied);
-      cell.setAttribute('aria-label', `${presentationCopy('game.row')} ${y + 1}, ${presentationCopy('game.column')} ${x + 1}, ${presentationCopy(cellKey[appearance])}${occupied ? `, ${presentationCopy('game.character-here')}` : ''}`);
+      cell.setAttribute('aria-label', semanticCopy(occupied ? 'board.cell-occupied' : 'board.cell',
+        { row: y + 1, column: x + 1, appearance }));
       cell.disabled = !enabled;
     }
     updateSelection();

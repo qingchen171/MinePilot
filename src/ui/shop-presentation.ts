@@ -1,4 +1,5 @@
 import { presentationCopy, type PresentationCopyKey } from '../config/presentation-copy';
+import { semanticCopy } from './semantic-copy';
 import type { PresentationViewModel } from './presentation-projection';
 
 type Offer = PresentationViewModel['shop']['offers'][number];
@@ -8,11 +9,6 @@ export interface ShopPresentationActions {
   readonly retry: () => void;
   readonly reload: () => void;
 }
-
-const ITEM_KEYS: Record<Offer['item'], PresentationCopyKey> = {
-  lucky: 'shop.item.lucky', detection: 'shop.item.detection',
-  revive: 'shop.item.revive', airplane: 'shop.item.airplane',
-};
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, text: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -29,7 +25,7 @@ export function renderShopPanel(root: HTMLElement, view: PresentationViewModel,
   }): void {
   root.replaceChildren();
   root.append(element('h2', presentationCopy('shop.title')));
-  root.append(element('p', `${presentationCopy('shop.balance')}: ${view.account.coins}`));
+  root.append(element('p', semanticCopy('shop.balance-sentence', { coins: view.account.coins })));
   if (view.shop.status !== 'available') {
     root.append(element('p', presentationCopy(view.shop.status === 'account-only' ? 'shop.account-only' : 'shop.unavailable')));
     return;
@@ -52,7 +48,8 @@ export function renderShopPanel(root: HTMLElement, view: PresentationViewModel,
   }
   for (const offer of view.shop.offers) {
     const row = document.createElement('div');
-    row.append(element('span', `${presentationCopy(ITEM_KEYS[offer.item])} — ${offer.price} ${presentationCopy('shop.coin')} · ${presentationCopy('shop.owned')}: ${offer.owned} `));
+    row.append(element('span', semanticCopy(offer.price === 1 ? 'shop.offer-single' : 'shop.offer-plural',
+      { item: offer.item, price: offer.price, owned: offer.owned })));
     const buy = element('button', presentationCopy('shop.buy'));
     buy.type = 'button';
     buy.dataset.shopItem = offer.item;

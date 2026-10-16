@@ -144,7 +144,7 @@ test('controlled L2 committed move-away prompts once, F5 keeps Help without repl
   const unknown = page.locator('[data-appearance="unknown"]');
   expect(await unknown.count()).toBeGreaterThan(0);
   const labels = await unknown.evaluateAll((cells) => cells.map((cell) => cell.getAttribute('aria-label')));
-  expect(new Set(labels.map((label) => label?.replace(/Row \d+, Column \d+, /, ''))).size).toBe(1);
+  expect(new Set(labels.map((label) => label?.replace(/Row \d+, column \d+: /, ''))).size).toBe(1);
 });
 
 test('controlled L5 pending Mine and settled Failure show the frozen contextual help in browser', async ({ page }) => {

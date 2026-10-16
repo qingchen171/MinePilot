@@ -155,6 +155,14 @@ export function checkArchitecture() {
     }
 
     const sourceText = fs.readFileSync(absolutePath, 'utf8');
+    if (['ui', 'audio', 'scenes'].includes(layerOf(relativePath)) &&
+        /\b(?:Stage4GameState|sanitizeStage4Runtime|createProductionStage4Session)\b/.test(sourceText)) {
+      violations.push(`${relativePath}: presentation decoration must not import raw Runtime or production authority`);
+    }
+    if (relativePath === 'src/config/presentation-copy-templates.ts' &&
+        /\bfunction\b|=>|\bMath\.random\b/.test(sourceText)) {
+      violations.push(`${relativePath}: copy resources must remain declarative`);
+    }
     if (relativePath === 'src/main.ts') {
       if (!sourceText.includes('createProductionStage4Session(') ||
           !sourceText.includes('productionSession =')) {
