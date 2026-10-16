@@ -1,7 +1,7 @@
 # PROJECT_STATUS
 
 **项目：MinePilot / Minesweeper Product**  
-**状态更新时间：2026-10-11**
+**状态更新时间：2026-10-17**
 **控制文档版本：v1.0 FROZEN**  
 **正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01 至 S5-07 PASS / CLOSED。Production 保持单一 Stage 4 Runtime/Account authority 与唯一 guarded Save v4 writer。**
 
@@ -197,9 +197,15 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 5 / S5-08 — Animation, Audio & Copy Polish Design Review**
+**Stage 5 / S5-08 — Animation, Audio & Copy Polish Implementation**
 
-S5-07 Implementation 已由 PR #82 合入并完成正式 closeout；当前 `CURRENT_SAVE_VERSION = 4`，唯一 production writer 为 guarded v4。下方历史设计段中的旧 Next Action/production 状态不覆盖本段。S5-08 仅授权 Design Review，不在本 closeout 执行。
+S5-08 Design 已通过 Attack、Correction 与独立技术复审，并由下方可恢复的 Design Freeze 合同记录；此处仅授权后续 Implementation，不在本次文档收尾执行。当前 `CURRENT_SAVE_VERSION = 4`，唯一 production writer 仍为 guarded v4；Stage 5 保持 IN PROGRESS。下方历史设计段中的旧 Next Action/production 状态不覆盖本段。
+
+### Stage 5 / S5-08 — Animation, Audio & Copy Polish Design — FROZEN / READY FOR IMPLEMENTATION
+
+- 冻结合同：`docs/18_S5-08_Animation_Audio_Copy_Polish_Design_Contract.md`。四项 Attack 修正为：同一已提交 immutable envelope/result 的脱敏一次性效果证明（精确保留 Retry identity）；权威状态即时渲染与稳定无障碍文本优先、可丢弃且按 epoch 失效的装饰效果；页面生命周期唯一 audio adapter，Settings/visibility/Recovery/外部权威变化及异步 `play()` 过期均能立即停播旧 handle；完整句式与 ARIA 文本使用 typed centralized semantic copy。外部权威 dirty 信号不暗中清除无关 retained Retry；uncertain 不重放。素材来源与许可证须可追溯，任何支出须先获 Elio 批准。
+- Protocol §7.1：受影响的冻结接口限于 S5-02 presentation adapter/envelope 与 bootstrap 脱敏交接、S5-07 同操作 Reward/Lucky 证明及精确 Retry 归属、S5-06 非交互效果层、S5-05 reload/freshness 信号、S5-04 public Settings 消费；兼容性、无 Save/schema/version/migration 影响、回归义务和受审查回滚详见合同 §7，unit/真实 guarded-session/browser 实现验收矩阵见 §8。单 Runtime、Stage 1–4 gameplay、Save v4 writer、Shop/navigation/board 输入和 Stage 6 边界不变。
+- 已发生的 Design Freeze 证据：合同-only 提交 `4a8814dab786a1647cd059715a500ca8e4b2ab18` 经独立只读 Reviewer 对该精确 revision PASS；PR #84 仅新增合同文件，合并 main `71461f7fb881a9e96ccb3c6fbeb38266fae91ad7`。本地 `npm run quality` 全部 PASS（960 unit、259 integration、50 Playwright）；branch/PR/main Linux Quality runs `38956157204` / `38956957553` / `38957856362` 均 Success。合并后 Recovery 检查可从正式合同、现有状态、Git/CI 恢复四项 Attack 边界、§7.1、验收与单一后续入口；此次设计冻结未修改 production/tests/config/Save，也不等于 S5-08 Implementation 完成。
 
 ### Stage 5 / S5-07 — Item, Reward, Benben, Terminal & Tutorial Presentation Implementation — PASS / CLOSED
 
@@ -1165,7 +1171,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md 与 17_S5-07_Item_Reward_Benben_Terminal_Tutorial_Presentation_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01 至 S5-07 PASS / CLOSED。Production 保持单一 Stage 4 Runtime/full Account、Settings/Tutorial 必填与唯一 guarded Save v4 writer。S5-07 PR #82 已合入，§7 验收、独立 Reviewer、Linux Quality 与 Recovery 证据见状态记录和 Git/CI。唯一下一行动是 Stage 5 / S5-08 — Animation, Audio & Copy Polish Design Review；不得自动开始 Implementation 或 Stage 6。
+请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md 与 18_S5-08_Animation_Audio_Copy_Polish_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01 至 S5-07 PASS / CLOSED，S5-08 Design FROZEN / READY FOR IMPLEMENTATION。Production 保持单一 Stage 4 Runtime/full Account、Settings/Tutorial 必填与唯一 guarded Save v4 writer。S5-08 Design Freeze 的 Reviewer、PR #84、Linux Quality、Recovery 与 §7.1 证据见上方状态记录和 Git/CI。唯一下一行动是 Stage 5 / S5-08 — Animation, Audio & Copy Polish Implementation；不得自动开始 S5-09 或 Stage 6。
 ```
 
 ## 阶段看板
@@ -1177,7 +1183,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN / PASS；annotated `stage-3-frozen` 已验证 | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | FROZEN / PASS；annotated `stage-4-frozen` 已验证；S4-09 PASS/CLOSED；当时 Save v3 writer ACTIVE，现由 S5-04 的 v4 writer 接替 | Stage 3 FROZEN / PASS |
-| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-07 PASS / CLOSED；production Save v4 ACTIVE | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-08 Design Review |
+| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-07 PASS / CLOSED；S5-08 Design FROZEN；production Save v4 ACTIVE | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-08 Implementation |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
 
