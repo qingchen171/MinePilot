@@ -3,7 +3,7 @@
 **项目：MinePilot / Minesweeper Product**  
 **状态更新时间：2026-10-17**
 **控制文档版本：v1.0 FROZEN**  
-**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01 至 S5-07 PASS / CLOSED。Production 保持单一 Stage 4 Runtime/Account authority 与唯一 guarded Save v4 writer。**
+**正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01 至 S5-08 PASS / CLOSED。Production 保持单一 Stage 4 Runtime/Account authority 与唯一 guarded Save v4 writer。**
 
 ## 当前事实
 
@@ -197,9 +197,17 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 5 / S5-08 — Animation, Audio & Copy Polish Implementation**
+**Stage 5 / S5-09 — Presentation Integration & Stage 5 Freeze Gate Design Review**
 
-S5-08 Design 已通过 Attack、Correction 与独立技术复审，并由下方可恢复的 Design Freeze 合同记录；此处仅授权后续 Implementation，不在本次文档收尾执行。当前 `CURRENT_SAVE_VERSION = 4`，唯一 production writer 仍为 guarded v4；Stage 5 保持 IN PROGRESS。下方历史设计段中的旧 Next Action/production 状态不覆盖本段。
+S5-08 实现已通过技术验收，形式收尾仅在本次 docs-only PR 经独立 Reviewer、受保护合并、main Linux Quality 与最终 Recovery 均成功后生效；任一门禁失败时不得以本段宣称 CLOSED 或开始 S5-09。当前 `CURRENT_SAVE_VERSION = 4`，唯一 production writer 仍为 guarded v4；Stage 5 保持 IN PROGRESS。此处只授权 S5-09 **Design Review**，不授权其实现或 Stage 5 Freeze。下方历史设计段中的旧 Next Action/production 状态不覆盖本段。
+
+### Stage 5 / S5-08 — Animation, Audio & Copy Polish Implementation — PASS / CLOSED（以上述形式收尾门禁全部成功为生效条件）
+
+- 接受的实现：PR #86，最终独立只读 full-diff Reviewer 对 `9770d031e69b2c309b4ddf0515c1c1551865cbaa..d41926664e920d70e1b842797e3a5200e74d4ebb` 判定 PASS；实现 branch head `d41926664e920d70e1b842797e3a5200e74d4ebb`，合并 main baseline `e84dbfdabc2816dd4bcda484871d9d6cbba82af8`。Reviewer 首轮 BLOCKED 指出监听器销毁和 §8 证据缺口；最终修订断开观察者/监听器、补真实受保护会话及浏览器证据，并修复最后 Safe 胜利提示被 Move 覆盖的表现问题。此 Reviewer 是任务中的独立只读技术复审，不冒称 GitHub 审批记录。
+- 冻结合同 §8：同一已提交 immutable envelope/result 才产生脱敏一次性效果；精确保留 Retry identity，Reward/Lucky 使用既有 proof，不从 F5、重绘或库存差推断；权威画面和稳定可访问文本先更新，可取消效果与限流音频在后。unit/architecture、真实 guarded Save v4 session（含 Airplane、胜利、Shop、Settings）、浏览器中断/异步音频/Recovery 及 S5-02–S5-07 回归均已覆盖。实现阶段本地完整 `npm run quality` 实际 PASS：968 Unit、267 Integration、55 Playwright，Architecture、TypeScript、build 同时 PASS；本次未发生 Windows Playwright `EACCES`。branch/PR/main Linux Quality runs `38966292792` / `38967206379` / `38967840130` 均对相应精确 SHA 报告 Success；PR #86 实际合并且 diff 为 26 个 S5-08 presentation/guard/test/asset-provenance 文件。
+- 素材：`docs/S5-08_Asset_Provenance.md` 记录 Phaser 几何图形和 Web Audio 合成音为项目自制占位，新增第三方/付费素材为 0、费用 0；不宣称最终美术/音乐主观验收，未来外部素材须核许可证/署名，支出先获 Elio 批准。
+- 冻结与回滚：Stage 0–4 gameplay、单 production Runtime/session、Save v4 schema/version、唯一 guarded writer、生产关卡及 Stage 6 范围不变；本形式收尾仅修改本状态文档，不改 production/tests/config/Save。实现若需回退，只能受审查地撤销展示效果/音频/文案增量，保留已提交 Runtime 与 Save v4；本次文档回退为受审查的 docs-only revert，不重置存档或移动 frozen tags。非阻塞限制：F5 可错过一次性庆祝但不丢已提交资产；浏览器 autoplay/可见性行为不同；localStorage 无 atomic CAS；生产仅一个关卡且当前 generator 不生成 one-time Reward；Phaser bundle >500 KB warning。
+- 本次形式收尾的 Reviewer、branch/PR/main CI、最终 Recovery 与 closeout baseline 必须以其实际运行和 Git 历史核验，不在本段预写未来编号或自引用 SHA。完成后可仅凭本文件、冻结合同、素材记录和 Git/CI 恢复 S5-08 实现证据及唯一 S5-09 Design Review 入口。
 
 ### Stage 5 / S5-08 — Animation, Audio & Copy Polish Design — FROZEN / READY FOR IMPLEMENTATION
 
@@ -1171,7 +1179,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md 与 18_S5-08_Animation_Audio_Copy_Polish_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01 至 S5-07 PASS / CLOSED，S5-08 Design FROZEN / READY FOR IMPLEMENTATION。Production 保持单一 Stage 4 Runtime/full Account、Settings/Tutorial 必填与唯一 guarded Save v4 writer。S5-08 Design Freeze 的 Reviewer、PR #84、Linux Quality、Recovery 与 §7.1 证据见上方状态记录和 Git/CI。唯一下一行动是 Stage 5 / S5-08 — Animation, Audio & Copy Polish Implementation；不得自动开始 S5-09 或 Stage 6。
+请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md 与 18_S5-08_Animation_Audio_Copy_Polish_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01 至 S5-08 PASS / CLOSED（S5-08 形式收尾以本次 PR/main Quality/Recovery 全绿为生效条件），Stage 5 仍 IN PROGRESS。Production 保持单一 Stage 4 Runtime/full Account、Settings/Tutorial 必填与唯一 guarded Save v4 writer。S5-08 的设计与实现证据分别见上方状态记录、PR #84/#86、素材记录及 Git/CI。唯一下一行动是 Stage 5 / S5-09 — Presentation Integration & Stage 5 Freeze Gate Design Review；不得自动开始其 Implementation、Stage 5 Freeze 或 Stage 6。
 ```
 
 ## 阶段看板
@@ -1183,7 +1191,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN / PASS；annotated `stage-3-frozen` 已验证 | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | FROZEN / PASS；annotated `stage-4-frozen` 已验证；S4-09 PASS/CLOSED；当时 Save v3 writer ACTIVE，现由 S5-04 的 v4 writer 接替 | Stage 3 FROZEN / PASS |
-| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-07 PASS / CLOSED；S5-08 Design FROZEN；production Save v4 ACTIVE | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-08 Implementation |
+| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-08 PASS / CLOSED；production Save v4 ACTIVE | Stage 4 `stage-4-frozen` 已确认；唯一入口 S5-09 Design Review（S5-08 形式收尾门禁全部成功后） |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
 
