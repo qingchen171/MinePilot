@@ -35,6 +35,13 @@
 | FR-018 | 付费皮肤、充值、DLC | CAPTURED | 商业化 | 合规、支付、玩家信任 | 核心产品价值和留存先成立 |
 | FR-019 | 游戏平台/Steam/itch.io 等发布 | CAPTURED | 获客 | 平台规则与包体适配 | 自有 Web 版本稳定上线 |
 | FR-020 | 大规模关卡生产与自动配置生成 | CAPTURED | 扩展到数百/数千关 | 内容质量、重复感 | 约 20 关 MVP 获得正向数据 |
+| FR-021 | Shop / Settings / Feedback / 弹窗与辅助页同等级视觉精修 | APPROVED | 核心三页之外也达到统一品质与清晰度；不是可取消的可选美化 | 依赖 Home/Level Selection/Game 方向稳定、资产授权与独立验收；初步统一风格不等于完成 | Elio 2026-10-18 批准路线方向；后续设计明确交付检查点并通过变更控制/具体 Task 授权后实施 |
+
+### FR-021 — Required later refinement, not current implementation authority
+
+来源：`MinePilot_Master_Roadmap_v1.0_Confirmed.md` §2.1/§5 与 `21_S5-09_Product_Acceptance_Rejection_Change_Intake.md`。Shop/Settings 首轮必须有一致基础风格，之后仍须完成与核心三页同等级的全质量精修；Feedback、弹窗及辅助页同样保留。只有真实逐页产品验收和对应工程证据才能解除义务，不能以“已统一风格”注销。本条 APPROVED 表示产品方向/未来必交付义务，不授权当前编码。
+
+完整中英切换/语言选择持久化、专用手机竖屏/平板验证、Skin/test theme 已属于路线书与既有 Stage 6 承诺，不另建可选 Registry 条目；Stage 6 仍 LOCKED。FR-012 仍只指中英之外的后续语言扩展。当前唯一行动以 PROJECT_STATUS 为准。
 
 ## 新条目模板
 
