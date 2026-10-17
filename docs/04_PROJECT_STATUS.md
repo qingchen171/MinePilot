@@ -1,9 +1,11 @@
 # PROJECT_STATUS
 
 **项目：MinePilot / Minesweeper Product**  
-**状态更新时间：2026-10-17**
+**状态更新时间：2026-10-18**
 **控制文档版本：v1.0 FROZEN**  
 **正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01 至 S5-08 PASS / CLOSED。Production 保持单一 Stage 4 Runtime/Account authority 与唯一 guarded Save v4 writer。**
+
+**当前产品验收：FAILED。Elio 接受 S5-09 / PR #90 的既有技术证据，但明确拒绝当前视觉与音频体验。S5-09 Formal Closeout 暂停，未 PASS/CLOSED；Stage 5 不得 FROZEN/PASS，Stage 6/7 继续 LOCKED。本轮仅接收已批准路线方向与受控设计入口，不实施重制。**
 
 ## 当前事实
 
@@ -197,11 +199,23 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 5 / S5-09 — Presentation Integration & Stage 5 Freeze Gate Implementation**
+**Stage 5 / S5-09 Product Acceptance Remediation — Desktop Presentation Redesign & Frozen-Boundary Change Design Review**
 
-S5-09 Design Freeze 合同 PR #88 已完成独立 Reviewer、branch/PR/main Linux Quality、受保护合并和合同 Recovery。**本 status-only closeout PR 的独立 Reviewer、branch/PR/main Linux Quality、受保护合并与最终 Recovery 全部成功后**，本段才成为正式 Implementation 入口；任一门禁失败时有效任务仍是 S5-09 Design Freeze closeout，不得开始 Implementation。当前 `CURRENT_SAVE_VERSION = 4`，唯一 production writer 仍为 guarded v4；Stage 5 保持 IN PROGRESS。此处仅授权 S5-09 **Implementation**，不宣称 S5-09 PASS/CLOSED、Stage 5 FROZEN、Elio 产品验收或 Stage 6 入口。下方历史段中的旧 Next Action/production 状态不覆盖本段。
+本次 **S5-09 Product Acceptance Rejection — Controlled Roadmap and Change Intake** 文档任务的独立只读 Reviewer、质量检查、branch/PR/main Linux Quality、受保护合并与最终 Recovery 全部成功后，上述唯一 **Design Review** 入口才生效；任何门禁未完成时有效任务仍是该文档接收任务。它是 S5-09 产品验收整改的设计/变更审查入口，不是新增产品 Task ID，不授权代码、素材生成、音频替换、Freeze、S5-09 Formal Closeout 或 Stage 6。下方历史 Next Action/状态均不覆盖本段。实际 intake PR/精确 revision/CI/Recovery 由本任务 PR 和 Git history 核验，不预写未来 PASS。
 
-### Stage 5 / S5-09 — Presentation Integration & Stage 5 Freeze Gate Design — FROZEN / READY FOR IMPLEMENTATION（以上述 status-only closeout 门禁全部成功为生效条件）
+### S5-09 技术证据保留 / 产品验收 FAILED / Roadmap v1.0 受控接收
+
+- Elio 于 2026-10-18 明确拒绝现有 Stage 5 主观视觉与音频体验，同时接受既有技术实现证据。**产品验收 FAILED；S5-09 Formal Closeout BLOCKED，Stage 5 IN PROGRESS，Stage 6/7 LOCKED**。不因此虚构新的 production-code P0/P1 缺陷，也不撤销 S5-01–S5-08 历史工程 closeout。
+- 保留实现 PR #90：base `c2c2c76a798f699cf710beb57911a270ef7863da`，head `445c045dc38112c9cb71d7739b842aa226a38780`，已合并 main `04baf1ce2a2938d0d38ced418f63d9dfba5d6bcd`。实际八文件 diff 仅 tests 与 G1–G9 evidence ledger，production/config/Save 修改为 0。GitHub branch/PR/main Quality runs `38983955824` / `38984602019` / `38985418497` 已核验 Success；原 independent full-diff PASS 为 Elio 本任务确认接受的既有报告，不冒称本轮重新执行或 GitHub review approval。
+- `19_S5-09_Presentation_Integration_Freeze_Gate_Design_Contract.md` 与 `20_S5-09_Presentation_Integration_Evidence_Ledger.md` 原样保留；技术通过不能替代 G7/G9 的实际主观产品验收。production / controlled catalog / strict-v4 compatibility fixture 来源继续严格区分；测试 L2–L5 不等于已上线内容。
+- 已批准原始路线书原样纳入 `MinePilot_Master_Roadmap_v1.0_Confirmed.md`；权力低于 Specification、Protocol 与本状态文档，不是冻结合同。原文“待入库”是签收前快照，当前生效门禁见本段；不可据此重复任务或越权实现。完整决策、证据分类、§7.1 影响登记与恢复清单见 `21_S5-09_Product_Acceptance_Rejection_Change_Intake.md`。
+- 新产品方向包括桌面横屏 1366×768 非裁切基线、统一温暖多彩 Q 版探险、可用高质量 AI 占位、格内探险动物与头顶当前数字、棋盘优先、Home/Levels/Game 优先、Shop/Settings 基础统一后仍必须精修、正常局减少常驻帮助、明确奖励/道具/终局反馈、真正舒适 BGM/卡通 SFX、中文优先及首轮 Home 角落真实可用状态的语言入口。不得伪装完整英文切换；完整双语和专用手机竖屏仍为后续承诺。FR-021 永久跟踪二级页面精修，不重复或降级既有 Stage 6 承诺。
+- Frozen-boundary 影响目前仅**登记待设计与批准**，未修改任何 frozen contract。Save v4、单 Runtime/session、guarded writer、已冻结 gameplay/RNG/Item/Reward/Benben 与 L1 9×9/10 Mines/无障碍不变；只看到少数公开雷不构成调难度授权。未生成资产、未购买素材、未创建/移动 Stage 5 frozen tag。
+- 技术恢复点为 `04baf1ce2a2938d0d38ced418f63d9dfba5d6bcd`，不是产品验收通过版本。文档撤销使用 reviewed revert，不能清除验收拒绝事实而伪造 PASS；未来表现回退必须保留 Save v4 和已提交资产。后续须重新取得 Elio 实际产品验收及适用工程/文档门禁，才能恢复 Formal Closeout/Stage 5 Freeze。
+
+### Stage 5 / S5-09 — Presentation Integration & Stage 5 Freeze Gate Design — 历史 FROZEN / READY FOR IMPLEMENTATION
+
+Historical entry superseded：以下保留设计冻结时记录，原 PR #89 的 Implementation 入口已执行至 PR #90；当前产品验收拒绝与唯一 Design Review 入口以上方为准。不得把这里的历史未来时态当作重新执行 Implementation 或继续 Formal Closeout 的授权。
 
 - 冻结合同：`docs/19_S5-09_Presentation_Integration_Freeze_Gate_Design_Contract.md`。G1–G9 分别约束桌面跨页/Attempt、四独立提交的 Reward→合法 leave→局外 Shop→新局/F5、Board/Item/terminal、Benben 3/10 双结果与独立 claim/card、Reward/tutorial、authority/recovery、效果/音频/无障碍、1280×720 与 1024×768 客观布局、工程及 Elio 验收治理。每门禁须区分现有证据、未来缺口、production/controlled-catalog/strict-v4-fixture 来源、已提交/持久化事实、失败条件与责任；不可把兼容 fixture 称为已上线生产内容。
 - 合同-only reviewed head `ef97993ad7a7068b082e505b3919fab63d2b39eb` 经独立只读 Reviewer PASS；PR #88 仅新增该文档，合并 main `070e0c4b4d534e86e68816ee132b6d03f0660544`。本地 `npm run quality` 实际 PASS：968 Unit、267 Integration、55 Playwright，Architecture/TypeScript/build PASS；branch/PR/main Linux Quality runs `38976881879` / `38977713631` / `38978450908` 均对相应 revision 报 Success。合并后从正式 Git/合同/控制文档做合同 Recovery：可恢复 G1–G9、四项 Attack 修正、未完成的未来 Implementation 证据、单一 Save v4 authority 和 Stage 5 未冻结边界。
@@ -1185,7 +1199,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、Protocol、最新 PROJECT_STATUS、11_Stage_5_Presentation_Architecture_Contract.md 与 19_S5-09_Presentation_Integration_Freeze_Gate_Design_Contract.md。Stage 0–4 FROZEN / PASS；S5-01 至 S5-08 PASS / CLOSED；Stage 5 仍 IN PROGRESS。Production 保持单一 Stage 4 Runtime/full Account、Settings/Tutorial 必填与唯一 guarded Save v4 writer。S5-09 Design Freeze 的 G1–G9、四项 Attack 修正、未来待补集成/桌面布局证据及 Elio hands-on/annotated-tag 前置见合同；合同 PR #88 已通过 Reviewer、branch/PR/main Linux Quality 与合同 Recovery。本状态收尾 PR 的 Reviewer、branch/PR/main Quality 与最终 Recovery 全绿后，唯一下一行动是 Stage 5 / S5-09 — Presentation Integration & Stage 5 Freeze Gate Implementation；否则仍为 Design Freeze closeout。不得把设计冻结当作 S5-09 Implementation PASS、Stage 5 FROZEN 或 Stage 6 授权。
+请读取 AGENTS、Specification、Protocol、Product Manager Operation Manual、最新 PROJECT_STATUS、docs/11、docs/19–21、MinePilot_Master_Roadmap_v1.0_Confirmed.md 与 Future Registry。Stage 0–4 FROZEN/PASS，S5-01–S5-08 历史工程 CLOSED；PR #90 / main 04baf1ce2a2938d0d38ced418f63d9dfba5d6bcd 技术证据保留，但 Elio 于 2026-10-18 明确拒绝 Stage 5 视觉/音频，产品验收 FAILED。S5-09 Formal Closeout 不可继续，Stage 5 IN PROGRESS，Stage 6/7 LOCKED，不能打冻结标签。路线书是低于冻结 authority 的导航原件；§7.1 影响只登记，不是接口修改授权。核验本次文档接收 PR 的 Reviewer、branch/PR/main Quality、受保护合并与 Recovery；全过后唯一下一行动为 Stage 5 / S5-09 Product Acceptance Remediation — Desktop Presentation Redesign & Frozen-Boundary Change Design Review，否则仍处理文档接收门禁。不得开始实现、生成素材、改音频/Save/gameplay 或进入 Stage 6。
 ```
 
 ## 阶段看板
@@ -1197,7 +1211,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN / PASS；annotated `stage-3-frozen` 已验证 | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | FROZEN / PASS；annotated `stage-4-frozen` 已验证；S4-09 PASS/CLOSED；当时 Save v3 writer ACTIVE，现由 S5-04 的 v4 writer 接替 | Stage 3 FROZEN / PASS |
-| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-08 PASS / CLOSED；S5-09 Design FROZEN/READY 以上述状态收尾门禁成功为条件；production Save v4 ACTIVE | Stage 4 `stage-4-frozen` 已确认；门禁完成后唯一入口 S5-09 Implementation |
+| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-08 历史工程 PASS / CLOSED；S5-09 技术证据保留，Elio 产品验收 FAILED，Formal Closeout BLOCKED；Save v4 ACTIVE | Stage 4 frozen 不变；文档接收门禁完成后仅进入上述产品验收整改 Design Review |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
 
@@ -1210,7 +1224,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 - Reward farming/反自动化继续保留于 Future Requirements Registry；在出现真实经济破坏证据前不提前实现复杂防刷系统。
 - 游戏正式名称与域名未定。
 - S5-03 四种 Shop Item 的当前 MVP 价格已冻结为 1/2/4/8 coin；其他未冻结的后续关卡平衡（例如 level-002+ 的 Reward/难度参数、障碍比例最终值）等待可玩原型数据；不得把已冻结的 `level-001` Reward 配置或 Benben global 阈值重新标为待定。
-- 美术、音乐与音效素材来源等待核心玩法验证后决定。
+- 当前视觉/音频已被 Elio 拒绝；新方向见批准路线书及 docs/21。高质量 AI 占位可用，但资产来源、许可证、署名和实际品质需后续审查；支出须先批准。当前自制合成音的技术/授权证据不代表产品音乐验收。
 - 目标浏览器最低版本等待 Stage 0/6 兼容性审查。
 - 流程改进候选：现行“同一 Bug 两次修复未通过即 STOP”可能需要区分“未知根因下的连续试错”与“根因已明确的直接连锁修复”；在正式审查并修改 Protocol 前继续严格遵守现行规则，本次不修改 Protocol。
 
