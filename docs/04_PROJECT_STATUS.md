@@ -222,7 +222,7 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ### Stage 5 / S5-09 — Presentation Integration & Stage 5 Freeze Gate Design — 历史 FROZEN / READY FOR IMPLEMENTATION
 
-Historical entry superseded：以下保留设计冻结时记录，原 PR #89 的 Implementation 入口已执行至 PR #90；当前产品验收拒绝与唯一 Design Review 入口以上方为准。不得把这里的历史未来时态当作重新执行 Implementation 或继续 Formal Closeout 的授权。
+Historical entry superseded：以下保留设计冻结时记录，原 PR #89 的 Implementation 入口已执行至 PR #90；当前产品验收拒绝与唯一下一行动以上方为准。不得把这里的历史未来时态当作重新执行 Implementation 或继续 Formal Closeout 的授权。
 
 - 冻结合同：`docs/19_S5-09_Presentation_Integration_Freeze_Gate_Design_Contract.md`。G1–G9 分别约束桌面跨页/Attempt、四独立提交的 Reward→合法 leave→局外 Shop→新局/F5、Board/Item/terminal、Benben 3/10 双结果与独立 claim/card、Reward/tutorial、authority/recovery、效果/音频/无障碍、1280×720 与 1024×768 客观布局、工程及 Elio 验收治理。每门禁须区分现有证据、未来缺口、production/controlled-catalog/strict-v4-fixture 来源、已提交/持久化事实、失败条件与责任；不可把兼容 fixture 称为已上线生产内容。
 - 合同-only reviewed head `ef97993ad7a7068b082e505b3919fab63d2b39eb` 经独立只读 Reviewer PASS；PR #88 仅新增该文档，合并 main `070e0c4b4d534e86e68816ee132b6d03f0660544`。本地 `npm run quality` 实际 PASS：968 Unit、267 Integration、55 Playwright，Architecture/TypeScript/build PASS；branch/PR/main Linux Quality runs `38976881879` / `38977713631` / `38978450908` 均对相应 revision 报 Success。合并后从正式 Git/合同/控制文档做合同 Recovery：可恢复 G1–G9、四项 Attack 修正、未完成的未来 Implementation 证据、单一 Save v4 authority 和 Stage 5 未冻结边界。
