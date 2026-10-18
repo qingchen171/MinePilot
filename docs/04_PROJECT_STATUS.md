@@ -5,7 +5,7 @@
 **控制文档版本：v1.0 FROZEN**  
 **正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01 至 S5-08 PASS / CLOSED。Production 保持单一 Stage 4 Runtime/Account authority 与唯一 guarded Save v4 writer。**
 
-**当前产品验收：FAILED。Elio 接受 S5-09 / PR #90 的既有技术证据，但明确拒绝当前视觉与音频体验。S5-09 Formal Closeout 暂停，未 PASS/CLOSED；Stage 5 不得 FROZEN/PASS，Stage 6/7 继续 LOCKED。本轮仅接收已批准路线方向与受控设计入口，不实施重制。**
+**当前产品验收：FAILED。Elio 接受 S5-09 / PR #90 的既有技术证据，但明确拒绝当前视觉与音频体验。S5-09 Formal Closeout 暂停，未 PASS/CLOSED；Stage 5 不得 FROZEN/PASS，Stage 6/7 继续 LOCKED。已批准的桌面重制设计冻结仅在其独立文档门禁全部通过后授权后续 Implementation；本次文档任务不实施重制。**
 
 ## 当前事实
 
@@ -199,9 +199,16 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 5 / S5-09 Product Acceptance Remediation — Desktop Presentation Redesign & Frozen-Boundary Change Design Review**
+**Stage 5 / S5-09 Product Acceptance Remediation — Desktop Presentation Redesign Implementation**
 
-本次 **S5-09 Product Acceptance Rejection — Controlled Roadmap and Change Intake** 文档任务的独立只读 Reviewer、质量检查、branch/PR/main Linux Quality、受保护合并与最终 Recovery 全部成功后，上述唯一 **Design Review** 入口才生效；任何门禁未完成时有效任务仍是该文档接收任务。它是 S5-09 产品验收整改的设计/变更审查入口，不是新增产品 Task ID，不授权代码、素材生成、音频替换、Freeze、S5-09 Formal Closeout 或 Stage 6。下方历史 Next Action/状态均不覆盖本段。实际 intake PR/精确 revision/CI/Recovery 由本任务 PR 和 Git history 核验，不预写未来 PASS。
+上述唯一 **Implementation** 入口只有在本次 docs-only **S5-09 Desktop Presentation Redesign Design Freeze** 的独立只读 Reviewer PASS、本地适用质量、branch/PR/main Linux Quality Success、受保护合并及最终 Recovery PASS 全部经实际证据核实后才生效。门禁未齐时，有效任务仍为本次 Design Freeze，不可依赖分支上的未来时态实施。此后也必须另起已授权 Implementation 阶段，先按 `docs/22_S5-09_Desktop_Presentation_Remediation_Design_Contract.md` 的 Gate A/B 分别取得 Elio 批准；本文不授权本轮代码、素材、音频替换、S5-09 Formal Closeout、Stage 5 tag 或 Stage 6/7。下方历史 Next Action/状态均不覆盖本段。不预写本次 Reviewer、CI、Recovery 或最终产品验收 PASS。
+
+### S5-09 Desktop Presentation Redesign Design Freeze — 受控文档门禁
+
+- Elio 已批准五项 Attack 发现修正后的设计进入 **Design Freeze**，不等于批准未创建的视觉资产或可玩切片。冻结候选主合同为 `docs/22_S5-09_Desktop_Presentation_Remediation_Design_Contract.md`；其四视口、格内动物/头顶数字、已提交结果驱动效果、分层素材与预算、中文/真实音频、Gate A/B、回归及回滚边界属于下一阶段 Implementation 的验收要求。
+- 本次窄幅 §7.1 修订只澄清 Specification §1/§3.2/附录 A 当前格数字的位置、Stage 5/S5-05 首轮 Home 语言信息入口、S5-08 脱敏效果目标/提交终点/锚点，以及 S5-09 G7–G9 的**附加**桌面/音频/产品门禁；具体 reason、compatibility、schema/migration、regression 和 rollback 见 doc 22 §7。原 G1–G9 技术证据及 PR #90 不被撤销；Save v4、单 Runtime/session/guarded writer、L1 9×9/10 Mines、玩法/RNG/Item/Reward/Benben 不变。
+- 此段只在本次受保护 docs-only PR、branch/PR/main Linux Quality、独立 Reviewer 和最终 Recovery 实际完成后构成 **Design FROZEN / READY FOR IMPLEMENTATION**。工作分支中的文本是待核验候选，不宣称当前 Reviewer、CI 或 Recovery 已通过；具体 revision/PR/run 由 GitHub/Git 事实恢复。
+- **产品验收仍 FAILED**，S5-09 未 PASS/CLOSED，Stage 5 IN PROGRESS，Stage 6/7 LOCKED，不得创建或移动 Stage 5 frozen tag。Gate A 三屏视觉构图、Gate B 生产 L1 可玩切片、最终 Elio hands-on 产品重验为以后分别可拒绝的门禁；FR-021 后续二级页同等级精修不因基础统一而完成。任何支出须 Elio 事先逐笔批准，预算目标 ≤$100、绝对上限 $200，旧 `$0–$80` 不是报价。
 
 ### S5-09 技术证据保留 / 产品验收 FAILED / Roadmap v1.0 受控接收
 
@@ -210,12 +217,12 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 - `19_S5-09_Presentation_Integration_Freeze_Gate_Design_Contract.md` 与 `20_S5-09_Presentation_Integration_Evidence_Ledger.md` 原样保留；技术通过不能替代 G7/G9 的实际主观产品验收。production / controlled catalog / strict-v4 compatibility fixture 来源继续严格区分；测试 L2–L5 不等于已上线内容。
 - 已批准原始路线书原样纳入 `MinePilot_Master_Roadmap_v1.0_Confirmed.md`；权力低于 Specification、Protocol 与本状态文档，不是冻结合同。原文“待入库”是签收前快照，当前生效门禁见本段；不可据此重复任务或越权实现。完整决策、证据分类、§7.1 影响登记与恢复清单见 `21_S5-09_Product_Acceptance_Rejection_Change_Intake.md`。
 - 新产品方向包括桌面横屏 1366×768 非裁切基线、统一温暖多彩 Q 版探险、可用高质量 AI 占位、格内探险动物与头顶当前数字、棋盘优先、Home/Levels/Game 优先、Shop/Settings 基础统一后仍必须精修、正常局减少常驻帮助、明确奖励/道具/终局反馈、真正舒适 BGM/卡通 SFX、中文优先及首轮 Home 角落真实可用状态的语言入口。不得伪装完整英文切换；完整双语和专用手机竖屏仍为后续承诺。FR-021 永久跟踪二级页面精修，不重复或降级既有 Stage 6 承诺。
-- Frozen-boundary 影响目前仅**登记待设计与批准**，未修改任何 frozen contract。Save v4、单 Runtime/session、guarded writer、已冻结 gameplay/RNG/Item/Reward/Benben 与 L1 9×9/10 Mines/无障碍不变；只看到少数公开雷不构成调难度授权。未生成资产、未购买素材、未创建/移动 Stage 5 frozen tag。
+- 本条为**历史接收阶段记录**：当时 Frozen-boundary 影响仅登记、尚未修订；本次后续 Design Freeze 的批准窄幅修订见上方及 doc 22，不能误读为该 intake 当时已批准实施。Save v4、单 Runtime/session、guarded writer、已冻结 gameplay/RNG/Item/Reward/Benben 与 L1 9×9/10 Mines/无障碍不变；只看到少数公开雷不构成调难度授权。未生成资产、未购买素材、未创建/移动 Stage 5 frozen tag。
 - 技术恢复点为 `04baf1ce2a2938d0d38ced418f63d9dfba5d6bcd`，不是产品验收通过版本。文档撤销使用 reviewed revert，不能清除验收拒绝事实而伪造 PASS；未来表现回退必须保留 Save v4 和已提交资产。后续须重新取得 Elio 实际产品验收及适用工程/文档门禁，才能恢复 Formal Closeout/Stage 5 Freeze。
 
 ### Stage 5 / S5-09 — Presentation Integration & Stage 5 Freeze Gate Design — 历史 FROZEN / READY FOR IMPLEMENTATION
 
-Historical entry superseded：以下保留设计冻结时记录，原 PR #89 的 Implementation 入口已执行至 PR #90；当前产品验收拒绝与唯一 Design Review 入口以上方为准。不得把这里的历史未来时态当作重新执行 Implementation 或继续 Formal Closeout 的授权。
+Historical entry superseded：以下保留设计冻结时记录，原 PR #89 的 Implementation 入口已执行至 PR #90；当前产品验收拒绝与唯一下一行动以上方为准。不得把这里的历史未来时态当作重新执行 Implementation 或继续 Formal Closeout 的授权。
 
 - 冻结合同：`docs/19_S5-09_Presentation_Integration_Freeze_Gate_Design_Contract.md`。G1–G9 分别约束桌面跨页/Attempt、四独立提交的 Reward→合法 leave→局外 Shop→新局/F5、Board/Item/terminal、Benben 3/10 双结果与独立 claim/card、Reward/tutorial、authority/recovery、效果/音频/无障碍、1280×720 与 1024×768 客观布局、工程及 Elio 验收治理。每门禁须区分现有证据、未来缺口、production/controlled-catalog/strict-v4-fixture 来源、已提交/持久化事实、失败条件与责任；不可把兼容 fixture 称为已上线生产内容。
 - 合同-only reviewed head `ef97993ad7a7068b082e505b3919fab63d2b39eb` 经独立只读 Reviewer PASS；PR #88 仅新增该文档，合并 main `070e0c4b4d534e86e68816ee132b6d03f0660544`。本地 `npm run quality` 实际 PASS：968 Unit、267 Integration、55 Playwright，Architecture/TypeScript/build PASS；branch/PR/main Linux Quality runs `38976881879` / `38977713631` / `38978450908` 均对相应 revision 报 Success。合并后从正式 Git/合同/控制文档做合同 Recovery：可恢复 G1–G9、四项 Attack 修正、未完成的未来 Implementation 证据、单一 Save v4 authority 和 Stage 5 未冻结边界。
@@ -1199,7 +1206,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、Protocol、Product Manager Operation Manual、最新 PROJECT_STATUS、docs/11、docs/19–21、MinePilot_Master_Roadmap_v1.0_Confirmed.md 与 Future Registry。Stage 0–4 FROZEN/PASS，S5-01–S5-08 历史工程 CLOSED；PR #90 / main 04baf1ce2a2938d0d38ced418f63d9dfba5d6bcd 技术证据保留，但 Elio 于 2026-10-18 明确拒绝 Stage 5 视觉/音频，产品验收 FAILED。S5-09 Formal Closeout 不可继续，Stage 5 IN PROGRESS，Stage 6/7 LOCKED，不能打冻结标签。路线书是低于冻结 authority 的导航原件；§7.1 影响只登记，不是接口修改授权。核验本次文档接收 PR 的 Reviewer、branch/PR/main Quality、受保护合并与 Recovery；全过后唯一下一行动为 Stage 5 / S5-09 Product Acceptance Remediation — Desktop Presentation Redesign & Frozen-Boundary Change Design Review，否则仍处理文档接收门禁。不得开始实现、生成素材、改音频/Save/gameplay 或进入 Stage 6。
+请读取 AGENTS、Specification、Protocol、Product Manager Operation Manual、最新 PROJECT_STATUS、docs/11、docs/19–22、MinePilot_Master_Roadmap_v1.0_Confirmed.md 与 Future Registry。Stage 0–4 FROZEN/PASS，S5-01–S5-08 历史工程 CLOSED；PR #90 / main 04baf1ce2a2938d0d38ced418f63d9dfba5d6bcd 技术证据保留，但 Elio 于 2026-10-18 明确拒绝 Stage 5 视觉/音频，产品验收 FAILED。S5-09 Formal Closeout 不可继续，Stage 5 IN PROGRESS，Stage 6/7 LOCKED，不能打冻结标签。路线书是低于冻结 authority 的导航原件；docs/22 记录本次产品批准的窄范围 §7.1 设计修订，不授权扩大玩法或持久化变更。核验本次 Design Freeze 文档 PR 的 Reviewer、branch/PR/main Quality、受保护合并与 Recovery；全过后唯一下一行动为 Stage 5 / S5-09 Product Acceptance Remediation — Desktop Presentation Redesign Implementation，否则仍处理 Design Freeze 门禁。不得在本次任务开始实现、生成素材、改音频/Save/gameplay 或进入 Stage 6。
 ```
 
 ## 阶段看板
@@ -1211,7 +1218,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN / PASS；annotated `stage-3-frozen` 已验证 | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | FROZEN / PASS；annotated `stage-4-frozen` 已验证；S4-09 PASS/CLOSED；当时 Save v3 writer ACTIVE，现由 S5-04 的 v4 writer 接替 | Stage 3 FROZEN / PASS |
-| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-08 历史工程 PASS / CLOSED；S5-09 技术证据保留，Elio 产品验收 FAILED，Formal Closeout BLOCKED；Save v4 ACTIVE | Stage 4 frozen 不变；文档接收门禁完成后仅进入上述产品验收整改 Design Review |
+| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-08 历史工程 PASS / CLOSED；S5-09 技术证据保留，Elio 产品验收 FAILED，Formal Closeout BLOCKED；Save v4 ACTIVE | Stage 4 frozen 不变；本次 Design Freeze 门禁完成后仅进入产品验收整改 Implementation |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
 
