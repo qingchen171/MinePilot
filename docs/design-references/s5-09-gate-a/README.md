@@ -41,7 +41,7 @@ node docs/design-references/s5-09-gate-a/geometry.mjs
 
 The checker reads the archived files without writing, verifies all three SHA256/PNG dimensions, and evaluates doc22's normalized bounds at four exact named cell minima and four allocated viewport cell values, each at center/four edges/four corners:36+36 arithmetic cases. It verifies foot support containment, full envelope/viewport/header/rail fit, helmet gap and separation between the number box and adjacent critical-marker boxes. The extra allocated cases account for rounded published minima; they are not72 browser/gameplay tests.
 
-Locally executed2026-10-27: reference hashes/dimensions PASS;36 exact-minimum+36 allocated cases PASS. Geometry table and formulas are frozen in doc22 §2–3. No real browser, DPR, actual font contrast, frame mask, hit alignment, pointer/keyboard, animation, lifecycle, CI or Recovery result is claimed by this arithmetic. Those remain separately evidenced gates.
+Locally executed2026-10-27: reference hashes/dimensions PASS;36 exact-minimum+36 allocated cases PASS. Geometry table and formulas are specified in the candidate amendment in doc22 §2–3. No real browser, DPR, actual font contrast, frame mask, hit alignment, pointer/keyboard, animation, lifecycle, CI or Recovery result is claimed by this arithmetic. Those remain separately evidenced gates.
 
 ## Protocol §7.1 and recovery
 
