@@ -1,0 +1,68 @@
+{
+  "status": "Gate B implementation assets; Elio playable/product acceptance PENDING",
+  "created": "2026-10-29",
+  "provider": "OpenAI built-in image_gen tool",
+  "model": "Not disclosed by tool response; no model/version inferred",
+  "creator": "AI-generated for MinePilot under Elio-authorized Gate B implementation",
+  "rights": {
+    "input": "Elio represented ownership/permission for supplied visual references. Gate A PNGs remain design references and are not runtime textures.",
+    "output": "OpenAI Terms of Use, Content / Ownership of content, assigns OpenAI's rights in Output to the user to extent permitted by law. New derivatives here use that basis, subject to input rights; no exclusivity or third-party clearance guarantee.",
+    "source": "https://openai.com/policies/terms-of-use/",
+    "checked": "2026-10-29",
+    "effective": "2026-01-01",
+    "distribution": "Intended source repository and playable MinePilot build redistribution, adaptation and commercial use under user-owned Output; no third-party stock asset license added.",
+    "attribution": "AI-generated status disclosed here. No separate attribution obligation found in cited ownership clause; reference providers/rights remain Elio's representation.",
+    "productionAcceptance": "Not granted by this manifest; Gate B hands-on acceptance remains pending"
+  },
+  "cost": {
+    "purchases": 0,
+    "incrementalToolCharge": "Not exposed by built-in tool; no paid API, asset or service purchase initiated",
+    "approval": "No new spending authorization used"
+  },
+  "assets": [
+    {
+      "path": "src/assets/explorer/explorer-atlas.png",
+      "sha256": "E5582F11225258C00B2613173FA59B0953F49DF41618786B7C753086B75DDCF2",
+      "bytes": 1787241,
+      "width": 1254,
+      "height": 1254,
+      "prompt": "Use case: identity-preserve. Production transparent sprite atlas of the orange explorer animal in attached reference. EXACT 4x4 evenly spaced atlas, 16 FULL BODY separate sprites. Preserve orange-and-white furry cub, gold lamp helmet, red scarf, leather backpack, rounded volumetric proportions and friendly identity. CRITICAL: each character occupies only middle 65% width and 65% height of its cell; large clean fully transparent spacing. No ground or shadows or glow outside contours. Row1 faces lower-right, row2 faces lower-left, row3 faces upper-right with backpack visible and face looking RIGHT, row4 faces upper-left with backpack visible and face looking LEFT. Columns idle, small left-paw step, small right-paw step, alert observing. All feet at same baseline within their individual cell. Full tails and paws, no boundary touching. NO colored haze, bloom, outline, glitter, smoke, scenery or white matte. Truly clean alpha outside silhouette. This is technical registration and directional production work, not a style redesign. No numeral, text, tile, grid or floor. Crisp material separation of fur/leather/metal, warmly lit dimensional commercial cartoon quality.",
+      "humanEdits": "No bitmap edits. Original output copied intact; runtime atlas rectangles/registered pivots for explorer and tiles. CSS/Phaser authored geometry and controls are separate.",
+      "source": "design-drafts/s5-09-gate-a-three-screens-8of10-r1/accepted-8of10-reference.png",
+      "sourceSha256": "030FB4FBDD710C24AFE5516473870831C65F4889E3AA171827BB410FCFD7D67A",
+      "usage": "Four directions × idle/two steps/observe; committed position only",
+      "decodedBytes": 6290064
+    },
+    {
+      "path": "src/assets/game/backdrop.png",
+      "sha256": "D73C6AA61197CD5E45067E0440D80E782418BFB55BA3B5EA287503F871B43CF2",
+      "bytes": 2327302,
+      "width": 1672,
+      "height": 941,
+      "prompt": "Production layered Game background ONLY, 16:9 landscape. Identity/style reference attached is ONLY art direction, do not reproduce its UI. Warm cute richly detailed floating-island cartoon adventure world with blue sky, distant waterfalls, tiny distant castle islands, sunlit foliage and soft white clouds, warm wood and sandstone accents. Keep central 75 percent visually quiet so a separate 9x9 interactive board can be overlaid. Distant scenery at left/right margins and bottom edge. NO board, NO tiles/grid, NO character, NO numerals, NO words, NO buttons, NO controls, NO baked UI. Standalone decorative backdrop, commercial-quality welcoming cartoon depth. Single same approved style, no alternative concept.",
+      "humanEdits": "No bitmap edits. Original output copied intact; runtime atlas rectangles/registered pivots for explorer and tiles. CSS/Phaser authored geometry and controls are separate.",
+      "source": "docs/design-references/s5-09-gate-a/game-1366x768.png",
+      "sourceSha256": "393FD00202FA62871E2DEEBE882A8F3A081240AC59774939832BE2E9E4CECCD6",
+      "usage": "Game-only background; zero hit targets or baked board",
+      "decodedBytes": 6293408
+    },
+    {
+      "path": "src/assets/game/tiles.png",
+      "sha256": "A424DA3E4D7EEA1D285212D7AF263606835E48DABC1A3CFF40540295D5E14356",
+      "bytes": 1544719,
+      "width": 1774,
+      "height": 887,
+      "prompt": "Production tile atlas ONLY. Two square 3D cartoon sandstone game tiles side-by-side on genuinely transparent background, equal size and large transparent gap. Left warm orange hidden-cell tile with inset pickaxe mark; right light cream explored tile with inset paw mark. Same thick beveled tactile ceramic/sandstone material and warm upper-left light as attached approved reference. Camera almost directly overhead, square straight sides, each top surface occupies 90 percent of tile; narrow lower bevel giving depth, no perspective distortion. Each tile fully isolated no flowers or surrounding scenery, NO number, NO character, NO rewards, NO mines, NO flags. Exact two tiles only. No new gameplay art, this is the existing unknown/explored public appearances. Preserve square geometry and transparent corners.",
+      "humanEdits": "No bitmap edits. Original output copied intact; runtime atlas rectangles/registered pivots for explorer and tiles. CSS/Phaser authored geometry and controls are separate.",
+      "source": "docs/design-references/s5-09-gate-a/game-1366x768.png",
+      "sourceSha256": "393FD00202FA62871E2DEEBE882A8F3A081240AC59774939832BE2E9E4CECCD6",
+      "usage": "Two public tile appearances; unknown Safe and hidden Mine use identical texture",
+      "decodedBytes": 6294152
+    }
+  ],
+  "limitations": [
+    "Generated frames require actual registration/mask/browser verification; artwork alone proves no gameplay fact.",
+    "Atlas source retains more resolution than 96px planning export; measured transfer and decoded-memory costs listed explicitly.",
+    "Tile and character presentation approval is pending Elio; this is not Stage 5 product PASS."
+  ]
+}

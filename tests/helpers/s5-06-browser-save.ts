@@ -17,7 +17,7 @@ type Variant = 'pending' | 'failed' | 'won' | 'occupancy' | 'zero' | 'number' |
   'benben-available' | 'detection-rich' | 'temporary-detection' | 'waiting' | 'coin-reward' | 'one-time-l4';
 
 /** Real valid v4 snapshot. Fixture construction never enters production UI or catalog. */
-export function boardBrowserSave(variant: Variant) {
+export function boardBrowserSave(variant: Variant, preferredCoordinate?: Coordinate) {
   // The coin case is a catalog-generated Reward in a deterministic preloaded L1 snapshot,
   // not a changed production reward table or a fresh-install promise.
   let made = createCompleteAttempt({ level: PRODUCTION_LEVEL_CATALOG.levels[0]!, runId: `browser-${variant}`,
@@ -30,6 +30,18 @@ export function boardBrowserSave(variant: Variant) {
     }
   }
   if (made.status !== 'created') throw new Error('attempt fixture');
+  if (preferredCoordinate) {
+    for (let seed = 1; seed <= 1000; seed++) {
+      made = createCompleteAttempt({ level: PRODUCTION_LEVEL_CATALOG.levels[0]!, runId: `browser-${variant}`,
+        generationProvenance: { seed, rngVersion: 'mulberry32-v1', generationVersion: 'mine-placement-v1' } });
+      if (made.status !== 'created') throw new Error('generated corner fixture');
+      const cell = made.attempt.run.board.cells[preferredCoordinate.y * 9 + preferredCoordinate.x]!;
+      if (cell.kind === 'safe' && !made.attempt.rewards.some((reward) =>
+        reward.coordinate.x === preferredCoordinate.x && reward.coordinate.y === preferredCoordinate.y) &&
+        countAdjacentMines(made.attempt.run.board, preferredCoordinate) > 0) break;
+      if (seed === 1000) throw new Error('no generated corner fixture');
+    }
+  }
   if (variant === 'coin-reward' && !made.attempt.rewards.some((reward) => reward.payload.kind === 'coins'))
     throw new Error('catalog-generated coin fixture');
   const attempt = made.attempt;
@@ -81,7 +93,8 @@ export function boardBrowserSave(variant: Variant) {
     if (variant === 'temporary-detection')
       account = { ...account, benbenByLevel: [{ levelId: 'level-001', status: 'used', failureStreak: 0 }] };
     const rewardCells = new Set(attempt.rewards.map((reward) => `${reward.coordinate.x},${reward.coordinate.y}`));
-    const index = board.cells.findIndex((cell, i) => cell.kind === 'safe' &&
+    const index = board.cells.findIndex((cell, i) => (!preferredCoordinate ||
+      i === preferredCoordinate.y * width + preferredCoordinate.x) && cell.kind === 'safe' &&
       !rewardCells.has(`${i % width},${Math.floor(i / width)}`) &&
       (variant === 'zero' ? countAdjacentMines(board, { x: i % width, y: Math.floor(i / width) }) === 0 :
         (variant === 'detection-rich' || variant === 'temporary-detection')

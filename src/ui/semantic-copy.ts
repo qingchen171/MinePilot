@@ -8,6 +8,8 @@ type Params = {
   'board.position': { row: number; column: number };
   'board.mine-position': { row: number; column: number };
   'board.current-number': { count: number };
+  'board.current-announcement': { row: number; column: number; count: number };
+  'board.zero-announcement': { row: number; column: number };
   'board.cell': { row: number; column: number; appearance: Cell };
   'board.cell-occupied': { row: number; column: number; appearance: Cell };
   'shop.balance-sentence': { coins: number };

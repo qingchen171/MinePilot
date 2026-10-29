@@ -26,9 +26,13 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
   let selectionEpoch = 0;
   let cells: HTMLButtonElement[] = [];
   const number = document.createElement('p'); number.className = 'board-current-number';
+  const announcement = document.createElement('p'); announcement.className = 'board-current-announcement sr-only';
+  announcement.setAttribute('aria-live', 'polite'); announcement.setAttribute('aria-atomic', 'true');
+  const badge = document.createElement('span'); badge.className = 'board-number-badge';
+  badge.setAttribute('aria-hidden', 'true'); badge.hidden = true; stage.append(badge);
   const phase = document.createElement('p'); phase.className = 'board-phase';
-  const positionLabel = document.createElement('p'); positionLabel.className = 'board-position';
-  const selectedLabel = document.createElement('p'); selectedLabel.className = 'board-selected';
+  const positionLabel = document.createElement('p'); positionLabel.className = 'board-position sr-only';
+  const selectedLabel = document.createElement('p'); selectedLabel.className = 'board-selected sr-only';
   const flag = document.createElement('button'); flag.type = 'button'; flag.dataset.action = 'board-flag';
   flag.textContent = presentationCopy('game.flag-target');
   const moveMode = document.createElement('button'); moveMode.type = 'button'; moveMode.dataset.action = 'touch-move';
@@ -36,7 +40,7 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
   const flagMode = document.createElement('button'); flagMode.type = 'button'; flagMode.dataset.action = 'touch-flag';
   flagMode.textContent = presentationCopy('game.mode.flag');
   const modes = document.createElement('div'); modes.className = 'board-touch-modes'; modes.append(moveMode, flagMode);
-  controls.append(phase, positionLabel, number, selectedLabel, flag, modes);
+  controls.prepend(phase, positionLabel, number, announcement, selectedLabel, flag, modes);
 
   function targetOf(element: Element | null): BoardTarget | null {
     const cell = element?.closest<HTMLButtonElement>('[data-cell-index]');
@@ -72,9 +76,10 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
   grid.addEventListener('mousedown', (event) => {
     if (event.button === 2) secondaryPressCount = event.detail;
   });
-  grid.addEventListener('pointerover', (event) => {
+  grid.addEventListener('pointermove', (event) => {
     const target = targetOf(event.target instanceof Element ? event.target : null);
-    if (target !== null && event.pointerType === 'mouse') select(target);
+    if (target !== null && event.pointerType === 'mouse' &&
+        (target.x !== selected?.x || target.y !== selected?.y)) select(target);
   });
   grid.addEventListener('focusin', (event) => {
     const target = targetOf(event.target instanceof Element ? event.target : null);
@@ -167,6 +172,24 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     number.textContent = currentNumber.kind === 'number' ?
       semanticCopy('board.current-number', { count: currentNumber.value! }) :
       currentNumber.kind === 'zero-feedback' ? presentationCopy('game.zero-feedback') : '';
+    number.classList.toggle('sr-only', currentNumber.kind === 'number');
+    const currentAnnouncement = next.position.kind === 'on-board' ?
+      currentNumber.kind === 'number' ? semanticCopy('board.current-announcement', {
+        row: next.position.y+1, column: next.position.x+1, count: currentNumber.value! }) :
+      currentNumber.kind === 'zero-feedback' ? semanticCopy('board.zero-announcement', {
+        row: next.position.y+1, column: next.position.x+1 }) : '' : '';
+    // Resize/repaint does not mutate the live region or replay the committed announcement.
+    if (announcement.textContent !== currentAnnouncement) announcement.textContent = currentAnnouncement;
+    badge.hidden = currentNumber.kind !== 'number' || next.position.kind !== 'on-board';
+    if (!badge.hidden && next.position.kind !== 'waiting') {
+      const rect = boardCellRect(layout, next.position.x, next.position.y)!;
+      badge.textContent = String(currentNumber.value);
+      badge.style.left = `${rect.x + .25*layout.cellSize}px`;
+      badge.style.top = `${rect.y - .65*layout.cellSize}px`;
+      badge.style.width = `${.42*layout.cellSize}px`;
+      badge.style.height = `${.38*layout.cellSize}px`;
+      badge.style.fontSize = `${Math.max(14,.32*layout.cellSize)}px`;
+    } else badge.textContent = '';
     for (const [index, cell] of cells.entries()) {
       const x = index % next.board.width; const y = Math.floor(index / next.board.width);
       const rect = boardCellRect(layout, x, y)!;
@@ -187,6 +210,8 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
     attempt = null; enabled = false; selected = null; pointerTarget = null; gate.reset();
     grid.replaceChildren(); cells = []; flag.disabled = true;
     number.textContent = ''; phase.textContent = ''; positionLabel.textContent = ''; selectedLabel.textContent = '';
+    badge.hidden = true; badge.textContent = '';
+    announcement.textContent = '';
   }
   function invalidateAuthority() {
     selectionEpoch += 1;
