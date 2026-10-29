@@ -4,9 +4,9 @@ import frames from '../../src/config/explorer-frames';
 
 const positions = [[0,0],[4,0],[8,0],[0,4],[4,4],[8,4],[0,8],[4,8],[8,8]] as const;
 for (const [width,height,minimum] of [[1366,768,64.9],[1280,720,60.4],[1024,768,56.9],[1920,1080,87.1]] as const) {
-  test(`Gate B ${width}x${height}: valid generated L1 corner/edge saves, badge, focus and pointer ownership`, async ({ browser }, info) => {
+  for (const [x,y] of positions) test(`Gate B ${width}x${height} cell ${x},${y}: valid generated L1 save, badge, focus and pointer ownership`, async ({ browser }, info) => {
     const context = await browser.newContext({ viewport:{width,height} });
-    for (const [x,y] of positions) {
+    // One independent browser boot per test: nine boots must not share a 30-second CI budget.
       // Strict preloaded v4 compatibility fixture; not a claim of nine continuous player journeys.
       const fixture = boardBrowserSave('number',{x,y}); const page = await context.newPage();
       await page.addInitScript((entries) => { localStorage.clear(); for(const [key,value] of entries) localStorage.setItem(key,value); }, fixture.entries);
@@ -46,7 +46,6 @@ for (const [width,height,minimum] of [[1366,768,64.9],[1280,720,60.4],[1024,768,
         {x:n.x+n.width/2,y:n.y+n.height/2}); expect(underlying).toBe(String((y-1)*9+x)); }
       if(x===4&&y===4) await page.screenshot({path:info.outputPath(`gate-b-${width}x${height}.png`)});
       await page.close();
-    }
     await context.close();
   });
 }
