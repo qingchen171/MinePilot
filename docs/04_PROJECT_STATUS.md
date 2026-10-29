@@ -1,11 +1,11 @@
 # PROJECT_STATUS
 
 **项目：MinePilot / Minesweeper Product**  
-**状态更新时间：2026-10-27**
+**状态更新时间：2026-10-29**
 **控制文档版本：v1.0 FROZEN**  
 **正式游戏代码：Stage 1 core、Stage 2 persistence、Stage 3 Item systems 与 Stage 4 gameplay/economy/persistence compatibility gate 均已完成。Stage 0–4 已由既有 frozen tags 确认 FROZEN / PASS；Stage 5 IN PROGRESS，S5-01 至 S5-08 PASS / CLOSED。Production 保持单一 Stage 4 Runtime/Account authority 与唯一 guarded Save v4 writer。**
 
-**最终 Stage 5 产品验收仍未通过。原体验的 FAILED 记录保留；Elio 已于 2026-10-27 明确 PASS 桌面重制 Gate A 三屏视觉方向（含最后 Game 主角/数字放大）。这不是 Gate B 或最终产品 PASS。S5-09 Formal Closeout 仍暂停，未 PASS/CLOSED；Stage 5 IN PROGRESS，Stage 6/7 LOCKED，不得创建冻结标签。当前仅执行 Gate A 受控越界的窄幅文档冻结。**
+**最终 Stage 5 产品验收仍未通过。原体验的 FAILED 记录保留；Elio 已于 2026-10-27 明确 PASS 桌面重制 Gate A 三屏视觉方向（含最后 Game 主角/数字放大）。Gate A 受控越界窄幅设计冻结已完成，见 PR #93 及下方分级证据；这不是 Gate B 或最终产品 PASS。S5-09 Formal Closeout 仍暂停，未 PASS/CLOSED；Stage 5 IN PROGRESS，Stage 6/7 LOCKED，不得创建冻结标签。Gate B 未开始，须 Elio 单独授权。**
 
 ## 当前事实
 
@@ -199,22 +199,29 @@ Stage 0 工程骨架、Stage 1 核心棋盘、Stage 2 State + Save 均已 FROZEN
 
 ## 唯一下一行动
 
-**Stage 5 / S5-09 Product Acceptance Remediation — Narrow Gate A Controlled-Overflow Design Freeze**
+**Stage 5 / S5-09 Product Acceptance Remediation — Desktop Presentation Redesign Implementation, Gate B small playable production-L1 slice**
 
-本轮仅文档/设计参考冻结。Elio 的 Gate A 视觉批准和公开设计归档授权已经给出，不重新验美术；但本次独立 Reviewer、branch/PR/main Linux Quality、受保护合并与最终 Recovery 尚须实际完成后才能标记本次窄幅 Design FROZEN。不得据此开始 Gate B；后续 Gate B Implementation 必须由 Elio 单独授权。精确三图与哈希、来源/授权、几何复现入口见 `docs/design-references/s5-09-gate-a/README.md` 和 `reference-manifest.json`；原始未跟踪草稿保留，不整包入库。生产代码/测试/配置/Save/Runtime 不变。
+**等待 Elio 单独授权；Gate B has NOT started。** 此入口只安排后续小型生产 L1 可玩切片，不构成本次实施许可。当前状态同步 PR 自身的独立只读 Reviewer、branch/PR/main Linux Quality、受保护合并及最终 Recovery 尚未齐备时，有效任务仍为本次 status-only closeout；全部实际通过后，本入口生效，但仍须取得 Elio 的单独 Gate B 授权才能实施。本轮只同步本状态文件，不改代码、测试、配置、美术或冻结合同，不生成新图、不创建 Stage 5 tag。三张已选设计参考及其完整哈希、来源和归档授权以 `docs/design-references/s5-09-gate-a/reference-manifest.json` 为精确身份权威，`README.md` 为来源/使用边界记录；所有原始未跟踪草稿保留。
 
-### Gate A visual PASS / controlled-overflow freeze — IN PROGRESS
+### Gate A visual PASS / narrow controlled-overflow Design FROZEN — COMPLETE
 
-- 已接受：Home、Levels 及 `design-drafts/s5-09-gate-a-game-presence-r1/game-1366x768.png`；Game SHA256 `393FD00202FA62871E2DEEBE882A8F3A081240AC59774939832BE2E9E4CECCD6`。只归档三个已选设计参考；不将它们批准为生产资产。
+- Elio 的明确产品决定：Home、Levels 与最后放大主角/数字的 Game 三屏方向 **Gate A PASS**。精确归档为 `docs/design-references/s5-09-gate-a/` 中 `home-1366x768.png`、`levels-1366x768.png`、`game-1366x768.png`，均为 1366×768；完整 SHA256 及原稿对应关系以 `reference-manifest.json` 为准。最终 Game 原稿为 `design-drafts/s5-09-gate-a-game-presence-r1/game-1366x768.png`，SHA256 `393FD00202FA62871E2DEEBE882A8F3A081240AC59774939832BE2E9E4CECCD6`，不得回退到旧选稿。这是设计参考批准，不是生产资产批准、可玩证据或最终 Stage 5 产品验收。
 - Elio 直接确认拥有/已获输入参考素材授权，允许公开设计归档；未来生产素材许可、署名、分层与性能清单仍须满足 docs/22 §5。
 - docs/22 §2–3 明确逻辑当前格与装饰绘制范围：允许头盔/上身/尾包/数字受控越界，双脚与接触影在当前顶面；不扩大 DOM hit，不读取隐藏事实。四个格宽及边角计算入口 `node docs/design-references/s5-09-gate-a/geometry.mjs`；这是设计几何复核，不是浏览器测试。
-- 本轮本地完整 `npm run quality` 已实际 PASS：64 unit files / 968 tests、32 integration files / 273 tests、66 Playwright tests；Architecture、TypeScript、Build PASS，未出现 EACCES。三图 hash/尺寸及 36 exact-minimum + 36 viewport geometry cases PASS，均不代表新越界浏览器实现已验证。本轮独立 Reviewer、PR/CI 与 Recovery 证据只在实际完成后记录。Gate B、S5-09 Formal Closeout、Stage 5 FROZEN 和 Stage 6/7 未授权。
+- **VERIFIED — Git/受保护合并：** PR [#93](https://github.com/qingchen171/MinePilot/pull/93) 已于 2026-10-29 合并；最终 reviewed head `0141d7725538312e6e4b88c0cb9c802bafecfa63`，实际 merge/main baseline `d5c369eae45523b904488b263cd277649868ca33`，两者 Git Tree 均为 `7fffbe19b1bcc20722440616127e893d283f9689`。本次从 GitHub API 与实际 Git objects 重新核验；main protection 要求 strict `Linux quality gate`。PR #93 仅十个 docs/设计参考文件，production/tests/config/Save/Runtime changes = 0。
+- **VERIFIED — Linux Quality：** [branch 40457865982](https://github.com/qingchen171/MinePilot/actions/runs/40457865982) 和 [PR 40465130743](https://github.com/qingchen171/MinePilot/actions/runs/40465130743) 均在 `0141d7725538312e6e4b88c0cb9c802bafecfa63` Success；[main 40805144225](https://github.com/qingchen171/MinePilot/actions/runs/40805144225) 在 `d5c369eae45523b904488b263cd277649868ca33` Success。本次核验 workflow、job 与 complete quality step 均实际完成成功，不将历史 CI 当作本状态同步 PR 的 CI。
+- **REPORTED — 原独立只读 AI Reviewer：** PR #93 body 记录最终 reviewed head `0141d7725538312e6e4b88c0cb9c802bafecfa63` 的 PASS；初审指出一处提前声称 frozen 的 README 句子，修正后复核 PASS。此为保留的独立 agent 审查报告，不是 GitHub human approval，也不冒称本轮重新执行 full-diff review。
+- **REPORTED — 原本地质量与最终隔离 Recovery：** 原完整 `npm run quality` 在 `2ab5184f04273b93af3569e7402e6e6c37f6878d` PASS：64 unit files / 968 tests、32 integration files / 273 tests、66 Playwright tests，Architecture/TypeScript/Build PASS，未出现 EACCES；随后 `0141d77` 只修 README 句子，合并树不变。上一轮最终隔离副本在 `d5c369e` 恢复参考图、哈希、尺寸、36 exact-minimum + 36 allocated-viewport geometry cases、唯一 Next Action 与阶段限制并保持 clean，报告 PASS。该报告是本次接收的历史证据，不冒称重跑本地 suite/Recovery，也不把算术称为浏览器实现证明。
+- 上述门禁支持本次窄幅 **Design FROZEN / COMPLETE**；只完成 Gate A 设计冻结，不关闭 S5-09。当前 status-only PR 自身的质量、独立 Reviewer、branch/PR/main CI 与最终 Recovery 证据由其实际 PR/Git/CI 记录恢复，未完成前不得预称 PASS。本状态差异回滚为受审查的 docs-only revert，恢复点 `d5c369eae45523b904488b263cd277649868ca33`；不撤销 Elio 历史 Gate A 批准、不删草稿、不改 Save 或移动 frozen tags。
+- **仍未验证/未授权：** Gate B 实际 sprite/frame masks、contrast、四视口边角/DPR/zoom/scroll、DOM/Phaser hit、keyboard/focus、F5/Recovery/uncertain interruption 等实现证据；生产资产逐项清单与许可仍待后续；Gate B 未开始且须 Elio 单独授权。S5-09 未 PASS/CLOSED，Stage 5 IN PROGRESS，Stage 6/7 LOCKED，最终产品验收 FAILED hold、PR #90/G1–G9、Save v4、单 Runtime/session/guarded writer、冻结玩法/RNG/Item/Reward/Benben 和生产 L1 均不变。
 
 Historical entry superseded：下方原 Desktop Presentation Redesign Implementation 的条件入口与早期 Design Freeze 记录只保留历史，不覆盖本轮窄幅冻结及上方唯一下一行动。
 
-上述唯一 **Implementation** 入口只有在本次 docs-only **S5-09 Desktop Presentation Redesign Design Freeze** 的独立只读 Reviewer PASS、本地适用质量、branch/PR/main Linux Quality Success、受保护合并及最终 Recovery PASS 全部经实际证据核实后才生效。门禁未齐时，有效任务仍为本次 Design Freeze，不可依赖分支上的未来时态实施。此后也必须另起已授权 Implementation 阶段，先按 `docs/22_S5-09_Desktop_Presentation_Remediation_Design_Contract.md` 的 Gate A/B 分别取得 Elio 批准；本文不授权本轮代码、素材、音频替换、S5-09 Formal Closeout、Stage 5 tag 或 Stage 6/7。下方历史 Next Action/状态均不覆盖本段。不预写本次 Reviewer、CI、Recovery 或最终产品验收 PASS。
+原窄幅 Design Freeze 的条件入口已由上方 PR #93 证据及唯一下一行动取代；不得重新执行已完成的冻结，也不得把其完成误读为 Gate B 实施许可。Gate B 与最终 Stage 5 hands-on 产品重验仍为分别可拒绝的门禁，后续执行顺序遵循 docs/22 §8。
 
-### S5-09 Desktop Presentation Redesign Design Freeze — 受控文档门禁
+### Historical — S5-09 Desktop Presentation Redesign Design Freeze 受控文档门禁
+
+以下保留早期设计冻结候选时的门禁快照；其中“本次/当前/以后”的条件时态不覆盖上方 PR #93 完成事实、Gate A PASS 或唯一下一行动。
 
 - Elio 已批准五项 Attack 发现修正后的设计进入 **Design Freeze**，不等于批准未创建的视觉资产或可玩切片。冻结候选主合同为 `docs/22_S5-09_Desktop_Presentation_Remediation_Design_Contract.md`；其四视口、格内动物/头顶数字、已提交结果驱动效果、分层素材与预算、中文/真实音频、Gate A/B、回归及回滚边界属于下一阶段 Implementation 的验收要求。
 - 本次窄幅 §7.1 修订只澄清 Specification §1/§3.2/附录 A 当前格数字的位置、Stage 5/S5-05 首轮 Home 语言信息入口、S5-08 脱敏效果目标/提交终点/锚点，以及 S5-09 G7–G9 的**附加**桌面/音频/产品门禁；具体 reason、compatibility、schema/migration、regression 和 rollback 见 doc 22 §7。原 G1–G9 技术证据及 PR #90 不被撤销；Save v4、单 Runtime/session/guarded writer、L1 9×9/10 Mines、玩法/RNG/Item/Reward/Benben 不变。
@@ -1217,7 +1224,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 把下面指令交给将在本机执行开发的 AI：
 
 ```text
-请读取 AGENTS、Specification、Protocol、Product Manager Operation Manual、最新 PROJECT_STATUS、docs/11、docs/19–22、docs/design-references/s5-09-gate-a/README.md 与 reference-manifest.json。Stage 0–4 FROZEN/PASS、S5-01–S5-08 历史工程 CLOSED；PR #90 技术证据保留，但最终 Stage 5 产品验收未通过，Stage 5 IN PROGRESS，Stage 6/7 LOCKED，不可 Formal Closeout 或打冻结标签。Elio 已 PASS Gate A 三屏视觉方向并确认公开设计归档权利；只使用 manifest 指定的最终 Game 及其完整哈希，不回退旧选稿。当前唯一行动为 Narrow Gate A Controlled-Overflow Design Freeze：核验本次独立 Reviewer、branch/PR/main Quality、受保护合并与 Recovery，未齐不得称 FROZEN。几何复现命令 node docs/design-references/s5-09-gate-a/geometry.mjs；算术不替代浏览器证据。冻结门禁完成后，Gate B Implementation 仍需 Elio 单独授权；不得自动实施、生成新美术、改变生产/Save/gameplay 或进入 Stage 6。
+请读取 AGENTS、Specification、Protocol、Product Manager Operation Manual、最新 PROJECT_STATUS、docs/11、docs/19–22、docs/design-references/s5-09-gate-a/README.md 与 reference-manifest.json。Stage 0–4 FROZEN/PASS、S5-01–S5-08 历史工程 CLOSED；PR #90/G1–G9 技术证据保留，但最终 Stage 5 产品验收未通过，S5-09 NOT CLOSED，Stage 5 IN PROGRESS，Stage 6/7 LOCKED，不可 Formal Closeout 或打冻结标签。Elio 已 PASS Gate A 三屏视觉方向并确认公开设计归档权利；manifest 的三张精确参考只获设计归档批准，不是生产资产。PR #93 窄幅 controlled-overflow Design Freeze 已完成；按上方 VERIFIED/REPORTED 区分恢复 Git、CI、Reviewer 与 Recovery 证据，不重复冻结。本状态同步 PR 自身门禁未齐前只完成 status-only closeout。之后唯一下一行动为 Desktop Presentation Redesign Implementation, Gate B small playable production-L1 slice，但 Gate B has NOT started，必须等待 Elio 单独授权；不得自动实施、生成新美术或改变生产/Save/gameplay。几何复现命令 node docs/design-references/s5-09-gate-a/geometry.mjs；36+36 算术不替代 Gate B 浏览器证据。
 ```
 
 ## 阶段看板
@@ -1229,7 +1236,7 @@ Historical entry superseded：上段 S4-09 closeout 当时的 S5-01 Design Revie
 | 2 | State + Save | FROZEN / PASS（S2-01 至 S2-09） | Stage 1 FROZEN / PASS |
 | 3 | 四大道具 | FROZEN / PASS；annotated `stage-3-frozen` 已验证 | Stage 2 FROZEN / PASS |
 | 4 | 关卡/奖励/商店/笨笨 | FROZEN / PASS；annotated `stage-4-frozen` 已验证；S4-09 PASS/CLOSED；当时 Save v3 writer ACTIVE，现由 S5-04 的 v4 writer 接替 | Stage 3 FROZEN / PASS |
-| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-08 历史工程 PASS / CLOSED；S5-09 技术证据保留，Elio 产品验收 FAILED，Formal Closeout BLOCKED；Save v4 ACTIVE | Stage 4 frozen 不变；本次 Design Freeze 门禁完成后仅进入产品验收整改 Implementation |
+| 5 | 表现层 | IN PROGRESS — S5-01 至 S5-08 历史工程 PASS / CLOSED；S5-09 技术证据保留，Elio 产品验收 FAILED，Formal Closeout BLOCKED；Save v4 ACTIVE | Stage 4 frozen 不变；Gate A visual PASS / 窄幅 Design FROZEN；Gate B 未开始，等待 Elio 单独授权 |
 | 6 | 皮肤框架/中英/移动端 | LOCKED | Stage 5 PASS |
 | 7 | RC/约 20 关/部署 | LOCKED | Stage 6 PASS |
 
