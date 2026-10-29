@@ -146,7 +146,8 @@ describe('S5-08 operation-bound evidence over real guarded Save v4', () => {
     expect(f.root.takeEffect(lucky)).toMatchObject({ kind: 'lucky' });
     const pending = f.root.submit({ kind: 'move', coordinate: target(mines[1]!) });
     expect(pending.status).toBe('committed');
-    expect(f.root.takeEffect(pending)).toMatchObject({ kind: 'pending' });
+    expect(f.root.takeEffect(pending)).toMatchObject({ kind: 'pending',
+      requestedTarget: target(mines[1]!), committedDestination: target(mines[0]!), effectAnchor: target(mines[1]!) });
     const revive = f.root.submit({ kind: 'revive' });
     expect(revive.status).toBe('committed');
     expect(f.root.takeEffect(revive)).toMatchObject({ kind: 'revive' });

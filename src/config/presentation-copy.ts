@@ -34,6 +34,7 @@ export const PRESENTATION_COPY = Object.freeze({
   'shop.coin': 'coins',
   'shop.owned': 'Owned',
   'shop.item.lucky': 'Lucky',
+  'game.lucky.unavailable': 'Automatic protection is unavailable.',
   'shop.item.detection': 'Detection',
   'shop.item.revive': 'Revive',
   'shop.item.airplane': 'Airplane',

@@ -23,6 +23,9 @@ export interface EffectCue {
   readonly kind: EffectCueKind;
   readonly coordinate: { readonly x: number; readonly y: number } | null;
   readonly from: { readonly x: number; readonly y: number } | null;
+  readonly requestedTarget: { readonly x: number; readonly y: number } | null;
+  readonly committedDestination: { readonly x: number; readonly y: number } | null;
+  readonly effectAnchor: { readonly x: number; readonly y: number } | null;
   readonly rewardCount: number;
 }
 
@@ -58,6 +61,12 @@ export function projectEffectCue(input: PublicEffectInput): EffectCue {
   else if (input.kind === 'failure' && sameAttempt && before.phase === 'pending-mine-encounter' &&
     after.phase === 'failed') kind = 'failure';
   else if (['detection', 'airplane', 'revive'].includes(input.kind) && sameAttempt) kind = 'item';
+  const destination = after?.position.kind === 'waiting' ? null : after?.position ?? null;
+  const committedDestination = destination === null ? null : Object.freeze({ x: destination.x, y: destination.y });
+  const requestedTarget = input.target === null ? null : Object.freeze({ ...input.target });
+  const effectAnchor = kind === 'move' || kind === 'lucky' || kind === 'revive' || kind === 'victory'
+    ? committedDestination : coordinate;
   return Object.freeze({ operationId: input.operationId, kind, coordinate, from,
+    requestedTarget, committedDestination, effectAnchor,
     rewardCount: input.rewardReceipt.status === 'proven' ? input.rewardReceipt.entries.length : 0 });
 }

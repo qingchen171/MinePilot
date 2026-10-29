@@ -1,9 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 import { boardBrowserSave } from '../helpers/s5-06-browser-save';
 
-const viewports = [{ width: 1280, height: 720 }, { width: 1024, height: 768 }] as const;
+const viewports = [{ width: 1280, height: 720 }, { width: 1024, height: 768 },
+  { width: 1366, height: 768 }, { width: 1920, height: 1080 }] as const;
 
 async function checkPage(page: Page, name: string, board = false) {
+  // The frozen remediation moves help/history into native on-demand drawers.
+  // Open them so the same clipping/obstruction assertions also test their controls.
+  for (const summary of await page.locator('#game-controls details > summary').all()) {
+    if (await summary.locator('..').getAttribute('open') === null) await summary.click();
+  }
   const failures = await page.evaluate(() => {
     const issues: string[] = [];
     if (document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)
@@ -85,9 +91,11 @@ async function checkPhaserAlignment(page: Page) {
     await expect(page.locator(`[data-cell-index="${index}"]`)).toHaveAttribute('data-appearance', 'flagged');
   }
   await expect.poll(async () => {
-    const screenshot = await page.locator('#game-stage canvas').screenshot();
-    return page.evaluate(async ({ bytes, targets }) => {
-      const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
+    // CSS-resolution capture still samples the actual DPR2/zoomed composition.
+    // Avoid serializing millions of individual byte numbers across the driver boundary.
+    const screenshot = await page.locator('#game-stage canvas').screenshot({ scale: 'css' });
+    return page.evaluate(async ({ encoded, targets }) => {
+      const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${encoded}`)).blob());
       const scratch = document.createElement('canvas'); scratch.width = bitmap.width; scratch.height = bitmap.height;
       const context = scratch.getContext('2d');
       if (context === null) throw new Error('screenshot decoder');
@@ -95,13 +103,14 @@ async function checkPhaserAlignment(page: Page) {
       const canvas = document.querySelector('#game-stage canvas')!.getBoundingClientRect();
       return targets.map((index) => {
         const rect = document.querySelector(`[data-cell-index="${index}"]`)!.getBoundingClientRect();
-        const x = Math.floor((rect.left + rect.width * .55 - canvas.left) * scratch.width / canvas.width);
-        const y = Math.floor((rect.top + rect.height * .35 - canvas.top) * scratch.height / canvas.height);
+        // doc22 §3 moves public markers to the protected upper-right box.
+        const x = Math.floor((rect.left + rect.width * .82 - canvas.left) * scratch.width / canvas.width);
+        const y = Math.floor((rect.top + rect.height * .16 - canvas.top) * scratch.height / canvas.height);
         const pixel = context.getImageData(x, y, 1, 1).data;
         return pixel[0]! > pixel[1]! + 50 && pixel[0]! > pixel[2]! + 50;
       });
-    }, { bytes: Array.from(screenshot), targets: indices });
-  }, { message: 'Phaser flag artwork aligns with corner, edge and center DOM hit cells' })
+    }, { encoded: screenshot.toString('base64'), targets: indices });
+  }, { timeout: 15_000, message: 'Phaser flag artwork aligns with corner, edge and center DOM hit cells' })
     .toEqual(indices.map(() => true));
 }
 
@@ -113,6 +122,16 @@ async function fixture(page: Page, variant: 'pending' | 'failed' | 'won') {
   await page.goto('/');
   await page.getByRole('button', { name: 'Continue' }).click();
 }
+
+test('Gate B DPR 2, CSS zoom and scroll retain unobscured controls and pixel-proven flag alignment', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 2 });
+  const page = await context.newPage(); await page.goto('/');
+  await page.locator('[data-action="route-levels"]').first().click();
+  await page.locator('[data-level-id="level-001"]').click();
+  await page.evaluate(() => { document.body.style.zoom = '125%'; window.dispatchEvent(new Event('resize')); });
+  await checkPage(page, 'zoomed Game', true); await checkPhaserAlignment(page);
+  expect(await page.evaluate(() => devicePixelRatio)).toBe(2); await context.close();
+});
 
 for (const viewport of viewports) {
   test(`G8 ${viewport.width}x${viewport.height}: Home, Levels, Shop, Settings, Feedback and active Game`, async ({ page }) => {

@@ -4,6 +4,8 @@ export const PRESENTATION_TEMPLATES = Object.freeze({
   'board.position': 'Character at row {row}, column {column}.',
   'board.mine-position': 'Character standing on a revealed mine at row {row}, column {column}.',
   'board.current-number': 'Nearby mines: {count}.',
+  'board.current-announcement': 'Character at row {row}, column {column}. Nearby mines: {count}.',
+  'board.zero-announcement': 'Character at row {row}, column {column}. No nearby mines here.',
   'board.cell': 'Row {row}, column {column}: {appearance}.',
   'board.cell-occupied': 'Row {row}, column {column}: {appearance}. Character here.',
   'shop.balance-sentence': 'Coins: {coins}.',

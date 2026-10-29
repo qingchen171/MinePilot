@@ -36,6 +36,7 @@ test('actual Game: tutorial ack is explicit, Airplane uses selected DOM target, 
   await expect(page.locator('[data-game-action="airplane"]')).toBeDisabled();
   await expect(page.locator('.game-detail')).toContainText('Uses remaining: 0');
   const ack = page.locator('[data-game-action="acknowledge-tutorial"]');
+  await page.locator('.game-tutorial-drawer > summary').click();
   await expect(ack).toBeVisible();
   const beforeAck = await revision(page);
   await ack.click();
@@ -311,6 +312,7 @@ test('a different Game control cannot hide the exact Retry after proven pre-comm
   await page.locator('[data-game-action="detection"]').click();
   expect(await revision(page)).toBe(before);
   await expect(page.locator('[data-game-action="retry-retained"]')).toBeVisible();
+  await page.locator('.game-tutorial-drawer > summary').click();
   await page.locator('[data-game-action="acknowledge-tutorial"]').click();
   expect(await revision(page)).toBe(before);
   await expect(page.locator('[data-game-action="retry-retained"]')).toBeVisible();

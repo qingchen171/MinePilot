@@ -4,7 +4,7 @@ import { SHOP_PRICES } from './config/shop-prices';
 import { validateShopCatalog } from './core/shop';
 import { createPresentationRoot } from './presentation-root';
 import { BoardScene } from './scenes/board-scene';
-import { boardLayout } from './ui/board-layout';
+import { decorativeBoardLayout, desktopBoardFrame } from './ui/desktop-board-layout';
 import { createEffectEpoch } from './ui/effect-epoch';
 import { createPageAudio, createBrowserSoundFactory } from './audio/page-audio';
 import { createBoardPresentation } from './ui/board-presentation';
@@ -204,7 +204,19 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
   const drawBoard = (current = presentationRoot.read()) => {
     const route = presentationRoot.navigation.route();
     const attempt = current.status === 'recovery' || route !== 'game' ? null : current.view.attempt;
-    const layout = attempt === null ? null : boardLayout(gameStage.clientWidth, gameStage.clientHeight,
+    const frame = desktopBoardFrame(gamePanel.parentElement?.clientWidth ?? document.documentElement.clientWidth);
+    document.documentElement.style.setProperty('--board-center', `${frame.left+frame.side/2}px`);
+    gameStage.style.width = `${frame.side + 2*frame.lateral}px`;
+    gameStage.style.height = `${frame.side + frame.gutter}px`;
+    gameStage.style.left = `${frame.left-frame.lateral}px`;
+    gameStage.style.top = `${frame.top}px`;
+    gameControls.style.left = `${frame.railLeft}px`;
+    gameControls.style.top = `${frame.railTop}px`;
+    gameControls.style.width = `${frame.railWidth}px`;
+    gameControls.style.maxHeight = `${frame.railHeight}px`;
+    gamePanel.style.minHeight = `${Math.max(frame.top + frame.gutter + frame.side,
+      frame.railTop+frame.railHeight)+20}px`;
+    const layout = attempt === null ? null : decorativeBoardLayout(frame.side,
       attempt.board.width, attempt.board.height);
     if (layout !== null) phaserGame?.scale.resize(layout.width, layout.height);
     board.render(attempt, current.status === 'recovery' ? { kind: 'hidden', value: null } :
@@ -215,6 +227,7 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
     committedSnapshot: ReturnType<typeof presentationRoot.read> | null = null) => {
     const current = committedSnapshot ?? presentationRoot.read();
     const route = presentationRoot.navigation.route() as PublicPage;
+    document.documentElement.dataset.page = route;
     if (lastRoute !== null && route !== lastRoute) {
       invalidateEffects();
       if (message === null && status) status.textContent = presentationCopy('game.ready');
@@ -350,7 +363,7 @@ phaserGame = new Phaser.Game({
   type: Phaser.AUTO,
   width: 640,
   height: 360,
-  backgroundColor: '#dff3ff',
+  transparent: true,
   parent: 'game-stage',
   scene: boardScene,
   callbacks: {

@@ -70,6 +70,7 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
   let restartConfirmation = false;
   let benbenDeferred = false;
   let helpOpen = false;
+  let tutorialOpen = false;
   let lastMilestone: GameMilestone | null = null;
   let lastRender: { view: PresentationViewModel | null; receipt: Receipt | null;
     retainedRetry: boolean; reloadRequired: boolean; eventMilestone: GameMilestone | null;
@@ -141,23 +142,31 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
     host.replaceChildren();
     const attempt = view?.attempt;
     if (!attempt) { pendingKey = null; restartConfirmation = false; return; }
+    const decisions = document.createElement('div'); decisions.className = 'game-decisions'; host.append(decisions);
     const append = (key: PresentationCopyKey, action: Action, enabled = true, milestone?: string) =>
-      host.append(button(key, action, enabled && (!reloadRequired || action === 'reload') &&
+      decisions.append(button(key, action, enabled && (!reloadRequired || action === 'reload') &&
         (!authorityDirty || action === 'reload' || action === 'retry-retained'), milestone));
     host.append(node('h3', 'game.items'));
+    const cards = document.createElement('div'); cards.className = 'game-item-cards'; host.append(cards);
     for (const item of ['detection', 'airplane', 'revive'] as const) {
       const offer = attempt.items[item];
-      if (item === 'revive' && attempt.phase !== 'pending-mine-encounter') continue;
-      if (item !== 'revive' && attempt.phase !== 'active') continue;
+      const card = document.createElement('div'); card.className = `game-item-card item-${item}`;
       const label = node('p', `shop.item.${item}`);
       label.textContent = semanticCopy('game.item-status', { item, resource: offer.resource,
         uses: offer.usesRemaining });
-      host.append(label);
-      append(`game.item.${item}`, item, offer.offered && (item !== 'airplane' || actions.airplaneTargetAvailable()));
+      const use = button(`game.item.${item}`, item, offer.offered && !reloadRequired && !authorityDirty &&
+        (item !== 'airplane' || actions.airplaneTargetAvailable()));
+      card.append(label);
+      if (item !== 'revive' && attempt.phase === 'active') card.append(use);
+      cards.append(card);
     }
-    if (attempt.items.automaticLuckyAvailable) host.append(node('p', 'game.lucky.automatic'));
+    const lucky = document.createElement('div'); lucky.className = 'game-item-card item-lucky';
+    lucky.append(node('p', 'shop.item.lucky'));
+    lucky.append(node('p', attempt.items.automaticLuckyAvailable ? 'game.lucky.automatic' : 'game.lucky.unavailable'));
+    cards.append(lucky);
     if (attempt.phase === 'pending-mine-encounter') {
-      host.append(node('p', 'game.pending'));
+      decisions.append(node('p', 'game.pending'));
+      append('game.item.revive', 'revive', attempt.items.revive.offered);
       append('game.failure', 'failure', attempt.terminal.failure);
     }
     if (attempt.benben.entitlement === 'available' && !benbenDeferred) {
@@ -190,8 +199,11 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
       for (const entry of receipt.entries) host.append(rewardLine(entry));
     }
     if (attempt.claimedRewards.length > 0) {
-      host.append(node('h4', 'game.rewards.claimed'));
-      for (const entry of attempt.claimedRewards) host.append(rewardLine(entry));
+      const history = document.createElement('details');
+      const summary = document.createElement('summary'); summary.append(node('h4', 'game.rewards.claimed'));
+      history.append(summary);
+      for (const entry of attempt.claimedRewards) history.append(rewardLine(entry));
+      host.append(history);
     }
     const acknowledged = new Set(view!.tutorialProgress.acknowledgedMilestoneIds);
     const contexts = gameTutorialContexts(view!, eventMilestone);
@@ -201,12 +213,16 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
     const retainedPrompt = lastMilestone !== null && contexts.help.includes(lastMilestone) &&
       !acknowledged.has(lastMilestone) ? lastMilestone : null;
     if (unacknowledged.length || retainedPrompt !== null) {
-      host.append(node('h4', 'game.tutorial.title'));
+      const tutorial = document.createElement('details');
+      tutorial.className = 'game-tutorial-drawer'; tutorial.open = tutorialOpen;
+      tutorial.addEventListener('toggle', () => { if (host.contains(tutorial)) tutorialOpen = tutorial.open; });
+      tutorial.append(node('summary', 'game.tutorial.title')); host.append(tutorial);
       const chosen = eventMilestone && unacknowledged.includes(eventMilestone) ? eventMilestone :
         retainedPrompt ?? unacknowledged[0]!;
       lastMilestone = chosen;
-      host.append(node('p', `game.tutorial.${chosen}`));
-      if (view!.tutorialAcknowledgmentAllowed) append('game.tutorial.acknowledge', 'acknowledge-tutorial', true, chosen);
+      tutorial.append(node('p', `game.tutorial.${chosen}`));
+      if (view!.tutorialAcknowledgmentAllowed) tutorial.append(button('game.tutorial.acknowledge',
+        'acknowledge-tutorial', !reloadRequired && !authorityDirty, chosen));
     }
     append('game.tutorial.title', 'toggle-help');
     if (helpOpen) for (const id of contexts.help) {
@@ -235,6 +251,6 @@ export function createGamePresentation(host: HTMLElement, actions: GamePresentat
   }
   return Object.freeze({ render, clear: () => {
     host.replaceChildren(); pendingKey = null; keyboardCompanion = null;
-    restartConfirmation = false; benbenDeferred = false; helpOpen = false; lastMilestone = null; lastRender = null;
+    restartConfirmation = false; benbenDeferred = false; helpOpen = false; tutorialOpen = false; lastMilestone = null; lastRender = null;
   }, afterCommit: () => { restartConfirmation = false; benbenDeferred = false; } });
 }
