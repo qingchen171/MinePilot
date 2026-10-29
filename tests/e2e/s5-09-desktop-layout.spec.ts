@@ -91,9 +91,11 @@ async function checkPhaserAlignment(page: Page) {
     await expect(page.locator(`[data-cell-index="${index}"]`)).toHaveAttribute('data-appearance', 'flagged');
   }
   await expect.poll(async () => {
-    const screenshot = await page.locator('#game-stage canvas').screenshot();
-    return page.evaluate(async ({ bytes, targets }) => {
-      const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
+    // CSS-resolution capture still samples the actual DPR2/zoomed composition.
+    // Avoid serializing millions of individual byte numbers across the driver boundary.
+    const screenshot = await page.locator('#game-stage canvas').screenshot({ scale: 'css' });
+    return page.evaluate(async ({ encoded, targets }) => {
+      const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${encoded}`)).blob());
       const scratch = document.createElement('canvas'); scratch.width = bitmap.width; scratch.height = bitmap.height;
       const context = scratch.getContext('2d');
       if (context === null) throw new Error('screenshot decoder');
@@ -107,7 +109,7 @@ async function checkPhaserAlignment(page: Page) {
         const pixel = context.getImageData(x, y, 1, 1).data;
         return pixel[0]! > pixel[1]! + 50 && pixel[0]! > pixel[2]! + 50;
       });
-    }, { bytes: Array.from(screenshot), targets: indices });
+    }, { encoded: screenshot.toString('base64'), targets: indices });
   }, { timeout: 15_000, message: 'Phaser flag artwork aligns with corner, edge and center DOM hit cells' })
     .toEqual(indices.map(() => true));
 }
