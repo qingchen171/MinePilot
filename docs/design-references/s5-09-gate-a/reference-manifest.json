@@ -1,0 +1,85 @@
+{
+  "schema": "minepilot-gate-a-design-reference-v1",
+  "scope": "Public design archive only; not production-asset clearance or Gate B/Stage 5 acceptance",
+  "approval": {
+    "owner": "Elio",
+    "date": "2026-10-27",
+    "basis": "Explicit Task message: Home accepted; Levels accepted; latest Game accepted including ~32% explorer / ~38% numeral scale increase",
+    "visualGate": "PASS",
+    "gateB": "NOT STARTED",
+    "stage5FinalAcceptance": "NOT GRANTED"
+  },
+  "archivePermission": {
+    "date": "2026-10-27",
+    "owner": "Elio",
+    "confirmation": "拥有/已获授权，允许公开设计归档（不代表生产资产批准）",
+    "basis": "Direct answer to rights/public-archive question in the active task",
+    "productionClearance": false,
+    "independentThirdPartyTitleAudit": false
+  },
+  "acceptedReferences": [
+    {
+      "screen": "Home",
+      "archiveFile": "home-1366x768.png",
+      "originalDraft": "design-drafts/s5-09-gate-a-three-screens-8of10-r1/home-1366x768.png",
+      "width": 1366,
+      "height": 768,
+      "sha256": "CE5AC21729B557AE1961544EF31C310201C4155CE3B996ABA2ECD5B9C76707C0"
+    },
+    {
+      "screen": "Levels",
+      "archiveFile": "levels-1366x768.png",
+      "originalDraft": "design-drafts/s5-09-gate-a-three-screens-8of10-r1/levels-1366x768.png",
+      "width": 1366,
+      "height": 768,
+      "sha256": "CD132E91AFD4B8657A0162D697CC44A1EB0051BAD2813DCA4203C280CE7F1740"
+    },
+    {
+      "screen": "Final Game",
+      "archiveFile": "game-1366x768.png",
+      "originalDraft": "design-drafts/s5-09-gate-a-game-presence-r1/game-1366x768.png",
+      "width": 1366,
+      "height": 768,
+      "sha256": "393FD00202FA62871E2DEEBE882A8F3A081240AC59774939832BE2E9E4CECCD6"
+    }
+  ],
+  "provenance": {
+    "provider": "OpenAI built-in imagegen, followed by documented static compositing/export",
+    "modelVersion": "Not disclosed by the tool; not inferred",
+    "provenanceRecord": "README.md",
+    "referenceOnly": true,
+    "productionImportsAllowed": false,
+    "sources": [
+      {
+        "file": "accepted-8of10-reference.png",
+        "sha256": "030FB4FBDD710C24AFE5516473870831C65F4889E3AA171827BB410FCFD7D67A",
+        "role": "Elio-supplied sole accepted nearshot direction"
+      },
+      {
+        "file": "home-source.png",
+        "generatedOriginal": "exec-5b6ca46f-56b5-445f-a3cd-deabf2b14028.png",
+        "sha256": "EA7A7F6887AB9685E078217DC00EEA26A7BFCFC9A55FFB8CD5902826D6AA6267"
+      },
+      {
+        "file": "levels-source.png",
+        "generatedOriginal": "exec-010164cb-d355-42b4-abc4-748618aeff16.png",
+        "sha256": "5219FB4E500DAA2026BD2D2A4E48780E8646E3D61042340FB9EB706B082642FA"
+      },
+      {
+        "file": "accepted-group-extraction-working.png",
+        "generatedOriginal": "exec-be6634a7-7a9e-4205-8be2-387ed7af03fa.png",
+        "sha256": "2133B5774CD6CD5D71DCD7C407CCE7C02C0DA2E4231F8A08269D4B43126E6407"
+      },
+      {
+        "file": "game-rail-backplate-source.png",
+        "generatedOriginal": "exec-aa0b857b-cc75-4ca7-88c1-96bf07c8c9b4.png",
+        "sha256": "B0315BFA120EC692B8C14050896A1F2D54F85DB3DD1924640DD9723FB10C09D3"
+      },
+      {
+        "file": "design-drafts/s5-09-gate-a-game-presence-r1/compose-presence.ps1",
+        "sha256": "5738DB89DEA5ADF7F305622F049D036D5230003921DB235E5A0A62A0B6CFAA64",
+        "role": "Final measured assembly; body82 and numeral22 on1672x941 source, export1366x768"
+      }
+    ]
+  }
+}
