@@ -101,9 +101,10 @@ html[data-page="game"] .board-hit-cell { border: 0; border-radius: 0; padding: 0
 html[data-page="game"] .board-hit-cell[data-selected="true"] { box-shadow: inset 0 0 0 3px #1a4a92; }
 html[data-page="game"] .board-hit-cell:focus-visible { outline: 3px solid #152b83; outline-offset: -4px; }
 .board-number-badge { position: absolute; z-index: 3; pointer-events: none; display: flex;
-  align-items: center; justify-content: center; box-sizing: border-box; border-radius: 9px;
-  color: #fff7cc; background: #09579d; border: 1px solid #ffe3a1; font-weight: 900;
-  line-height: 1; text-shadow: 0 1px 1px #072d58; box-shadow: 0 2px 1px #56341b66; }
+  align-items: flex-end; justify-content: center; box-sizing: border-box; overflow: hidden;
+  color: #125bb4; background: transparent; font-family: "Arial Black", Arial, sans-serif; font-weight: 900;
+  -webkit-text-stroke: 1.5px #fff0ba; paint-order: stroke fill;
+  line-height: 1; text-shadow: 0 1px 0 #db9a2f, 0 2px 0 #75501d; }
 .board-number-badge[hidden] { display: none; }
 .sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
