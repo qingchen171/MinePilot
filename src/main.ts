@@ -25,11 +25,13 @@ try { browserStorage = window.localStorage; } catch { /* The adapter reports una
 const checkedShop = validateShopCatalog(SHOP_PRICES);
 const shopCatalog = checkedShop.status === 'valid' ? checkedShop.catalog : null;
 /** One browser authority; failed secure identity prevents boot without touching saved data. */
+let disposeProductionSession: (() => void) | null = null;
 export const presentationRoot = (() => {
   try {
     const productionSession = createProductionStage4Session(
       createLocalStorageAdapter(browserStorage), createWriterIdentity(), createSystemClock(), shopCatalog,
     );
+    disposeProductionSession = () => { productionSession.dispose(); };
     return createPresentationRoot(productionSession, createSecureTechnicalFacts({
       newGameplayRunId: () => globalThis.crypto.randomUUID(),
       newGenerationUint32: () => globalThis.crypto.getRandomValues(new Uint32Array(1))[0],
@@ -87,6 +89,7 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
   let visibleReceipt: RewardReceiptProof | null = null;
   let visibleMilestone: GameMilestone | null = null;
   let gameReloadRequired = false;
+  let gameReloadCopy: PresentationCopyKey | null = null;
   let lastRoute: PublicPage | null = null;
   const invalidateEffects = () => { effectEpoch.invalidate(); boardScene.cancelEffect(); };
   const announce = (key: PresentationCopyKey) => { if (status) status.textContent = presentationCopy(key); };
@@ -191,6 +194,7 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
     gameReloadRequired = outcome.status === 'rejected' ? outcome.policy.reloadRequired && !outcome.policy.retainEnvelope :
       outcome.status === 'unavailable' && outcome.reason === 'reload-required';
     if (gameReloadRequired) { board.invalidateAuthority(); gamePresentation.clear(); }
+    gameReloadCopy = gameReloadRequired ? outcome.copyKey : null;
     visibleReceipt = outcome.status === 'committed' ? outcome.rewardReceipt ?? null : null;
     visibleMilestone = outcome.status === 'committed' && outcome.snapshot.status !== 'recovery' &&
       outcome.snapshot.view.attempt?.levelId === 'level-004' &&
@@ -226,6 +230,9 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
   const draw = (message: PresentationCopyKey | null = null,
     committedSnapshot: ReturnType<typeof presentationRoot.read> | null = null) => {
     const current = committedSnapshot ?? presentationRoot.read();
+    gameReloadRequired = presentationRoot.requiresReload();
+    if (!gameReloadRequired) gameReloadCopy = null;
+    message = gameReloadCopy ?? message;
     const route = presentationRoot.navigation.route() as PublicPage;
     document.documentElement.dataset.page = route;
     if (lastRoute !== null && route !== lastRoute) {
@@ -254,7 +261,7 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
           audio.setAuthorityClean(snapshot.status !== 'recovery'); audio.setRecovery(snapshot.status === 'recovery');
           if (snapshot.status !== 'recovery') audio.adoptSettings(snapshot.view.settings);
           draw(); },
-      }, message);
+      }, message, gameReloadRequired);
     if (route === 'shop' && current.status !== 'recovery') {
       const tutorialBlocked = presentationRoot.shopTutorialRetryAvailable() ||
         presentationRoot.shopTutorialNeedsReload();
@@ -314,7 +321,7 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
       gamePresentation.render(current.view, visibleReceipt, presentationRoot.gameRetryAvailable(),
         gameReloadRequired, visibleMilestone, presentationRoot.authorityIsDirty());
       visibleMilestone = null;
-    } else { gamePresentation.clear(); visibleReceipt = null; visibleMilestone = null; gameReloadRequired = false; }
+    } else { gamePresentation.clear(); visibleReceipt = null; visibleMilestone = null; }
   };
   draw();
   const first = presentationRoot.read();
@@ -341,6 +348,7 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
   // every mutation still goes through the session's guarded authority checks.
   // Do not reload here: that would cancel unrelated retained Retry envelopes.
   window.addEventListener('pagehide', () => {
+    disposeProductionSession?.();
     invalidateEffects(); effectEpoch.dispose(); audio.dispose();
     resizeObserver.disconnect(); pageListeners.abort();
     // A BFCache restore must rebuild the disposed page rather than reuse its old session.

@@ -223,6 +223,7 @@ export function createPresentationAdapter(session: PresentationSessionPort, tech
         facts: sanitizeStage4Runtime(load.runtime, shopCatalog, catalog) }
         : { status: 'recovery' as const, reason: load.status };
     },
+    requiresReload: () => reloadRequired,
     retainedKind(): SessionIntent['kind'] | null { return unresolved?.intent.kind ?? null; },
     retainedToken(): OperationEnvelope | null { return unresolved; },
     cancelRetainedToken(token: OperationEnvelope): boolean {

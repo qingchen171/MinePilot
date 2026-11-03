@@ -79,6 +79,7 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
   return Object.freeze({
     markAuthorityDirty: () => { authorityDirty = true; },
     authorityIsDirty: () => authorityDirty,
+    requiresReload: () => authorityDirty || adapter.requiresReload(),
     takeEffect: (outcome: { readonly status: string; readonly effectHandoff?: CommittedEffectHandoff }) => {
       const handoff = outcome.status === 'committed' ? outcome.effectHandoff : undefined;
       if (handoff === undefined || !adapter.consumeEffectHandoff(handoff)) return null;
@@ -93,7 +94,7 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
         return pending === null ? null : Object.freeze({ target: pending.target, phase: pending.phase });
       },
       navigate: (next: Parameters<typeof navigation.navigate>[0]) => {
-        if (authorityDirty && (next === 'shop' || next === 'game')) {
+        if ((authorityDirty || adapter.requiresReload()) && (next === 'shop' || next === 'game')) {
           const current = adapter.read();
           return current.status === 'recovery'
             ? { status: 'recovery' as const, reason: current.reason }
@@ -107,9 +108,9 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
         const entries = navigation.levelList();
         return entries === null ? null : projectLevelListView(entries);
       },
-      selectLevel: (target: string) => authorityDirty
+      selectLevel: (target: string) => (authorityDirty || adapter.requiresReload())
         ? { status: 'blocked' as const, reason: 'authority-changed' } : navigation.selectLevel(target),
-      confirmReplacement: () => authorityDirty
+      confirmReplacement: () => (authorityDirty || adapter.requiresReload())
         ? { status: 'blocked' as const, reason: 'authority-changed' } : navigation.confirmReplacement(),
       cancelSelection: navigation.cancelSelection,
       retryReplacement: () => {
@@ -117,7 +118,7 @@ export function createPresentationRoot(session: PresentationSessionPort, technic
         if (result.status === 'committed') authorityDirty = false;
         return result;
       },
-      leaveAttemptForShop: () => authorityDirty
+      leaveAttemptForShop: () => (authorityDirty || adapter.requiresReload())
         ? { status: 'blocked' as const, reason: 'authority-changed' } : navigation.leaveAttemptForShop(),
     }),
     read: () => project(adapter.read()),

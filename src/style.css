@@ -36,7 +36,7 @@ main {
 .board-hit-cell { position: absolute; margin: 0; padding: 0; border: 0; background: transparent;
   color: transparent; cursor: pointer; }
 .board-hit-cell:focus-visible { outline: 3px solid #102f87; outline-offset: -3px; }
-.board-hit-cell[data-selected="true"] { box-shadow: inset 0 0 0 2px #205dc5; }
+.board-hit-cell[data-selected="true"] { box-shadow: inset 0 0 10px 2px #fff1ad99; }
 .board-hit-cell:disabled { cursor: default; }
 #game-controls { display: grid; gap: .3rem; padding: .4rem 0; }
 #game-controls p { margin: 0; }
@@ -98,7 +98,7 @@ html[data-page="game"] #page button { position: absolute; right: 32px; top: 78px
 #game-controls summary { cursor: pointer; font-weight: 700; color: #67431e; }
 html[data-page="game"] .board-hit-cell { border: 0; border-radius: 0; padding: 0; min-height: 0;
   background: transparent; color: transparent; box-shadow: none; opacity: 1; }
-html[data-page="game"] .board-hit-cell[data-selected="true"] { box-shadow: inset 0 0 0 3px #1a4a92; }
+html[data-page="game"] .board-hit-cell[data-selected="true"] { box-shadow: inset 0 0 10px 2px #fff1ad99; }
 html[data-page="game"] .board-hit-cell:focus-visible { outline: 3px solid #152b83; outline-offset: -4px; }
 .board-number-badge { position: absolute; z-index: 3; pointer-events: none; display: flex;
   align-items: flex-end; justify-content: center; box-sizing: border-box; overflow: hidden;

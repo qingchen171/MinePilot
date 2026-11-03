@@ -11,6 +11,7 @@ export const PRESENTATION_COPY = Object.freeze({
   'status.effect.move': 'Character move saved.',
   'error.domain': 'That action is not available right now.',
   'error.stale': 'Your game changed elsewhere. Reload before choosing again.',
+  'error.writer-busy': 'Another game session currently owns saving. Close it or wait briefly, then reload before choosing again.',
   'error.retry': 'The action was not saved. Reload and try again if your game is unchanged.',
   'error.technical': 'That action could not be completed.',
   'error.uncertain': 'The save result is uncertain. Reload before making another choice.',
