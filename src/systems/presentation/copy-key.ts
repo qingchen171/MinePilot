@@ -21,6 +21,7 @@ const PREFERENCE_REASON_KEYS: Readonly<Record<string, PresentationCopyKey>> = Ob
 });
 
 export function copyKeyForResult(category: ResultCategory, reason?: string): PresentationCopyKey {
+  if (reason === 'owned-by-another-session') return 'error.writer-busy';
   if (reason !== undefined && Object.hasOwn(SHOP_REASON_KEYS, reason)) return SHOP_REASON_KEYS[reason]!;
   if (reason !== undefined && Object.hasOwn(PREFERENCE_REASON_KEYS, reason)) return PREFERENCE_REASON_KEYS[reason]!;
   return RESULT_KEYS[category];

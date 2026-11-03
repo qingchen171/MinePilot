@@ -136,11 +136,9 @@ test('temporary Detection is consumed before Account inventory and expires on co
   await page.reload();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.locator('.game-detail')).toContainText('Temporary item used');
-  await page.evaluate(() => {
-    const key = 'minepilot:persistence:writer-lease';
-    const lease = JSON.parse(localStorage.getItem(key) ?? 'null') as { expiresAtMs: number };
-    localStorage.setItem(key, JSON.stringify({ ...lease, expiresAtMs: Date.now() - 1 }));
-  });
+  // Orderly F5 disposed the former writer. Do not fabricate an expired record
+  // from null: the real new session must acquire its own lease on Restart.
+  expect(await page.evaluate(() => localStorage.getItem('minepilot:persistence:writer-lease'))).toBeNull();
   await page.locator('[data-game-action="confirm-restart"]').click();
   await page.locator('[data-game-action="restart"]').click();
   expect(await revision(page)).toBe(before + 2);

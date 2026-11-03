@@ -43,5 +43,7 @@ describe('S5-02 exact production result classification', () => {
     expect(copyKeyForResult('domain', 'invalid-shop-item')).toBe('shop.invalid-item');
     expect(copyKeyForResult('technical', 'inventory-overflow')).toBe('shop.inventory-unavailable');
     expect(copyKeyForResult('unknown', 'insufficient-coins-future')).toBe('error.unknown');
+    expect(copyKeyForResult('stale', 'owned-by-another-session')).toBe('error.writer-busy');
+    expect(copyKeyForResult('stale', 'owned-by-another-session-future')).toBe('error.stale');
   });
 });

@@ -73,6 +73,8 @@ export class BoardScene extends Phaser.Scene {
         step += 1; this.showPose(step <= 3 ? step : 0);
       } });
     }
+    // Move feedback is the registered committed pose, not a directional ghost/ring.
+    if (cue.kind === 'move') return;
     const { originX, originY, cellSize, columns, rows } = this.layout;
     const coordinate = cue.effectAnchor;
     const x = coordinate ? originX + (coordinate.x + .5) * cellSize : originX + columns * cellSize / 2;
@@ -83,11 +85,6 @@ export class BoardScene extends Phaser.Scene {
       pending: 0xd47064, failure: 0x9a6670, victory: 0xf4bd45, item: 0x6d70d4, saved: 0x698aa0,
     };
     this.decoration.lineStyle(Math.max(2, cellSize * .08), colors[cue.kind], .9);
-    if (cue.kind === 'move' && cue.from !== null && cue.committedDestination !== null) {
-      const fromX = originX + (cue.from.x + .5) * cellSize;
-      const fromY = originY + (cue.from.y + .5) * cellSize;
-      this.decoration.lineBetween(fromX, fromY, x, y);
-    }
     this.decoration.strokeCircle(x, y, Math.max(8, cellSize * .3));
     this.decoration.setAlpha(1);
     this.decorationTween = this.tweens.add({ targets: this.decoration, alpha: 0, duration: 250,

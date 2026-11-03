@@ -8,7 +8,7 @@ import { executeStage4MutationV4 } from './production-stage4-mutation-v4';
 import { commitCandidateWithWriterLeaseV4 } from './guarded-persistence-v4';
 import { loadProductionPersistedSave } from './persistence-coordinator';
 import type { StringKeyValueStorage } from './key-value-storage';
-import { acquireWriterLease, type Clock, type WriterIdentity } from './writer-lease';
+import { acquireWriterLease, releaseWriterLease, type Clock, type WriterIdentity } from './writer-lease';
 
 /** The single production read surface: committed Stage 2 snapshot, then strict Stage 4 reconstruction. */
 export function loadProductionStage4Runtime(storage: StringKeyValueStorage) {
@@ -43,13 +43,22 @@ export function createProductionStage4Session(
   shopCatalog: ValidatedShopCatalog | null = null,
 ) {
   let authority = loadProductionStage4Runtime(storage);
+  let disposed = false;
   return {
+    /** End the old page's write capability before best-effort owner-checked release.
+     * No Save mutation or replay, including after an uncertain head write.
+     * Missing unload / failed release keeps the normal expiry fallback. */
+    dispose() {
+      disposed = true;
+      return releaseWriterLease(storage, identity, clock);
+    },
     read: () => authority,
     reload() {
       authority = loadProductionStage4Runtime(storage);
       return authority;
     },
     execute(intent: DormantMutationIntent): DormantMutationResult {
+      if (disposed) return { status: 'rejected', reason: 'invalid-request' };
       if (authority.status !== 'fresh' && authority.status !== 'loaded') {
         return { status: 'rejected', reason: authority.status };
       }

@@ -38,7 +38,7 @@ const ROUTES: readonly { readonly page: PublicPage; readonly key: PresentationCo
 export function renderNavigationPages(nav: HTMLElement, page: HTMLElement, route: PublicPage,
   view: PresentationViewModel | null, levels: readonly LevelListProjectionInput[] | null,
   confirmation: { readonly target: string; readonly phase: string } | null,
-  actions: NavigationPageActions, message: PresentationCopyKey | null = null): void {
+  actions: NavigationPageActions, message: PresentationCopyKey | null = null, reloadRequired = false): void {
   const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const previous = active?.dataset.action;
   const hadPageFocus = active !== null && (active.dataset.action !== undefined ||
@@ -61,6 +61,8 @@ export function renderNavigationPages(nav: HTMLElement, page: HTMLElement, route
     note.setAttribute('role', 'status');
     page.append(note);
   }
+  if (reloadRequired && route !== 'game' && route !== 'recovery')
+    page.append(button('action.reload', actions.reload, 'reload'));
   if (route === 'recovery') {
     page.append(el('p', 'recovery.note'));
     page.append(button('action.reload', actions.reload, 'reload'));
