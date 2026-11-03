@@ -22,13 +22,16 @@ for (const [width,height,minimum] of [[1366,768,64.9],[1280,720,60.4],[1024,768,
             .map(v => v <= .04045 ? v/12.92 : ((v+.055)/1.055)**2.4);
           return .2126*rgb[0]!+.7152*rgb[1]!+.0722*rgb[2]!;
         };
-        const a=luminance(style.color), b=luminance(style.backgroundColor);
+        // The glyph's gold outline is its local backing, not a rectangular panel.
+        const a=luminance(style.color), b=luminance(style.webkitTextStrokeColor);
         return { size:parseFloat(style.fontSize), line:parseFloat(style.lineHeight),
           contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05) };
       });
       expect(typography.size).toBeGreaterThanOrEqual(14);
       expect(typography.line).toBeGreaterThanOrEqual(16);
       expect(typography.contrast).toBeGreaterThanOrEqual(4.5);
+      await expect(badge).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(badge).toHaveCSS('-webkit-text-stroke-width', '1.5px');
       const c=(await cell.boundingBox())!, n=(await badge.boundingBox())!;
       expect(Math.abs(c.width-c.height)).toBeLessThan(.1); expect(c.width).toBeGreaterThanOrEqual(minimum-.02);
       expect(n.y).toBeGreaterThanOrEqual(104); expect(n.x).toBeGreaterThanOrEqual(c.x+.25*c.width-.1);

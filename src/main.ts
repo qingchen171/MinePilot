@@ -336,10 +336,10 @@ if (shopPanel !== null && navigationPanel !== null && pagePanel !== null &&
   window.addEventListener('storage', (event) => {
     if (event.key === null || event.key.startsWith('minepilot:persistence:')) dirty();
   }, { signal: pageListeners.signal });
-  let lostWindowFocus = false;
-  window.addEventListener('blur', () => { lostWindowFocus = true; }, { signal: pageListeners.signal });
-  window.addEventListener('focus', () => { if (lostWindowFocus) { lostWindowFocus = false; dirty(); } },
-    { signal: pageListeners.signal });
+  // Window focus is not a persistence notification (browser chrome and other
+  // applications also take focus). Storage signals still dirty the view, and
+  // every mutation still goes through the session's guarded authority checks.
+  // Do not reload here: that would cancel unrelated retained Retry envelopes.
   window.addEventListener('pagehide', () => {
     invalidateEffects(); effectEpoch.dispose(); audio.dispose();
     resizeObserver.disconnect(); pageListeners.abort();

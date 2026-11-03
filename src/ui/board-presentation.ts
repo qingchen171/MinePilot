@@ -188,7 +188,8 @@ export function createBoardPresentation(stage: HTMLElement, controls: HTMLElemen
       badge.style.top = `${rect.y - .65*layout.cellSize}px`;
       badge.style.width = `${.42*layout.cellSize}px`;
       badge.style.height = `${.38*layout.cellSize}px`;
-      badge.style.fontSize = `${Math.max(14,.32*layout.cellSize)}px`;
+      badge.style.fontSize = `${Math.max(14,.42*layout.cellSize)}px`;
+      badge.style.lineHeight = `${.38*layout.cellSize}px`;
     } else badge.textContent = '';
     for (const [index, cell] of cells.entries()) {
       const x = index % next.board.width; const y = Math.floor(index / next.board.width);
